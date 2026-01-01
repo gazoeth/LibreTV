@@ -20,6 +20,18 @@ const CUSTOMER_SITES = {
         api: 'https://360zy.com/api.php/provide/vod',
         name: '360资源',
     },
+    snzy: {
+        api: 'https://suoniapi.com/api.php/provide/vod',
+        name: '索尼资源',
+    },
+    dbzy: {
+        api: 'https://caiji.dbzy.tv/api.php/provide/vod',
+        name: '豆瓣资源',
+    },
+    lzzy: {
+        api: 'https://cj.lziapi.com/api.php/provide/vod',
+        name: '量子资源',
+    },
     wolong: {
         api: 'https://wolongzyw.com/api.php/provide/vod',
         name: '卧龙资源',
