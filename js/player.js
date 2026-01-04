@@ -252,26 +252,29 @@ function initializePageContent() {
     document.addEventListener('keydown', handleKeyboardShortcuts);
 
     // 添加页面离开事件监听，保存播放位置
-    window.addEventListener('beforeunload', saveCurrentProgress);
+    // 修改：传递 true 强制同步到历史记录
+    window.addEventListener('beforeunload', () => saveCurrentProgress(true));
 
     // 新增：页面隐藏（切后台/切标签）时也保存
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
-            saveCurrentProgress();
+            saveCurrentProgress(true);
         }
     });
 
     // 视频暂停时也保存
     const waitForVideo = setInterval(() => {
         if (art && art.video) {
-            art.video.addEventListener('pause', saveCurrentProgress);
+            // 修改：暂停时同步到历史记录
+            art.video.addEventListener('pause', () => saveCurrentProgress(true));
 
             // 新增：播放进度变化时节流保存
             let lastSave = 0;
             art.video.addEventListener('timeupdate', function() {
                 const now = Date.now();
                 if (now - lastSave > 5000) { // 每5秒最多保存一次
-                    saveCurrentProgress();
+                    // 修改：高频更新只保存当前进度，不同步到大历史记录表，防止卡顿
+                    saveCurrentProgress(false); 
                     lastSave = now;
                 }
             });
@@ -637,6 +640,22 @@ function initPlayer(videoUrl) {
     // 播放器加载完成后初始隐藏工具栏
     art.on('ready', () => {
         hideControls();
+        
+        // 修复：双击全屏事件处理移至 ready 事件中，避免重复绑定
+        // 绑定双击事件到视频容器
+        if (art.video) {
+            // 定义处理函数
+            const handleDblClick = () => {
+                art.fullscreen = !art.fullscreen;
+                // 如果是暂停状态则播放，避免干扰正常播放
+                if (art.paused) art.play(); 
+            };
+
+            // 先移除可能存在的旧监听器
+            art.video.removeEventListener('dblclick', handleDblClick);
+            // 重新绑定
+            art.video.addEventListener('dblclick', handleDblClick);
+        }
     });
 
     // 全屏 Web 模式处理
@@ -728,17 +747,8 @@ function initPlayer(videoUrl) {
             art.fullscreen = false;
         }
     });
-
-    // 添加双击全屏支持
-    art.on('video:playing', () => {
-        // 绑定双击事件到视频容器
-        if (art.video) {
-            art.video.addEventListener('dblclick', () => {
-                art.fullscreen = !art.fullscreen;
-                art.play();
-            });
-        }
-    });
+    
+    // 原来的 video:playing 事件中的重复 dblclick 监听器代码已移除
 
     // 10秒后如果仍在加载，但不立即显示错误
     setTimeout(function () {
@@ -782,24 +792,18 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     }
 }
 
-// 过滤可疑的广告内容
+// 过滤可疑的广告内容 (优化版)
 function filterAdsFromM3U8(m3u8Content, strictMode = false) {
     if (!m3u8Content) return '';
 
-    // 按行分割M3U8内容
-    const lines = m3u8Content.split('\n');
-    const filteredLines = [];
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // 只过滤#EXT-X-DISCONTINUITY标识
-        if (!line.includes('#EXT-X-DISCONTINUITY')) {
-            filteredLines.push(line);
-        }
+    // 快速检查：如果内容中没有 DISCONTINUITY 标记，直接返回原内容，避免无用处理
+    if (m3u8Content.indexOf('#EXT-X-DISCONTINUITY') === -1) {
+        return m3u8Content;
     }
 
-    return filteredLines.join('\n');
+    // 使用正则表达式一次性移除所有 #EXT-X-DISCONTINUITY 标签及其后的换行
+    // 这比 split/filter/join 的方式快很多，能显著减少卡顿
+    return m3u8Content.replace(/#EXT-X-DISCONTINUITY\r?\n/g, '');
 }
 
 
@@ -893,7 +897,7 @@ function playEpisode(index) {
 
     // 保存当前播放进度（如果正在播放）
     if (art && art.video && !art.video.paused && !videoHasEnded) {
-        saveCurrentProgress();
+        saveCurrentProgress(true); // 切换集数时保存并同步到历史
     }
 
     // 清除进度保存计时器
@@ -1222,17 +1226,18 @@ function startProgressSaveInterval() {
     }
 
     // 每30秒保存一次播放进度
-    progressSaveInterval = setInterval(saveCurrentProgress, 30000);
+    // 这里允许同步到历史记录，因为30秒频率较低
+    progressSaveInterval = setInterval(() => saveCurrentProgress(true), 30000);
 }
 
-// 保存当前播放进度
-function saveCurrentProgress() {
+// 保存当前播放进度 (增加参数控制是否同步到历史记录，默认同步)
+function saveCurrentProgress(syncToHistory = true) {
     if (!art || !art.video) return;
     const currentTime = art.video.currentTime;
     const duration = art.video.duration;
     if (!duration || currentTime < 1) return;
 
-    // 在localStorage中保存进度
+    // 1. 始终保存轻量级的单视频进度 (用于恢复播放)
     const progressKey = `videoProgress_${getVideoId()}`;
     const progressData = {
         position: currentTime,
@@ -1241,30 +1246,34 @@ function saveCurrentProgress() {
     };
     try {
         localStorage.setItem(progressKey, JSON.stringify(progressData));
-        // --- 新增：同步更新 viewingHistory 中的进度 ---
-        try {
-            const historyRaw = localStorage.getItem('viewingHistory');
-            if (historyRaw) {
-                const history = JSON.parse(historyRaw);
-                // 用 title + 集数索引唯一标识
-                const idx = history.findIndex(item =>
-                    item.title === currentVideoTitle &&
-                    (item.episodeIndex === undefined || item.episodeIndex === currentEpisodeIndex)
-                );
-                if (idx !== -1) {
-                    // 只在进度有明显变化时才更新，减少写入
-                    if (
-                        Math.abs((history[idx].playbackPosition || 0) - currentTime) > 2 ||
-                        Math.abs((history[idx].duration || 0) - duration) > 2
-                    ) {
-                        history[idx].playbackPosition = currentTime;
-                        history[idx].duration = duration;
-                        history[idx].timestamp = Date.now();
-                        localStorage.setItem('viewingHistory', JSON.stringify(history));
+        
+        // 2. 仅在 syncToHistory 为 true 时才更新庞大的历史记录列表
+        // 避免在 timeupdate 事件中频繁触发高昂的 JSON 序列化和 I/O 开销
+        if (syncToHistory) {
+            try {
+                const historyRaw = localStorage.getItem('viewingHistory');
+                if (historyRaw) {
+                    const history = JSON.parse(historyRaw);
+                    // 用 title + 集数索引唯一标识
+                    const idx = history.findIndex(item =>
+                        item.title === currentVideoTitle &&
+                        (item.episodeIndex === undefined || item.episodeIndex === currentEpisodeIndex)
+                    );
+                    if (idx !== -1) {
+                        // 只在进度有明显变化时才更新，减少写入
+                        if (
+                            Math.abs((history[idx].playbackPosition || 0) - currentTime) > 2 ||
+                            Math.abs((history[idx].duration || 0) - duration) > 2
+                        ) {
+                            history[idx].playbackPosition = currentTime;
+                            history[idx].duration = duration;
+                            history[idx].timestamp = Date.now();
+                            localStorage.setItem('viewingHistory', JSON.stringify(history));
+                        }
                     }
                 }
+            } catch (e) {
             }
-        } catch (e) {
         }
     } catch (e) {
     }
@@ -1684,7 +1693,6 @@ async function showSwitchResourceModal() {
                          class="w-full h-full object-cover"
                          onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE3IDggMTIgMyA3IDgiPjwvcG9seWxpbmU+PHBhdGggZD0iTTEyIDN2MTIiPjwvcGF0aD48L3N2Zz4='">
                     
-                    <!-- 速率显示在图片右上角 -->
                     <div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75">
                         ${formatSpeedDisplay(speedResult)}
                     </div>
