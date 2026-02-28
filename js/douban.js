@@ -513,7 +513,7 @@ async function renderDoubanCards(data, container) {
         `;
         fragment.appendChild(emptyEl);
     } else {
-        // 循环创建每个影视卡片，使用 for...of 以支持 async/await 鉴权
+        // 循环创建每个影视卡片
         for (const item of data.subjects) {
             const card = document.createElement("div");
             card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
@@ -530,21 +530,21 @@ async function renderDoubanCards(data, container) {
             
             const originalCoverUrl = item.cover;
             
-            // 方案 A：使用 LibreTV 自带代理，并等待计算加入鉴权参数（解决 401 拦截）
+            // 方案 A：首选网易图片缓存代理（国内直连，速度快，完美绕过豆瓣防盗链）
+            const neteaseUrl = `https://ip.ws.126.net/cbdfetch/original?url=${encodeURIComponent(originalCoverUrl)}`;
+            
+            // 方案 B：如果网易也挂了，使用自带的鉴权代理作为备用
             let localProxyUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
             if (window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl) {
                 localProxyUrl = await window.ProxyAuth.addAuthToProxyUrl(localProxyUrl);
             }
-
-            // 方案 B：备用无限制代理（AllOrigins 的 raw 模式，直接返回图片流）
-            const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(originalCoverUrl)}`;
             
-            // 将自带代理设为主力，AllOrigins 设为备用，原图作为最后挣扎
+            // 使用 onerror 实现自动降级：网易代理 -> 你的服务器代理 -> 原图（听天由命）
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${localProxyUrl}" alt="${safeTitle}" 
+                    <img src="${neteaseUrl}" alt="${safeTitle}" 
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="if(this.src !== '${allOriginsUrl}') { this.src='${allOriginsUrl}'; this.classList.add('object-contain'); } else { this.src='${originalCoverUrl}'; }"
+                        onerror="if(this.dataset.fallback !== 'local') { this.dataset.fallback = 'local'; this.src='${localProxyUrl}'; this.classList.add('object-contain'); } else if(this.dataset.fallback !== 'original') { this.dataset.fallback = 'original'; this.src='${originalCoverUrl}'; }"
                         loading="lazy" referrerpolicy="no-referrer">
                     <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
                     <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
