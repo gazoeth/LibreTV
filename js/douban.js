@@ -513,7 +513,7 @@ async function renderDoubanCards(data, container) {
         `;
         fragment.appendChild(emptyEl);
     } else {
-        // 循环创建每个影视卡片（改用 for...of 以便于可能需要的异步操作按顺序执行）
+        // 循环创建每个影视卡片，使用 for...of 以支持 async/await 鉴权
         for (const item of data.subjects) {
             const card = document.createElement("div");
             card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
@@ -528,17 +528,23 @@ async function renderDoubanCards(data, container) {
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
             
-            // 处理图片URL：直接使用免费的全球CDN图片代理绕过豆瓣 418 拦截
-            // 这样既不需要消耗自身服务器/Vercel的代理流量，也规避了自有代理漏传 auth 参数导致的 401 错误
             const originalCoverUrl = item.cover;
-            const proxiedCoverUrl = `https://wsrv.nl/?url=${encodeURIComponent(originalCoverUrl)}`;
             
-            // 为不同设备优化卡片布局 (直接将 src 指向 proxy 以消灭 F12 中的 418 报错)
+            // 方案 A：使用 LibreTV 自带代理，并等待计算加入鉴权参数（解决 401 拦截）
+            let localProxyUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
+            if (window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl) {
+                localProxyUrl = await window.ProxyAuth.addAuthToProxyUrl(localProxyUrl);
+            }
+
+            // 方案 B：备用无限制代理（AllOrigins 的 raw 模式，直接返回图片流）
+            const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(originalCoverUrl)}`;
+            
+            // 将自带代理设为主力，AllOrigins 设为备用，原图作为最后挣扎
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${proxiedCoverUrl}" alt="${safeTitle}" 
+                    <img src="${localProxyUrl}" alt="${safeTitle}" 
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="this.onerror=null; this.src='${originalCoverUrl}'; this.classList.add('object-contain');"
+                        onerror="if(this.src !== '${allOriginsUrl}') { this.src='${allOriginsUrl}'; this.classList.add('object-contain'); } else { this.src='${originalCoverUrl}'; }"
                         loading="lazy" referrerpolicy="no-referrer">
                     <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
                     <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
