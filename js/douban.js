@@ -500,17 +500,14 @@ async function fetchDoubanData(url) {
 }
 
 // 抽取渲染豆瓣卡片的逻辑到单独函数
+// 抽取渲染豆瓣卡片的逻辑到单独函数
 async function renderDoubanCards(data, container) {
-    // 创建文档片段以提高性能
     const fragment = document.createDocumentFragment();
     
-    // 如果没有数据
     if (!data.subjects || data.subjects.length === 0) {
         const emptyEl = document.createElement("div");
         emptyEl.className = "col-span-full text-center py-8";
-        emptyEl.innerHTML = `
-            <div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>
-        `;
+        emptyEl.innerHTML = `<div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>`;
         fragment.appendChild(emptyEl);
     } else {
         // 循环创建每个影视卡片
@@ -518,33 +515,22 @@ async function renderDoubanCards(data, container) {
             const card = document.createElement("div");
             card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
             
-            // 生成卡片内容，确保安全显示（防止XSS）
-            const safeTitle = item.title
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;');
+            const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const safeRate = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
-            const safeRate = (item.rate || "暂无")
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            
+            // 唯一方案：全部依赖已修复的 Cloudflare Pages 自身强大代理
             const originalCoverUrl = item.cover;
+            let secureProxyUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
             
-            // 方案 A：首选网易图片缓存代理（国内直连，速度快，完美绕过豆瓣防盗链）
-            const neteaseUrl = `https://ip.ws.126.net/cbdfetch/original?url=${encodeURIComponent(originalCoverUrl)}`;
-            
-            // 方案 B：如果网易也挂了，使用自带的鉴权代理作为备用
-            let localProxyUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
+            // 附加上合法的密码鉴权哈希
             if (window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl) {
-                localProxyUrl = await window.ProxyAuth.addAuthToProxyUrl(localProxyUrl);
+                secureProxyUrl = await window.ProxyAuth.addAuthToProxyUrl(secureProxyUrl);
             }
             
-            // 使用 onerror 实现自动降级：网易代理 -> 你的服务器代理 -> 原图（听天由命）
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${neteaseUrl}" alt="${safeTitle}" 
+                    <img src="${secureProxyUrl}" alt="${safeTitle}" 
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        onerror="if(this.dataset.fallback !== 'local') { this.dataset.fallback = 'local'; this.src='${localProxyUrl}'; this.classList.add('object-contain'); } else if(this.dataset.fallback !== 'original') { this.dataset.fallback = 'original'; this.src='${originalCoverUrl}'; }"
                         loading="lazy" referrerpolicy="no-referrer">
                     <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
                     <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
@@ -569,11 +555,10 @@ async function renderDoubanCards(data, container) {
         }
     }
     
-    // 清空并添加所有新元素
     container.innerHTML = "";
     container.appendChild(fragment);
 }
-    
+     
 
 // 重置到首页
 function resetToHome() {
