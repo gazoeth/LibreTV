@@ -180,16 +180,18 @@ function initializePageContent() {
         localStorage.setItem('autoplayEnabled', autoplayEnabled);
     });
 
-    // 优先使用URL传递的集数信息，否则从localStorage获取
+    // 优先使用URL传递的集数信息，其次 sessionStorage（由搜索页直接写入，速度快），最后 localStorage
     try {
         if (episodesList) {
-            // 如果URL中有集数数据，优先使用它
             currentEpisodes = JSON.parse(decodeURIComponent(episodesList));
-
         } else {
-            // 否则从localStorage获取
-            currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
-
+            const sessionEp = sessionStorage.getItem('playerEpisodes');
+            if (sessionEp) {
+                currentEpisodes = JSON.parse(sessionEp);
+                sessionStorage.removeItem('playerEpisodes'); // 读取后清除，避免下次误用
+            } else {
+                currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
+            }
         }
 
         // 检查集数索引是否有效，如果无效则调整为0
@@ -243,10 +245,10 @@ function initializePageContent() {
     // 更新排序按钮状态
     updateOrderButton();
 
-    // 添加对进度条的监听（等 ArtPlayer 就绪后立刻绑定，消除固定 1000ms 等待）
-    if (art) {
-        art.on('ready', () => setupProgressBarPreciseClicks());
-    }
+    // 添加对进度条的监听，确保点击准确跳转
+    setTimeout(() => {
+        setupProgressBarPreciseClicks();
+    }, 1000);
 
     // 添加键盘快捷键事件监听
     document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -261,24 +263,24 @@ function initializePageContent() {
         }
     });
 
-    // 视频暂停时保存进度（等 ArtPlayer ready 后绑定，消除 200ms 轮询开销）
-    function _bindProgressSaveListeners() {
-        if (!art || !art.video) return;
-        art.video.addEventListener('pause', saveCurrentProgress);
-        let lastSave = 0;
-        art.video.addEventListener('timeupdate', function () {
-            const now = Date.now();
-            if (now - lastSave > 5000) { saveCurrentProgress(); lastSave = now; }
-        });
-    }
-    if (art) {
-        art.on('ready', _bindProgressSaveListeners);
-    } else {
-        // art 尚未创建（理论上不会，但做兜底）
-        const _waitBind = setInterval(() => {
-            if (art) { clearInterval(_waitBind); art.on('ready', _bindProgressSaveListeners); }
-        }, 100);
-    }
+    // 视频暂停时也保存
+    const waitForVideo = setInterval(() => {
+        if (art && art.video) {
+            art.video.addEventListener('pause', saveCurrentProgress);
+
+            // 新增：播放进度变化时节流保存
+            let lastSave = 0;
+            art.video.addEventListener('timeupdate', function() {
+                const now = Date.now();
+                if (now - lastSave > 5000) { // 每5秒最多保存一次
+                    saveCurrentProgress();
+                    lastSave = now;
+                }
+            });
+
+            clearInterval(waitForVideo);
+        }
+    }, 200);
 }
 
 // 处理键盘快捷键
@@ -854,7 +856,7 @@ function updateButtonStates() {
     }
 }
 
-// 渲染集数按钮（DocumentFragment 单次写入，避免反复触发重排）
+// 渲染集数按钮（DocumentFragment 单次写入）
 function renderEpisodes() {
     const episodesList = document.getElementById('episodesList');
     if (!episodesList) return;
@@ -1434,9 +1436,8 @@ function renderResourceInfoBar() {
     if (!container) return;
 
     const currentSource = new URLSearchParams(window.location.search).get('source') || '';
-
-    // 查找资源名（优先内置，其次自定义）
     let resourceName = currentSource;
+
     if (API_SITES[currentSource]) {
         resourceName = API_SITES[currentSource].name;
     } else {
@@ -1446,18 +1447,14 @@ function renderResourceInfoBar() {
         } catch (_) {}
     }
 
-    // 一次写入，无"加载中"闪烁
+    const svgIcon = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     container.innerHTML = `
       <div class="resource-info-bar-left flex">
         <span>${resourceName}</span>
         <span class="resource-info-bar-videos">${currentEpisodes.length} 个视频</span>
       </div>
       <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()">
-        <span class="resource-switch-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
+        <span class="resource-switch-icon">${svgIcon}</span>
         切换资源
       </button>`;
 }
@@ -1570,8 +1567,8 @@ function formatSpeedDisplay(speedResult) {
     return `<span class="${className}">${icon} ${speed}ms${note}</span>`;
 }
 
-// ─── 资源卡片占位图（base64，inline 避免额外请求）──────────────────────────
-const _FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE3IDggMTIgMyA3IDgiPjwvcG9seWxpbmU+PHBhdGggZD0iTTEyIDN2MTIiPjwvcGF0aD48L3N2Zz4=";
+// 占位图（inline base64，零额外请求）
+const _FALLBACK_CARD_IMG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE3IDggMTIgMyA3IDgiPjwvcG9seWxpbmU+PHBhdGggZD0iTTEyIDN2MTIiPjwvcGF0aD48L3N2Zz4=";
 
 async function showSwitchResourceModal() {
     const urlParams         = new URLSearchParams(window.location.search);
@@ -1583,9 +1580,11 @@ async function showSwitchResourceModal() {
     const modalContent = document.getElementById('modalContent');
 
     modalTitle.innerHTML = `<span class="break-words">${currentVideoTitle}</span>`;
+
+    // 立刻建好 grid 容器，搜到即插卡片
+    modalContent.innerHTML = '<div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>';
     modal.classList.remove('hidden');
 
-    // 构建资源选项表
     const resourceOptions = selectedAPIs.map(curr => {
         if (API_SITES[curr]) return { key: curr, name: API_SITES[curr].name };
         const idx = parseInt(curr.replace('custom_', ''), 10);
@@ -1593,27 +1592,33 @@ async function showSwitchResourceModal() {
     });
     const nameMap = Object.fromEntries(resourceOptions.map(o => [o.key, o.name]));
 
-    // ── 初始化 grid 容器（立刻可见，无闪烁）────────────────────────────────
-    modalContent.innerHTML = '<div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>';
-    const grid = document.getElementById('resource-grid');
-
-    // ── 辅助：渲染/刷新单张卡片 ─────────────────────────────────────────────
+    // 渲染/刷新单张卡片（搜到时无速度，速测后更新）
     function upsertCard(sourceKey, result, speedResult) {
-        const isCurrent  = String(sourceKey) === String(currentSourceCode)
-                        && String(result.vod_id) === String(currentVideoId);
+        const grid      = document.getElementById('resource-grid');
+        if (!grid) return;
+        const isCurrent  = String(sourceKey) === String(currentSourceCode) && String(result.vod_id) === String(currentVideoId);
         const sourceName = nameMap[sourceKey] || '未知资源';
 
         const speedHtml = speedResult
             ? `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75">${formatSpeedDisplay(speedResult)}</div>`
-            : `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75"><span class="speed-indicator" style="color:#aaa">⏳</span></div>`;
+            : `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75"><span class="speed-indicator" style="color:#aaa;font-size:11px">⏳</span></div>`;
 
         const epText = speedResult?.episodes ? `${speedResult.episodes}集` : '';
 
-        const cardHtml = `
+        let card = document.getElementById(`rcard-${sourceKey}`);
+        if (!card) {
+            card = document.createElement('div');
+            card.id = `rcard-${sourceKey}`;
+            grid.appendChild(card);
+        }
+
+        card.className = `relative group ${isCurrent ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 transition-transform'}`;
+        card.onclick    = (!isCurrent) ? () => switchToResource(sourceKey, result.vod_id) : null;
+
+        card.innerHTML = `
             <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
-                <img src="${result.vod_pic}" alt="${result.vod_name}"
-                     class="w-full h-full object-cover"
-                     onerror="this.src='${_FALLBACK_IMG}'">
+                <img src="${result.vod_pic}" alt="${result.vod_name}" class="w-full h-full object-cover"
+                     onerror="this.src='${_FALLBACK_CARD_IMG}'">
                 ${speedHtml}
             </div>
             <div class="mt-2">
@@ -1624,24 +1629,9 @@ async function showSwitchResourceModal() {
             ${isCurrent ? `<div class="absolute inset-0 flex items-center justify-center">
                 <div class="bg-blue-600 bg-opacity-75 rounded-lg px-2 py-0.5 text-xs text-white font-medium">当前播放</div>
             </div>` : ''}`;
-
-        let card = document.getElementById(`rcard-${sourceKey}`);
-        if (!card) {
-            card = document.createElement('div');
-            card.id        = `rcard-${sourceKey}`;
-            card.className = `relative group ${isCurrent
-                ? 'opacity-50 cursor-not-allowed'
-                : 'cursor-pointer hover:scale-105 transition-transform'}`;
-            if (!isCurrent) card.onclick = () => switchToResource(sourceKey, result.vod_id);
-            grid.appendChild(card);
-        }
-        card.innerHTML = cardHtml;
     }
 
-    // ── 核心：搜索与速测完全并行，搜到即显示，速测完即更新 ──────────────────
-    // testVideoSourceSpeed 内部会再请求一次 /api/detail，
-    // 改为直接复用搜索结果中已有的 vod_id，跳过重复的 detail 请求：
-    // 仅测 HEAD 延迟（如果 episodes[0] 已知）或仅计 API 往返时间
+    // 精简版速测：直接复用 detail API，收紧超时至 6s
     async function testSpeedFast(sourceKey, vodId) {
         try {
             const t0 = performance.now();
@@ -1658,20 +1648,15 @@ async function showSwitchResourceModal() {
             if (apiParams === null) return { speed: -1, error: 'API配置无效' };
 
             const resp = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`, {
-                signal: AbortSignal.timeout(6000)   // 由10s收紧至6s
+                signal: AbortSignal.timeout(6000)
             });
             if (!resp.ok) return { speed: -1, error: '获取失败' };
-
             const detail = await resp.json();
             if (!detail.episodes?.length) return { speed: -1, error: '无播放源' };
 
-            // 尝试 HEAD 测速（no-cors，失败时退化为仅返回 API 耗时）
             try {
-                await fetch(detail.episodes[0], {
-                    method: 'HEAD', mode: 'no-cors', cache: 'no-cache',
-                    signal: AbortSignal.timeout(3000)
-                });
-            } catch { /* 忽略，只记录到这里的总耗时 */ }
+                await fetch(detail.episodes[0], { method: 'HEAD', mode: 'no-cors', cache: 'no-cache', signal: AbortSignal.timeout(3000) });
+            } catch { /* 忽略，用 API 耗时 */ }
 
             return { speed: Math.round(performance.now() - t0), episodes: detail.episodes.length, error: null };
         } catch (e) {
@@ -1681,21 +1666,15 @@ async function showSwitchResourceModal() {
 
     let foundAny = false;
     await Promise.all(resourceOptions.map(async opt => {
-        // 搜索
         const queryResult = await searchByAPIAndKeyWord(opt.key, currentVideoTitle);
         if (!queryResult.length) return;
 
-        // 选最匹配的结果
         let result = queryResult[0];
-        for (const r of queryResult) {
-            if (r.vod_name === currentVideoTitle) { result = r; break; }
-        }
+        for (const r of queryResult) { if (r.vod_name === currentVideoTitle) { result = r; break; } }
 
         foundAny = true;
-        upsertCard(opt.key, result, null);          // 立刻显示卡片（速度待测）
-
-        // 速测与其他搜索并行，测完即更新徽章
-        testSpeedFast(opt.key, result.vod_id).then(sr => upsertCard(opt.key, result, sr));
+        upsertCard(opt.key, result, null);                              // 立刻显示卡片
+        testSpeedFast(opt.key, result.vod_id).then(sr => upsertCard(opt.key, result, sr)); // 速测完更新
     }));
 
     if (!foundAny) {
@@ -1703,19 +1682,18 @@ async function showSwitchResourceModal() {
     }
 }
 
-// 切换资源的函数（优化：原地换源，无需整页跳转，消除完整页面重载开销）
+// 切换资源（原地换源，无整页跳转）
 async function switchToResource(sourceKey, vodId) {
     document.getElementById('modal').classList.add('hidden');
     showLoading();
-
     try {
         let apiParams = '';
         if (sourceKey.startsWith('custom_')) {
-            const customApi = getCustomApiInfo(sourceKey.replace('custom_', ''));
-            if (!customApi) { showToast('自定义API配置无效', 'error'); return; }
-            apiParams = customApi.detail
-                ? `&customApi=${encodeURIComponent(customApi.url)}&customDetail=${encodeURIComponent(customApi.detail)}&source=custom`
-                : `&customApi=${encodeURIComponent(customApi.url)}&source=custom`;
+            const ca = getCustomApiInfo(sourceKey.replace('custom_', ''));
+            if (!ca) { showToast('自定义API配置无效', 'error'); return; }
+            apiParams = ca.detail
+                ? `&customApi=${encodeURIComponent(ca.url)}&customDetail=${encodeURIComponent(ca.detail)}&source=custom`
+                : `&customApi=${encodeURIComponent(ca.url)}&source=custom`;
         } else {
             apiParams = '&source=' + sourceKey;
         }
@@ -1723,21 +1701,17 @@ async function switchToResource(sourceKey, vodId) {
         const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`);
         const data     = await response.json();
 
-        if (!data.episodes || data.episodes.length === 0) {
-            showToast('未找到播放资源', 'error');
-            return;
-        }
+        if (!data.episodes?.length) { showToast('未找到播放资源', 'error'); return; }
 
-        // 尽量保持当前集数，否则退回第0集
         const targetIndex = currentEpisodeIndex < data.episodes.length ? currentEpisodeIndex : 0;
         const targetUrl   = data.episodes[targetIndex];
 
-        // ── 原地更新状态，不跳转页面 ─────────────────────────────────────
+        // 原地更新全局状态
         currentEpisodes     = data.episodes;
         currentEpisodeIndex = targetIndex;
         currentVideoUrl     = targetUrl;
 
-        // 同步更新 URL 参数（不刷新页面）
+        // 同步 URL 参数（不刷新页面）
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.set('id',     vodId);
         newUrl.searchParams.set('source', sourceKey);
@@ -1746,27 +1720,20 @@ async function switchToResource(sourceKey, vodId) {
         newUrl.searchParams.delete('position');
         window.history.replaceState({}, '', newUrl.toString());
 
-        // 持久化
         try {
             localStorage.setItem('currentEpisodes',     JSON.stringify(data.episodes));
             localStorage.setItem('currentEpisodeIndex', targetIndex);
             localStorage.setItem('currentSourceCode',   sourceKey);
         } catch (e) {}
 
-        // 直接在当前页面切换视频流
-        if (isWebkit) {
-            initPlayer(targetUrl);
-        } else {
-            art.switch = targetUrl;
-        }
+        // 切换视频流（无页面跳转）
+        if (isWebkit) { initPlayer(targetUrl); } else { art.switch = targetUrl; }
 
-        // 更新 UI
         updateEpisodeInfo();
         updateButtonStates();
         renderEpisodes();
         renderResourceInfoBar();
         showToast('已切换到新资源', 'success');
-
     } catch (error) {
         console.error('切换资源失败:', error);
         showToast('切换资源失败，请稍后重试', 'error');
