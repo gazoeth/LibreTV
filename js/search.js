@@ -1,124 +1,129 @@
+// ─── 鉴权前缀缓存（模块级，避免每次请求都重新 await）────────────────────────
+let _cachedAuthPrefix = null;
+let _authPrefixFetching = null; // 防止并发重复请求
+
+async function _getAuthPrefix() {
+    if (_cachedAuthPrefix !== null) return _cachedAuthPrefix;
+    if (_authPrefixFetching) return _authPrefixFetching; // 复用进行中的请求
+
+    if (window.ProxyAuth?.getAuthPrefix) {
+        _authPrefixFetching = window.ProxyAuth.getAuthPrefix().then(p => {
+            _cachedAuthPrefix = p ?? '';
+            _authPrefixFetching = null;
+            return _cachedAuthPrefix;
+        });
+        return _authPrefixFetching;
+    }
+    _cachedAuthPrefix = '';
+    return '';
+}
+
+// 失效缓存（ProxyAuth token 刷新时调用）
+function _invalidateAuthCache() {
+    _cachedAuthPrefix = null;
+}
+
+async function _buildSearchProxyUrl(rawUrl) {
+    // 优先使用 getAuthPrefix（同步拼接），其次回退 addAuthToProxyUrl
+    if (window.ProxyAuth?.getAuthPrefix) {
+        const prefix = await _getAuthPrefix();
+        return PROXY_URL + encodeURIComponent(rawUrl) + prefix;
+    }
+    if (window.ProxyAuth?.addAuthToProxyUrl) {
+        return window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(rawUrl));
+    }
+    return PROXY_URL + encodeURIComponent(rawUrl);
+}
+
 async function searchByAPIAndKeyWord(apiId, query) {
     try {
-        let apiUrl, apiName, apiBaseUrl;
-        
-        // 处理自定义API
+        let apiName, apiBaseUrl;
+
         if (apiId.startsWith('custom_')) {
-            const customIndex = apiId.replace('custom_', '');
-            const customApi = getCustomApiInfo(customIndex);
+            const customApi = getCustomApiInfo(apiId.replace('custom_', ''));
             if (!customApi) return [];
-            
             apiBaseUrl = customApi.url;
-            apiUrl = apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
-            apiName = customApi.name;
+            apiName    = customApi.name;
         } else {
-            // 内置API
             if (!API_SITES[apiId]) return [];
             apiBaseUrl = API_SITES[apiId].api;
-            apiUrl = apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
-            apiName = API_SITES[apiId].name;
+            apiName    = API_SITES[apiId].name;
         }
-        
-        // 添加超时处理
+
+        // 预取鉴权前缀（与后续请求并发；若已缓存则同步返回）
+        const authPrefixPromise = _getAuthPrefix();
+
+        const apiUrl = apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        
-        // 添加鉴权参数到代理URL
-        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
-            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(apiUrl)) :
-            PROXY_URL + encodeURIComponent(apiUrl);
-        
-        const response = await fetch(proxiedUrl, {
-            headers: API_CONFIG.search.headers,
-            signal: controller.signal
-        });
-        
+        const timeoutId  = setTimeout(() => controller.abort(), 10000); // 由15s收紧至10s
+
+        // 等鉴权和第一页数据同时就绪
+        const [, response] = await Promise.all([
+            authPrefixPromise,
+            (async () => {
+                const proxiedUrl = await _buildSearchProxyUrl(apiUrl);
+                return fetch(proxiedUrl, {
+                    headers: API_CONFIG.search.headers,
+                    signal: controller.signal
+                });
+            })()
+        ]);
+
         clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            return [];
-        }
-        
+        if (!response.ok) return [];
+
         const data = await response.json();
-        
-        if (!data || !data.list || !Array.isArray(data.list) || data.list.length === 0) {
-            return [];
-        }
-        
-        // 处理第一页结果
-        const results = data.list.map(item => ({
+        if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) return [];
+
+        const customApiUrl = apiId.startsWith('custom_')
+            ? getCustomApiInfo(apiId.replace('custom_', ''))?.url
+            : undefined;
+
+        const mapItem = item => ({
             ...item,
             source_name: apiName,
             source_code: apiId,
-            api_url: apiId.startsWith('custom_') ? getCustomApiInfo(apiId.replace('custom_', ''))?.url : undefined
-        }));
-        
-        // 获取总页数
-        const pageCount = data.pagecount || 1;
-        // 确定需要获取的额外页数 (最多获取maxPages页)
-        const pagesToFetch = Math.min(pageCount - 1, API_CONFIG.search.maxPages - 1);
-        
-        // 如果有额外页数，获取更多页的结果
+            ...(customApiUrl ? { api_url: customApiUrl } : {})
+        });
+
+        const results = data.list.map(mapItem);
+
+        // ── 追加分页（并发，复用已缓存鉴权前缀）────────────────────────────
+        const pageCount    = data.pagecount || 1;
+        const pagesToFetch = Math.min(pageCount - 1, (API_CONFIG.search.maxPages || 1) - 1);
+
         if (pagesToFetch > 0) {
-            const additionalPagePromises = [];
-            
-            for (let page = 2; page <= pagesToFetch + 1; page++) {
-                // 构建分页URL
+            const pagePromises = Array.from({ length: pagesToFetch }, (_, i) => {
+                const page    = i + 2;
                 const pageUrl = apiBaseUrl + API_CONFIG.search.pagePath
                     .replace('{query}', encodeURIComponent(query))
                     .replace('{page}', page);
-                
-                // 创建获取额外页的Promise
-                const pagePromise = (async () => {
+
+                return (async () => {
                     try {
-                        const pageController = new AbortController();
-                        const pageTimeoutId = setTimeout(() => pageController.abort(), 15000);
-                        
-                        // 添加鉴权参数到代理URL
-                        const proxiedPageUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
-                            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(pageUrl)) :
-                            PROXY_URL + encodeURIComponent(pageUrl);
-                        
-                        const pageResponse = await fetch(proxiedPageUrl, {
+                        const pc = new AbortController();
+                        const pt = setTimeout(() => pc.abort(), 10000);
+                        const pr = await fetch(await _buildSearchProxyUrl(pageUrl), {
                             headers: API_CONFIG.search.headers,
-                            signal: pageController.signal
+                            signal: pc.signal
                         });
-                        
-                        clearTimeout(pageTimeoutId);
-                        
-                        if (!pageResponse.ok) return [];
-                        
-                        const pageData = await pageResponse.json();
-                        
-                        if (!pageData || !pageData.list || !Array.isArray(pageData.list)) return [];
-                        
-                        // 处理当前页结果
-                        return pageData.list.map(item => ({
-                            ...item,
-                            source_name: apiName,
-                            source_code: apiId,
-                            api_url: apiId.startsWith('custom_') ? getCustomApiInfo(apiId.replace('custom_', ''))?.url : undefined
-                        }));
-                    } catch (error) {
-                        console.warn(`API ${apiId} 第${page}页搜索失败:`, error);
+                        clearTimeout(pt);
+                        if (!pr.ok) return [];
+                        const pd = await pr.json();
+                        return pd?.list ? pd.list.map(mapItem) : [];
+                    } catch {
                         return [];
                     }
                 })();
-                
-                additionalPagePromises.push(pagePromise);
-            }
-            
-            // 等待所有额外页的结果
-            const additionalResults = await Promise.all(additionalPagePromises);
-            
-            // 合并所有页的结果
-            additionalResults.forEach(pageResults => {
-                if (pageResults.length > 0) {
-                    results.push(...pageResults);
-                }
+            });
+
+            const settled = await Promise.allSettled(pagePromises);
+            settled.forEach(r => {
+                if (r.status === 'fulfilled' && r.value.length > 0) results.push(...r.value);
             });
         }
-        
+
         return results;
     } catch (error) {
         console.warn(`API ${apiId} 搜索失败:`, error);
