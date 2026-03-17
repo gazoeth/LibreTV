@@ -1487,25 +1487,19 @@ function renderResourceInfoBar() {
 
 // 测试视频源速率的函数
 async function testVideoSourceSpeed(sourceKey, vodId) {
+    const start = performance.now();
     try {
-        const startTime = performance.now();
-        
-        // 构建API参数
-        let apiParams = '';
-        if (sourceKey.startsWith('custom_')) {
-            const customIndex = sourceKey.replace('custom_', '');
-            const customApi = getCustomApiInfo(customIndex);
-            if (!customApi) {
-                return { speed: -1, error: 'API配置无效' };
-            }
-            if (customApi.detail) {
-                apiParams = '&customApi=' + encodeURIComponent(customApi.url) + '&customDetail=' + encodeURIComponent(customApi.detail) + '&source=custom';
-            } else {
-                apiParams = '&customApi=' + encodeURIComponent(customApi.url) + '&source=custom';
-            }
-        } else {
-            apiParams = '&source=' + sourceKey;
-        }
+        // 使用 AbortSignal.timeout 强制 4s 超时
+        const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}&source=${sourceKey}`, {
+            signal: AbortSignal.timeout(4000)
+        });
+        const end = performance.now();
+        const data = await response.json();
+        return { speed: Math.round(end - start), episodes: data.episodes?.length || 0 };
+    } catch (e) {
+        return { speed: -1, error: e.name === 'AbortError' ? '超时' : '失败' };
+    }
+}
         
         // 添加时间戳防止缓存
         const timestamp = new Date().getTime();
@@ -1594,17 +1588,58 @@ function formatSpeedDisplay(speedResult) {
 }
 
 async function showSwitchResourceModal() {
+    const modal = document.getElementById('modal');
+    const modalContent = document.getElementById('modalContent');
     const urlParams = new URLSearchParams(window.location.search);
     const currentSourceCode = urlParams.get('source');
     const currentVideoId = urlParams.get('id');
 
-    const modal = document.getElementById('modal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalContent = document.getElementById('modalContent');
-
     modalTitle.innerHTML = `<span class="break-words">${currentVideoTitle}</span>`;
-    modalContent.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa;grid-column:1/-1;">正在加载资源列表...</div>';
+    // 立即初始化容器，不显示“加载中”静止页面
+    modalContent.innerHTML = '<div id="resourceGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>';
+    const grid = document.getElementById('resourceGrid');
     modal.classList.remove('hidden');
+
+    // 对每个已选 API 发起并行处理
+    selectedAPIs.forEach(async (apiId) => {
+        try {
+            // 步骤1：并行搜索
+            const results = await searchByAPIAndKeyWord(apiId, currentVideoTitle);
+            if (!results || results.length === 0) return;
+
+            const bestMatch = results.find(r => r.vod_name === currentVideoTitle) || results[0];
+            const sourceName = API_SITES[apiId]?.name || (apiId.startsWith('custom_') ? '自定义源' : '未知源');
+            const isCurrent = (String(apiId) === String(currentSourceCode) && String(bestMatch.vod_id) === String(currentVideoId));
+
+            // 步骤2：搜索到结果立即渲染占位卡片
+            const cardId = `card-${apiId}-${bestMatch.vod_id}`;
+            const html = `
+                <div id="${cardId}" class="relative group ${isCurrent ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 transition-transform'}" 
+                     ${!isCurrent ? `onclick="switchToResource('${apiId}', '${bestMatch.vod_id}')"` : ''}>
+                    <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
+                        <img src="${bestMatch.vod_pic}" class="w-full h-full object-cover" onerror="this.src='image/nomedia.png'">
+                        <div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75" id="speed-tag-${apiId}">
+                            <span class="text-[10px] text-gray-400">⏳ 测速中</span>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <div class="text-xs font-medium text-gray-200 truncate">${bestMatch.vod_name}</div>
+                        <div class="text-[10px] text-gray-400 truncate">${sourceName}</div>
+                    </div>
+                </div>`;
+            grid.insertAdjacentHTML('beforeend', html);
+
+            // 步骤3：卡片上墙后，异步进行速率测试并更新局部 DOM
+            const speedData = await testVideoSourceSpeed(apiId, bestMatch.vod_id);
+            const tagEl = document.getElementById(`speed-tag-${apiId}`);
+            if (tagEl) {
+                tagEl.innerHTML = formatSpeedDisplay(speedData);
+            }
+        } catch (err) {
+            console.warn(`源 ${apiId} 处理异常`, err);
+        }
+    });
+}
 
     // 搜索
     const resourceOptions = selectedAPIs.map((curr) => {
