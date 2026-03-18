@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="same-origin">
-    <title>YiWuTV 播放器</title>
+    <title>LibreTV 播放器</title>
 
     <!-- Favicon -->
     <link rel="icon" href="image/logo.png">
@@ -27,7 +27,7 @@
                 <svg class="w-8 h-8 mr-2 text-[#00ccff] logo-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
-                <h1 class="text-xl font-bold gradient-text logo-text">YiwuTV</h1>
+                <h1 class="text-xl font-bold gradient-text logo-text">LibreTV</h1>
             </button>
         </div>
         <h2 id="videoTitle" class="text-xl font-semibold flex-1 text-center overflow-x-auto whitespace-nowrap truncate custom-title-scroll"></h2>
@@ -58,7 +58,12 @@
         </div>
     </div>
 
-    <main class="container mx-auto px-4 py-4">        <!-- 视频播放区 -->
+    <main class="container mx-auto px-4 py-4">
+        <div class="flex gap-4 items-start">
+        <!-- ── 左栏：播放器主内容 ── -->
+        <div class="flex-1 min-w-0">
+
+        <!-- 视频播放区 -->
         <div id="playerContainer" class="player-container mb-4">
             <div class="relative">
                 <div id="player" class="player-placeholder">
@@ -155,6 +160,38 @@
                 </div>
             </div>
         </div>
+        </div><!-- end 左栏 -->
+
+        <!-- ── 右侧推荐栏（桌面端显示）── -->
+        <aside id="sideRecommend" class="hidden lg:flex flex-col gap-3 w-56 xl:w-64 flex-shrink-0 sticky top-4">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-rose-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                    </svg>
+                    2026 热门推荐
+                </h3>
+                <span class="text-[10px] text-gray-600">TMDB</span>
+            </div>
+            <div id="sideRecommendList" class="flex flex-col gap-2.5">
+                <!-- 骨架屏 -->
+                <div class="side-rec-skeleton animate-pulse flex gap-2" style="--i:0"><div class="w-12 h-16 bg-[#222] rounded flex-shrink-0"></div><div class="flex-1 space-y-1.5 pt-1"><div class="h-3 bg-[#222] rounded w-full"></div><div class="h-3 bg-[#222] rounded w-2/3"></div></div></div>
+                <div class="side-rec-skeleton animate-pulse flex gap-2" style="--i:1"><div class="w-12 h-16 bg-[#222] rounded flex-shrink-0"></div><div class="flex-1 space-y-1.5 pt-1"><div class="h-3 bg-[#222] rounded w-full"></div><div class="h-3 bg-[#222] rounded w-2/3"></div></div></div>
+                <div class="side-rec-skeleton animate-pulse flex gap-2" style="--i:2"><div class="w-12 h-16 bg-[#222] rounded flex-shrink-0"></div><div class="flex-1 space-y-1.5 pt-1"><div class="h-3 bg-[#222] rounded w-full"></div><div class="h-3 bg-[#222] rounded w-2/3"></div></div></div>
+                <div class="side-rec-skeleton animate-pulse flex gap-2" style="--i:3"><div class="w-12 h-16 bg-[#222] rounded flex-shrink-0"></div><div class="flex-1 space-y-1.5 pt-1"><div class="h-3 bg-[#222] rounded w-full"></div><div class="h-3 bg-[#222] rounded w-2/3"></div></div></div>
+                <div class="side-rec-skeleton animate-pulse flex gap-2" style="--i:4"><div class="w-12 h-16 bg-[#222] rounded flex-shrink-0"></div><div class="flex-1 space-y-1.5 pt-1"><div class="h-3 bg-[#222] rounded w-full"></div><div class="h-3 bg-[#222] rounded w-2/3"></div></div></div>
+            </div>
+            <!-- 换一批 -->
+            <button id="sideRecommendRefresh"
+                    class="mt-1 w-full text-xs py-1.5 bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-400 hover:text-white rounded-lg transition-all flex items-center justify-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                换一批
+            </button>
+        </aside>
+
+        </div><!-- end flex wrapper -->
     </main>
 
     <!-- 添加快捷键提示元素 -->
@@ -174,9 +211,9 @@
                         <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                         </svg>
-                        <span class="gradient-text font-bold">YiwuTV</span>
+                        <span class="gradient-text font-bold">LibreTV</span>
                     </div>
-                    <p class="text-gray-500 text-sm mt-2 text-center md:text-left">© 2025 YiwuTV - 自由观影，畅享精彩</p>
+                    <p class="text-gray-500 text-sm mt-2 text-center md:text-left">© 2025 LibreTV - 自由观影，畅享精彩</p>
                 </div>
                 
                 <div class="text-center md:text-right">
@@ -234,6 +271,7 @@
     <script src="js/api.js"></script>
     <script src="js/search.js"></script>
     <script src="js/player.js"></script>
+    <script src="js/player-recommend.js"></script>
 
     <script>
         // 创建全局环境变量对象
