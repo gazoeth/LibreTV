@@ -1,49 +1,62 @@
 // player-recommend.js — 播放页右侧热门推荐
-// 数据来源：TMDB 2025-2026 热门（直连 CDN，无需代理）
+// 数据来源：TMDB 2025-2026 热门，走服务器代理（避免直连超时）
 
 const PR_TMDB_KEY  = 'b91a299b0c1cccf59e8765f913a24da2';
 const PR_TMDB_BASE = 'https://api.themoviedb.org/3';
-const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w185'; // 小尺寸，侧栏够用
-const PR_PER_PAGE  = 12; // 每批显示数量
-const PR_CACHE_TTL = 60 * 60 * 1000; // 1小时缓存
+const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w185';
+const PR_PER_PAGE  = 12;
+const PR_CACHE_TTL = 60 * 60 * 1000; // 1小时
 
-let _prPool    = [];   // 完整候选池
-let _prOffset  = 0;    // 当前显示位置
+let _prPool    = [];
+let _prOffset  = 0;
 let _prCacheTs = 0;
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     const aside = document.getElementById('sideRecommend');
     if (!aside) return;
-    aside.classList.remove('hidden');
-    aside.classList.add('lg:flex');
 
     loadSideRecommend();
 
     document.getElementById('sideRecommendRefresh')?.addEventListener('click', () => {
-        _prOffset = (_prOffset + PR_PER_PAGE) % Math.max(_prPool.length, 1);
+        if (_prPool.length === 0) return;
+        _prOffset = (_prOffset + PR_PER_PAGE) % _prPool.length;
         renderSideCards(_prPool.slice(_prOffset, _prOffset + PR_PER_PAGE));
     });
 });
 
-// ── 加载数据（两个并发请求：电影 + 剧集，2025-2026）────────────────────────
+// ── 构造代理 URL（复用已有鉴权）────────────────────────────────────────────
+async function _prProxyUrl(rawUrl) {
+    const authSuffix = window.ProxyAuth?.getAuthPrefix
+        ? await window.ProxyAuth.getAuthPrefix()
+        : (window.ProxyAuth?.getAuthSuffix ? window.ProxyAuth.getAuthSuffix() : '');
+    return (typeof PROXY_URL !== 'undefined' ? PROXY_URL : '/proxy/')
+        + encodeURIComponent(rawUrl) + authSuffix;
+}
+
+// ── 加载数据：电影 + 剧集并发，走代理 ───────────────────────────────────────
 async function loadSideRecommend() {
-    // 有效缓存直接渲染
     if (_prPool.length > 0 && (Date.now() - _prCacheTs) < PR_CACHE_TTL) {
         renderSideCards(_prPool.slice(0, PR_PER_PAGE));
         return;
     }
 
     try {
-        const base = `${PR_TMDB_BASE}/discover`;
-        const common = `api_key=${PR_TMDB_KEY}&language=zh-CN&sort_by=popularity.desc`
-                     + `&primary_release_date.gte=2025-01-01&primary_release_date.lte=2026-12-31`;
-        const tvCommon = `api_key=${PR_TMDB_KEY}&language=zh-CN&sort_by=popularity.desc`
-                       + `&first_air_date.gte=2025-01-01&first_air_date.lte=2026-12-31`;
+        const dateFilter = 'primary_release_date.gte=2025-01-01&primary_release_date.lte=2026-12-31';
+        const tvFilter   = 'first_air_date.gte=2025-01-01&first_air_date.lte=2026-12-31';
+        const common     = `api_key=${PR_TMDB_KEY}&language=zh-CN&sort_by=popularity.desc`;
+
+        const movieUrl = `${PR_TMDB_BASE}/discover/movie?${common}&${dateFilter}&page=1`;
+        const tvUrl    = `${PR_TMDB_BASE}/discover/tv?${common}&${tvFilter}&page=1`;
+
+        const [movieProxied, tvProxied] = await Promise.all([
+            _prProxyUrl(movieUrl),
+            _prProxyUrl(tvUrl),
+        ]);
 
         const [movieRes, tvRes] = await Promise.all([
-            fetch(`${base}/movie?${common}&page=1`, { signal: AbortSignal.timeout(6000) }),
-            fetch(`${base}/tv?${tvCommon}&page=1`,  { signal: AbortSignal.timeout(6000) }),
+            fetch(movieProxied, { signal: AbortSignal.timeout(10000) }),
+            fetch(tvProxied,    { signal: AbortSignal.timeout(10000) }),
         ]);
 
         const [movieData, tvData] = await Promise.all([
@@ -59,7 +72,7 @@ async function loadSideRecommend() {
             type,
         });
 
-        // 电影和剧集交错混排，增加多样性
+        // 电影剧集交错混排
         const movies = (movieData.results || []).map(i => toItem(i, 'movie'));
         const tvs    = (tvData.results    || []).map(i => toItem(i, 'tv'));
         const merged = [];
@@ -81,7 +94,7 @@ async function loadSideRecommend() {
     }
 }
 
-// ── 渲染卡片列表 ──────────────────────────────────────────────────────────────
+// ── 渲染卡片 ──────────────────────────────────────────────────────────────────
 function renderSideCards(items) {
     const list = document.getElementById('sideRecommendList');
     if (!list) return;
@@ -94,32 +107,27 @@ function renderSideCards(items) {
     const frag = document.createDocumentFragment();
     items.forEach((item, idx) => {
         const safeTitle = item.title
-            .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         const showRating = item.rating && parseFloat(item.rating) > 0;
         const typeLabel  = item.type === 'tv' ? '剧' : '影';
         const typeColor  = item.type === 'tv' ? 'bg-blue-700' : 'bg-rose-700';
 
         const card = document.createElement('div');
         card.className = 'side-rec-card flex gap-2.5 cursor-pointer group';
-        card.style.animationDelay = `${idx * 40}ms`;
+        card.style.setProperty('--i', idx);
         card.onclick = () => {
-            const input = document.getElementById('searchInput');
-            if (input) input.value = item.title;
-            // 跳回首页并搜索
-            const searchUrl = `/?s=${encodeURIComponent(item.title)}`;
-            window.location.href = searchUrl;
+            window.location.href = `/?s=${encodeURIComponent(item.title)}`;
         };
 
         card.innerHTML = `
-            <div class="relative flex-shrink-0 w-12 h-[4.5rem] rounded-md overflow-hidden bg-[#1a1a1a]
-                         group-hover:scale-105 transition-transform duration-200 shadow-sm">
+            <div class="relative flex-shrink-0 w-12 h-[4.5rem] rounded-md overflow-hidden
+                         bg-[#1a1a1a] group-hover:scale-105 transition-transform duration-200 shadow-sm">
                 ${item.poster
                     ? `<img src="${item.poster}" alt="${safeTitle}"
-                             class="w-full h-full object-cover"
-                             loading="lazy"
+                             class="w-full h-full object-cover" loading="lazy"
                              onerror="this.style.display='none'">`
                     : `<div class="w-full h-full flex items-center justify-center text-lg font-bold text-gray-700">
-                           ${item.title[0] || '?'}
+                           ${item.title[0]||'?'}
                        </div>`
                 }
                 <span class="absolute bottom-0 left-0 right-0 text-[9px] text-center font-bold
@@ -127,9 +135,7 @@ function renderSideCards(items) {
             </div>
             <div class="flex-1 min-w-0 py-0.5">
                 <p class="text-xs font-medium text-gray-200 group-hover:text-white
-                           transition-colors line-clamp-2 leading-snug mb-1">
-                    ${safeTitle}
-                </p>
+                           transition-colors line-clamp-2 leading-snug mb-1">${safeTitle}</p>
                 <div class="flex items-center gap-1.5 flex-wrap">
                     ${item.year ? `<span class="text-[10px] text-gray-500">${item.year}</span>` : ''}
                     ${showRating ? `
