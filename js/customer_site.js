@@ -51,7 +51,7 @@ const CUSTOMER_SITES = {
         name: '金鹰资源',
     },
     hongniu2: {
-        api: 'https://www.hongniuzy2.com/api.php/provide/vod',
+        api: 'https://www.hongniuzy2.com/api.php/provide/vod/from/hnm3u8/at/josn/',
         name: '红牛资源',
     },
     ffzynew: {
@@ -59,8 +59,8 @@ const CUSTOMER_SITES = {
         name: '非凡影视',
     },
     hongniu3: {
-        api: 'https://www.hongniuzy3.com/api.php/provide/vod',
-        name: '红牛资源3',
+        api: 'https://www.hongniuzy3.com/api.php/provide/vod/from/hnm3u8/at/josn/',
+        name: '红牛资源(备)',
     },
     subo: {
         api: 'https://subocaiji.com/api.php/provide/vod',
@@ -75,7 +75,7 @@ const CUSTOMER_SITES = {
         name: '百度云资源',
     },
     lianzi: {
-        api: 'https://cj.lziapi.com/api.php/provide/vod',
+        api: 'https://cj.lziapi.com/api.php/provide/vod/from/lzm3u8/',
         name: '量子资源',
     },
     maotai: {
