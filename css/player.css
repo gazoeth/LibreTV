@@ -139,8 +139,7 @@ div.player-loading-text {
 
 .player-container {
     width: 100%;
-    max-width: 1000px;
-    margin: 0 auto;
+    /* max-width 交由外层两栏布局控制，此处不再限制 */
 }
 
 #player {
@@ -398,9 +397,11 @@ input:checked + .slider:before {
 #sideRecommend {
     max-height: calc(100vh - 5rem);
     overflow-y: auto;
-    scrollbar-width: none;
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
 }
-#sideRecommend::-webkit-scrollbar { display: none; }
+#sideRecommend::-webkit-scrollbar { width: 3px; }
+#sideRecommend::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
 .side-rec-card {
     animation: sideRecIn 0.3s ease both;
