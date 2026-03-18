@@ -1,36 +1,43 @@
 // trending.js — 热门影视清单模块
-// 数据来源：TMDB API（通过代理）+ 本地精选兜底
+// 数据来源：TMDB API 实时获取（自动更新）+ 本地精选兜底
+// TMDB API: https://www.themoviedb.org/
 
-const TMDB_BASE  = 'https://api.themoviedb.org/3';
-const TMDB_IMG   = 'https://image.tmdb.org/t/p/w300';
-// TMDB public endpoints don't require auth key for basic trending
-const TMDB_KEY   = '3e4a3bbc5e9870f3da6752fd5e715f76'; // public demo key from TMDB docs
+const TMDB_BASE = 'https://api.themoviedb.org/3';
+const TMDB_IMG  = 'https://image.tmdb.org/t/p/w300';
+const TMDB_KEY  = 'b91a299b0c1cccf59e8765f913a24da2';
 
-// 本地精选兜底数据（TMDB 不可用时显示）
+// 缓存时间：1小时（毫秒），确保数据自动更新
+const TMDB_CACHE_TTL = 60 * 60 * 1000;
+
+// 本地兜底数据（TMDB 请求失败时显示）
 const FALLBACK_TRENDING = {
     movie: [
-        { title: '哪吒之魔童降世', year: '2024', poster: '', id: null },
-        { title: '封神第二部', year: '2025', poster: '', id: null },
-        { title: '功夫熊猫4', year: '2024', poster: '', id: null },
-        { title: '异形：夺命舰', year: '2024', poster: '', id: null },
-        { title: '沙丘：第二部', year: '2024', poster: '', id: null },
-        { title: '死侍与金刚狼', year: '2024', poster: '', id: null },
-        { title: '头脑特工队2', year: '2024', poster: '', id: null },
-        { title: '哥斯拉大战金刚2', year: '2024', poster: '', id: null },
-        { title: '变形金刚：投降', year: '2024', poster: '', id: null },
-        { title: '疯狂的麦克斯：狂暴女神', year: '2024', poster: '', id: null },
+        { title: '哪吒之魔童闹海',     year: '2025', poster: '', rating: '9.2' },
+        { title: '飞驰人生3',          year: '2026', poster: '', rating: '7.4' },
+        { title: '疯狂动物城2',        year: '2025', poster: '', rating: '8.1' },
+        { title: '镖人：风起大漠',      year: '2026', poster: '', rating: '7.5' },
+        { title: '惊蛰无声',          year: '2026', poster: '', rating: '6.2' },
+        { title: '熊出没·年年有熊',     year: '2026', poster: '', rating: '6.8' },
+        { title: '阿凡达3',           year: '2025', poster: '', rating: '7.0' },
+        { title: '匿杀',             year: '2026', poster: '', rating: '7.2' },
+        { title: '封神第二部',         year: '2025', poster: '', rating: '7.8' },
+        { title: '流浪地球3',          year: '2026', poster: '', rating: '' },
+        { title: '星河入梦',          year: '2026', poster: '', rating: '6.9' },
+        { title: '功夫熊猫4',          year: '2024', poster: '', rating: '7.5' },
     ],
     tv: [
-        { title: '庆余年 第二季', year: '2024', poster: '', id: null },
-        { title: '繁花', year: '2023', poster: '', id: null },
-        { title: '黑袍纠察队 第四季', year: '2024', poster: '', id: null },
-        { title: '权力的游戏：龙之家族 第二季', year: '2024', poster: '', id: null },
-        { title: '神秘博士', year: '2024', poster: '', id: null },
-        { title: '雪莲花特战队', year: '2024', poster: '', id: null },
-        { title: '墨雨云间', year: '2024', poster: '', id: null },
-        { title: '与凤行', year: '2024', poster: '', id: null },
-        { title: '猎冰', year: '2024', poster: '', id: null },
-        { title: '太平年', year: '2025', poster: '', id: null },
+        { title: '逐玉',       year: '2026', poster: '', rating: '' },
+        { title: '太平年',     year: '2026', poster: '', rating: '' },
+        { title: '好好的时光', year: '2026', poster: '', rating: '' },
+        { title: '我的山与海', year: '2026', poster: '', rating: '' },
+        { title: '小城大事',   year: '2026', poster: '', rating: '' },
+        { title: '罚罪2',      year: '2025', poster: '', rating: '7.8' },
+        { title: '猎影者',     year: '2026', poster: '', rating: '' },
+        { title: '折腰',       year: '2026', poster: '', rating: '' },
+        { title: '玫瑰丛生',   year: '2026', poster: '', rating: '' },
+        { title: '念无双',     year: '2026', poster: '', rating: '7.5' },
+        { title: '骄阳似我',   year: '2026', poster: '', rating: '' },
+        { title: '生命树',     year: '2026', poster: '', rating: '' },
     ]
 };
 
@@ -40,24 +47,24 @@ const TRENDING_TABS = [
     { key: 'tv',    label: '📺 剧集' },
 ];
 
-let trendingCurrentTab  = 'movie';
-let trendingCache       = {};  // { movie: [...], tv: [...] }
-let trendingImgCache    = {};  // { title: proxyUrl }
+let trendingCurrentTab = 'movie';
+// 内存缓存：{ movie: { data: [...], ts: timestamp }, tv: {...} }
+let trendingCache    = {};
+let trendingImgCache = {};
 
-// ── 初始化 ───────────────────────────────────────────────────────────────────
+// ── 初始化 ────────────────────────────────────────────────────────────────────
 function initTrending() {
     const area = document.getElementById('trendingArea');
     if (!area) return;
 
-    // 检查是否启用
-    const enabled = localStorage.getItem('trendingEnabled') !== 'false'; // 默认开启
+    const enabled = localStorage.getItem('trendingEnabled') !== 'false';
     if (!enabled) { area.classList.add('hidden'); return; }
 
     renderTrendingTabs();
     loadTrending(trendingCurrentTab);
 }
 
-// ── 标签切换 ─────────────────────────────────────────────────────────────────
+// ── 标签切换 ──────────────────────────────────────────────────────────────────
 function renderTrendingTabs() {
     const container = document.getElementById('trendingTabs');
     if (!container) return;
@@ -82,72 +89,83 @@ function switchTrendingTab(key) {
     loadTrending(key);
 }
 
-// ── 数据加载 ─────────────────────────────────────────────────────────────────
+// ── 数据加载（带 TTL 缓存，自动更新）─────────────────────────────────────────
 async function loadTrending(type) {
     const grid = document.getElementById('trendingGrid');
     if (!grid) return;
 
     // 骨架屏
-    grid.innerHTML = Array(10).fill(`
+    grid.innerHTML = Array(12).fill(`
         <div class="animate-pulse">
             <div class="aspect-[2/3] rounded-lg bg-[#222]"></div>
             <div class="h-3 bg-[#222] rounded mt-2 w-3/4 mx-auto"></div>
         </div>`).join('');
 
-    // 优先用缓存
-    if (trendingCache[type]) {
-        renderTrendingCards(trendingCache[type]);
+    // 检查内存缓存是否有效（1小时内）
+    const cached = trendingCache[type];
+    if (cached && (Date.now() - cached.ts) < TMDB_CACHE_TTL) {
+        renderTrendingCards(cached.data);
         return;
     }
 
+    // 尝试从 TMDB 实时获取
     try {
         const items = await fetchTMDBTrending(type);
-        trendingCache[type] = items;
+        trendingCache[type] = { data: items, ts: Date.now() };
         renderTrendingCards(items);
     } catch (e) {
-        console.warn('TMDB 获取失败，使用兜底数据', e);
-        trendingCache[type] = FALLBACK_TRENDING[type];
-        renderTrendingCards(FALLBACK_TRENDING[type]);
+        console.warn('TMDB 获取失败，使用兜底数据:', e.message);
+        // 即使 TMDB 失败，也检查是否有过期缓存可用
+        if (cached?.data) {
+            renderTrendingCards(cached.data);
+        } else {
+            trendingCache[type] = { data: FALLBACK_TRENDING[type], ts: 0 }; // ts=0 确保下次重试
+            renderTrendingCards(FALLBACK_TRENDING[type]);
+        }
     }
 }
 
+// ── TMDB 实时数据获取 ─────────────────────────────────────────────────────────
 async function fetchTMDBTrending(type) {
-    // TMDB trending endpoint: /trending/{movie|tv}/week
-    const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_KEY}&language=zh-CN&page=1`;
-    
-    const authSuffix = window.ProxyAuth?.getAuthPrefix
-        ? await window.ProxyAuth.getAuthPrefix()
-        : '';
-    const proxyUrl = PROXY_URL + encodeURIComponent(url) + authSuffix;
+    // 使用 /trending/{type}/week 获取当周热门，语言优先中文
+    const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_KEY}&language=zh-CN`;
 
-    const ctrl = new AbortController();
-    const tid  = setTimeout(() => ctrl.abort(), 8000);
+    // TMDB 直接请求（不走内部代理，避免代理超时影响体验）
+    // 同时也尝试通过代理，以防直连被屏蔽
+    let resp;
+    try {
+        // 先尝试直连 TMDB（速度更快）
+        resp = await fetch(url, {
+            signal: AbortSignal.timeout(6000),
+            headers: { 'Accept': 'application/json' }
+        });
+    } catch {
+        // 直连失败，走代理
+        const authSuffix = window.ProxyAuth?.getAuthPrefix
+            ? await window.ProxyAuth.getAuthPrefix()
+            : '';
+        const proxyUrl = PROXY_URL + encodeURIComponent(url) + authSuffix;
+        resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+    }
 
-    const resp = await fetch(proxyUrl, { signal: ctrl.signal });
-    clearTimeout(tid);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
     const data = await resp.json();
     if (!data.results?.length) throw new Error('无数据');
 
     return data.results.slice(0, 12).map(item => ({
         title:  item.title || item.name || '未知',
         year:   (item.release_date || item.first_air_date || '').slice(0, 4),
+        // 封面直接使用 TMDB CDN URL（无需代理，图片CDN允许跨域）
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : '',
         rating: item.vote_average ? item.vote_average.toFixed(1) : '',
         id:     item.id,
     }));
 }
 
-// ── 渲染卡片 ─────────────────────────────────────────────────────────────────
-async function renderTrendingCards(items) {
+// ── 渲染卡片 ──────────────────────────────────────────────────────────────────
+function renderTrendingCards(items) {
     const grid = document.getElementById('trendingGrid');
     if (!grid) return;
-
-    // 预取鉴权后缀（一次）
-    const authSuffix = window.ProxyAuth?.getAuthPrefix
-        ? await window.ProxyAuth.getAuthPrefix()
-        : '';
 
     const fragment = document.createDocumentFragment();
 
@@ -155,47 +173,45 @@ async function renderTrendingCards(items) {
         const safeTitle = item.title
             .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-        // 封面：有 poster 则走代理，否则显示占位
-        let imgSrc = '';
-        if (item.poster) {
-            if (trendingImgCache[item.title]) {
-                imgSrc = trendingImgCache[item.title];
-            } else {
-                imgSrc = PROXY_URL + encodeURIComponent(item.poster) + authSuffix;
-                trendingImgCache[item.title] = imgSrc;
-            }
-        }
+        // TMDB 图片 CDN 支持跨域，直接引用无需代理
+        const imgSrc = item.poster || '';
+
+        const showRating = item.rating && parseFloat(item.rating) > 0;
 
         const card = document.createElement('div');
         card.className = 'trending-card group cursor-pointer';
-        card.style.animationDelay = `${idx * 40}ms`;
+        card.style.animationDelay = `${idx * 35}ms`;
         card.onclick = () => trendingSearch(item.title);
         card.innerHTML = `
             <div class="relative aspect-[2/3] rounded-lg overflow-hidden bg-[#1a1a1a] shadow-lg
-                         group-hover:scale-105 group-hover:shadow-blue-900/30 group-hover:shadow-xl
+                         group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-blue-900/30
                          transition-all duration-300">
                 ${imgSrc
                     ? `<img src="${imgSrc}" alt="${safeTitle}"
                             class="w-full h-full object-cover"
                             loading="lazy"
-                            onerror="this.parentElement.innerHTML=trendingPlaceholder('${safeTitle}')">`
-                    : trendingPlaceholder(safeTitle)
+                            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                    : ''
                 }
-                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent
+                <div class="w-full h-full ${imgSrc ? 'hidden' : 'flex'} items-center justify-center
+                             bg-gradient-to-br from-[#1e2a3a] to-[#111] absolute inset-0">
+                    <span class="text-3xl font-bold text-gray-600">${item.title[0] || '?'}</span>
+                </div>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent
                              opacity-0 group-hover:opacity-100 transition-opacity duration-300
                              flex items-end p-2">
                     <span class="text-white text-xs font-medium leading-tight line-clamp-2">${safeTitle}</span>
                 </div>
-                ${item.rating ? `
-                <div class="absolute top-1.5 right-1.5 bg-black/70 text-yellow-400 text-[10px]
-                             font-bold px-1.5 py-0.5 rounded backdrop-blur-sm">
+                ${showRating ? `
+                <div class="absolute top-1.5 right-1.5 bg-black/75 text-yellow-400 text-[10px]
+                             font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm leading-tight">
                     ★ ${item.rating}
                 </div>` : ''}
                 <div class="absolute inset-0 ring-2 ring-transparent group-hover:ring-blue-500/50
                              rounded-lg transition-all duration-300 pointer-events-none"></div>
             </div>
             <div class="mt-1.5 px-0.5">
-                <p class="text-xs text-gray-300 truncate group-hover:text-white transition-colors leading-tight">
+                <p class="text-xs text-gray-300 truncate group-hover:text-white transition-colors leading-tight font-medium">
                     ${safeTitle}
                 </p>
                 ${item.year ? `<p class="text-[10px] text-gray-600 mt-0.5">${item.year}</p>` : ''}
@@ -207,14 +223,7 @@ async function renderTrendingCards(items) {
     grid.appendChild(fragment);
 }
 
-function trendingPlaceholder(title) {
-    const firstChar = (title || '?')[0];
-    return `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#1e2a3a] to-[#111]">
-        <span class="text-3xl font-bold text-gray-600">${firstChar}</span>
-    </div>`;
-}
-
-// ── 点击搜索 ─────────────────────────────────────────────────────────────────
+// ── 点击搜索 ──────────────────────────────────────────────────────────────────
 function trendingSearch(title) {
     const input = document.getElementById('searchInput');
     if (!input) return;
@@ -227,15 +236,13 @@ function trendingSearch(title) {
     if (window.innerWidth <= 768) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── 与豆瓣区域联动：搜索时隐藏，返回首页时重新显示 ──────────────────────────
+// ── 可见性联动 ────────────────────────────────────────────────────────────────
 function updateTrendingVisibility() {
-    const area       = document.getElementById('trendingArea');
+    const area        = document.getElementById('trendingArea');
     const resultsArea = document.getElementById('resultsArea');
     if (!area) return;
-
-    const enabled    = localStorage.getItem('trendingEnabled') !== 'false';
+    const enabled     = localStorage.getItem('trendingEnabled') !== 'false';
     const isSearching = resultsArea && !resultsArea.classList.contains('hidden');
-
     if (enabled && !isSearching) {
         area.classList.remove('hidden');
     } else {
@@ -243,5 +250,4 @@ function updateTrendingVisibility() {
     }
 }
 
-// 页面加载
 document.addEventListener('DOMContentLoaded', initTrending);
