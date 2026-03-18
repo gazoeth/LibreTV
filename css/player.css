@@ -139,7 +139,7 @@ div.player-loading-text {
 
 .player-container {
     width: 100%;
-    /* max-width 交由外层两栏布局控制，此处不再限制 */
+    max-width: 100%;
 }
 
 #player {
