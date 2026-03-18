@@ -441,95 +441,81 @@ function renderRecommend(tag, pageLimit, pageStart) {
         });
 }
 
+// 优化版 fetchDoubanData：使用同步 getAuthSuffix 拼接，省去 await addAuthToProxyUrl
 async function fetchDoubanData(url) {
-    // 添加超时控制
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-    
-    // 设置请求选项，包括信号和头部
+    const timeoutId  = setTimeout(() => controller.abort(), 10000);
+
     const fetchOptions = {
         signal: controller.signal,
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Referer': 'https://movie.douban.com/',
-            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer':    'https://movie.douban.com/',
+            'Accept':     'application/json, text/plain, */*',
         }
     };
 
     try {
-        // 添加鉴权参数到代理URL
-        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
-            await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(url)) :
-            PROXY_URL + encodeURIComponent(url);
-            
-        // 尝试直接访问（豆瓣API可能允许部分CORS请求）
+        // 优先同步拼接（预热后无 await 开销）
+        const authSuffix   = window.ProxyAuth?.getAuthSuffix ? window.ProxyAuth.getAuthSuffix() : '';
+        const proxiedUrl   = PROXY_URL + encodeURIComponent(url) + authSuffix;
+
         const response = await fetch(proxiedUrl, fetchOptions);
         clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        
+
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         return await response.json();
     } catch (err) {
+        clearTimeout(timeoutId);
         console.error("豆瓣 API 请求失败（直接代理）：", err);
-        
-        // 失败后尝试备用方法：作为备选
+
+        // 备用：allorigins
         const fallbackUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        
         try {
             const fallbackResponse = await fetch(fallbackUrl);
-            
-            if (!fallbackResponse.ok) {
-                throw new Error(`备用API请求失败! 状态: ${fallbackResponse.status}`);
-            }
-            
+            if (!fallbackResponse.ok) throw new Error(`备用API请求失败! 状态: ${fallbackResponse.status}`);
             const data = await fallbackResponse.json();
-            
-            // 解析原始内容
-            if (data && data.contents) {
-                return JSON.parse(data.contents);
-            } else {
-                throw new Error("无法获取有效数据");
-            }
+            if (data?.contents) return JSON.parse(data.contents);
+            throw new Error("无法获取有效数据");
         } catch (fallbackErr) {
             console.error("豆瓣 API 备用请求也失败：", fallbackErr);
-            throw fallbackErr; // 向上抛出错误，让调用者处理
+            throw fallbackErr;
         }
     }
 }
 
 // 抽取渲染豆瓣卡片的逻辑到单独函数
 // 抽取渲染豆瓣卡片的逻辑到单独函数
+// 优化版 renderDoubanCards：
+// 预取一次鉴权后缀，同步拼接所有封面 URL，消除 N 次串行 await
 async function renderDoubanCards(data, container) {
     const fragment = document.createDocumentFragment();
-    
+
     if (!data.subjects || data.subjects.length === 0) {
         const emptyEl = document.createElement("div");
         emptyEl.className = "col-span-full text-center py-8";
         emptyEl.innerHTML = `<div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>`;
         fragment.appendChild(emptyEl);
     } else {
-        // 循环创建每个影视卡片
+        // ── 预取一次鉴权后缀，后续同步拼接，无需循环内 await ────────────
+        const authSuffix = window.ProxyAuth?.getAuthSuffix
+            ? window.ProxyAuth.getAuthSuffix()           // 同步（已预热）
+            : window.ProxyAuth?.getAuthPrefix
+                ? await window.ProxyAuth.getAuthPrefix() // 异步兜底
+                : '';
+
         for (const item of data.subjects) {
+            const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const safeRate  = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // 同步拼接代理 URL，无需 await
+            const secureProxyUrl = PROXY_URL + encodeURIComponent(item.cover) + authSuffix;
+
             const card = document.createElement("div");
             card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
-            
-            const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-            const safeRate = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            // 唯一方案：全部依赖已修复的 Cloudflare Pages 自身强大代理
-            const originalCoverUrl = item.cover;
-            let secureProxyUrl = PROXY_URL + encodeURIComponent(originalCoverUrl);
-            
-            // 附加上合法的密码鉴权哈希
-            if (window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl) {
-                secureProxyUrl = await window.ProxyAuth.addAuthToProxyUrl(secureProxyUrl);
-            }
-            
             card.innerHTML = `
                 <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${secureProxyUrl}" alt="${safeTitle}" 
+                    <img src="${secureProxyUrl}" alt="${safeTitle}"
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
                         loading="lazy" referrerpolicy="no-referrer">
                     <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
@@ -543,18 +529,17 @@ async function renderDoubanCards(data, container) {
                     </div>
                 </div>
                 <div class="p-2 text-center bg-[#111]">
-                    <button onclick="fillAndSearchWithDouban('${safeTitle}')" 
+                    <button onclick="fillAndSearchWithDouban('${safeTitle}')"
                             class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
                             title="${safeTitle}">
                         ${safeTitle}
                     </button>
                 </div>
             `;
-            
             fragment.appendChild(card);
         }
     }
-    
+
     container.innerHTML = "";
     container.appendChild(fragment);
 }
