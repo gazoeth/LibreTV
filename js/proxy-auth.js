@@ -16,13 +16,19 @@ async function getPasswordHash() {
     const storedHash = localStorage.getItem('proxyAuthHash');
     if (storedHash) { cachedPasswordHash = storedHash; return storedHash; }
 
-    const passwordVerified   = localStorage.getItem('passwordVerified');
-    const storedPasswordHash = localStorage.getItem('passwordHash');
-    if (passwordVerified === 'true' && storedPasswordHash) {
-        localStorage.setItem('proxyAuthHash', storedPasswordHash);
-        cachedPasswordHash = storedPasswordHash;
-        return storedPasswordHash;
-    }
+    // password.js 把 {verified, timestamp, passwordHash} 存在同一个 key 的 JSON 里
+    // 不是独立的 'passwordHash' key，必须解析 JSON 才能取到
+    try {
+        const stored = localStorage.getItem('passwordVerified');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.verified && parsed.passwordHash) {
+                localStorage.setItem('proxyAuthHash', parsed.passwordHash);
+                cachedPasswordHash = parsed.passwordHash;
+                return parsed.passwordHash;
+            }
+        }
+    } catch (e) {}
 
     const userPassword = localStorage.getItem('userPassword');
     if (userPassword) {
