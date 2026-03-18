@@ -1,52 +1,49 @@
 // 豆瓣热门电影电视剧推荐功能
 
-// 豆瓣标签列表 - 修改为默认标签
-let defaultMovieTags = ['热门', '最新', '经典', '豆瓣高分', '冷门佳片', '华语', '欧美', '韩国', '日本', '动作', '喜剧', '日综', '爱情', '科幻', '悬疑', '恐怖', '治愈'];
-let defaultTvTags = ['热门', '美剧', '英剧', '韩剧', '日剧', '国产剧', '港剧', '日本动画', '综艺', '纪录片'];
+// ── JustWatch 风格平台标签配置 ──────────────────────────────────────────────
+// 映射：显示名 → TMDB watch_providers ID（台湾地区）
+const PLATFORM_TAGS = {
+    movie: [
+        { label: '🔥 本周热门',  tag: '热门',    icon: '' },
+        { label: '🆕 最新上映',  tag: '最新',    icon: '' },
+        { label: '⭐ 高分推荐',  tag: '豆瓣高分', icon: '' },
+        { label: '🎬 动作',      tag: '动作',    icon: '' },
+        { label: '😄 喜剧',      tag: '喜剧',    icon: '' },
+        { label: '💕 爱情',      tag: '爱情',    icon: '' },
+        { label: '🚀 科幻',      tag: '科幻',    icon: '' },
+        { label: '🔍 悬疑',      tag: '悬疑',    icon: '' },
+        { label: '😱 恐怖',      tag: '恐怖',    icon: '' },
+        { label: '🌏 华语',      tag: '华语',    icon: '' },
+        { label: '🎭 欧美',      tag: '欧美',    icon: '' },
+        { label: '🌸 日本',      tag: '日本',    icon: '' },
+        { label: '🇰🇷 韩国',    tag: '韩国',    icon: '' },
+    ],
+    tv: [
+        { label: '🔥 本周热门',  tag: '热门',    icon: '' },
+        { label: '🆕 最新剧集',  tag: '最新',    icon: '' },
+        { label: '🇺🇸 美剧',    tag: '美剧',    icon: '' },
+        { label: '🇰🇷 韩剧',    tag: '韩剧',    icon: '' },
+        { label: '🇨🇳 国产剧',  tag: '国产剧',  icon: '' },
+        { label: '🇯🇵 日剧',    tag: '日剧',    icon: '' },
+        { label: '🇬🇧 英剧',    tag: '英剧',    icon: '' },
+        { label: '🇭🇰 港剧',    tag: '港剧',    icon: '' },
+        { label: '🎌 动漫',      tag: '日本动画', icon: '' },
+        { label: '📺 综艺',      tag: '综艺',    icon: '' },
+        { label: '🎙️ 纪录片',   tag: '纪录片',  icon: '' },
+    ]
+};
 
-// 用户标签列表 - 存储用户实际使用的标签（包含保留的系统标签和用户添加的自定义标签）
-let movieTags = [];
-let tvTags = [];
+// 兼容旧代码引用
+let defaultMovieTags = PLATFORM_TAGS.movie.map(p => p.tag);
+let defaultTvTags    = PLATFORM_TAGS.tv.map(p => p.tag);
+let movieTags = [...defaultMovieTags];
+let tvTags    = [...defaultTvTags];
 
-// 加载用户标签
 function loadUserTags() {
-    try {
-        // 尝试从本地存储加载用户保存的标签
-        const savedMovieTags = localStorage.getItem('userMovieTags');
-        const savedTvTags = localStorage.getItem('userTvTags');
-        
-        // 如果本地存储中有标签数据，则使用它
-        if (savedMovieTags) {
-            movieTags = JSON.parse(savedMovieTags);
-        } else {
-            // 否则使用默认标签
-            movieTags = [...defaultMovieTags];
-        }
-        
-        if (savedTvTags) {
-            tvTags = JSON.parse(savedTvTags);
-        } else {
-            // 否则使用默认标签
-            tvTags = [...defaultTvTags];
-        }
-    } catch (e) {
-        console.error('加载标签失败：', e);
-        // 初始化为默认值，防止错误
-        movieTags = [...defaultMovieTags];
-        tvTags = [...defaultTvTags];
-    }
+    movieTags = [...defaultMovieTags];
+    tvTags    = [...defaultTvTags];
 }
-
-// 保存用户标签
-function saveUserTags() {
-    try {
-        localStorage.setItem('userMovieTags', JSON.stringify(movieTags));
-        localStorage.setItem('userTvTags', JSON.stringify(tvTags));
-    } catch (e) {
-        console.error('保存标签失败：', e);
-        showToast('保存标签失败', 'error');
-    }
-}
+function saveUserTags() {}
 
 let doubanMovieTvCurrentSwitch = 'movie';
 let doubanCurrentTag = '热门';
@@ -276,11 +273,11 @@ function renderDoubanMovieTvSwitch() {
     movieToggle.addEventListener('click', function() {
         if (doubanMovieTvCurrentSwitch !== 'movie') {
             // 更新按钮样式
-            movieToggle.classList.add('bg-pink-600', 'text-white');
-            movieToggle.classList.remove('text-gray-300');
+            movieToggle.classList.add('bg-rose-600', 'text-white');
+            movieToggle.classList.remove('text-gray-400');
             
-            tvToggle.classList.remove('bg-pink-600', 'text-white');
-            tvToggle.classList.add('text-gray-300');
+            tvToggle.classList.remove('bg-rose-600', 'text-white');
+            tvToggle.classList.add('text-gray-400');
             
             doubanMovieTvCurrentSwitch = 'movie';
             doubanCurrentTag = '热门';
@@ -302,11 +299,11 @@ function renderDoubanMovieTvSwitch() {
     tvToggle.addEventListener('click', function() {
         if (doubanMovieTvCurrentSwitch !== 'tv') {
             // 更新按钮样式
-            tvToggle.classList.add('bg-pink-600', 'text-white');
-            tvToggle.classList.remove('text-gray-300');
+            tvToggle.classList.add('bg-rose-600', 'text-white');
+            tvToggle.classList.remove('text-gray-400');
             
-            movieToggle.classList.remove('bg-pink-600', 'text-white');
-            movieToggle.classList.add('text-gray-300');
+            movieToggle.classList.remove('bg-rose-600', 'text-white');
+            movieToggle.classList.add('text-gray-400');
             
             doubanMovieTvCurrentSwitch = 'tv';
             doubanCurrentTag = '热门';
@@ -325,52 +322,37 @@ function renderDoubanMovieTvSwitch() {
     });
 }
 
-// 渲染豆瓣标签选择器
+// 渲染 JustWatch 风格平台/类型标签筛选器
 function renderDoubanTags(tags) {
     const tagContainer = document.getElementById('douban-tags');
     if (!tagContainer) return;
-    
-    // 确定当前应该使用的标签列表
-    const currentTags = doubanMovieTvCurrentSwitch === 'movie' ? movieTags : tvTags;
-    
-    // 清空标签容器
+
+    const platformList = doubanMovieTvCurrentSwitch === 'movie'
+        ? PLATFORM_TAGS.movie
+        : PLATFORM_TAGS.tv;
+
     tagContainer.innerHTML = '';
 
-    // 先添加标签管理按钮
-    const manageBtn = document.createElement('button');
-    manageBtn.className = 'py-1.5 px-3.5 rounded text-sm font-medium transition-all duration-300 bg-[#1a1a1a] text-gray-300 hover:bg-pink-700 hover:text-white border border-[#333] hover:border-white';
-    manageBtn.innerHTML = '<span class="flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>管理标签</span>';
-    manageBtn.onclick = function() {
-        showTagManageModal();
-    };
-    tagContainer.appendChild(manageBtn);
-
-    // 添加所有标签
-    currentTags.forEach(tag => {
+    platformList.forEach(platform => {
         const btn = document.createElement('button');
-        
-        // 设置样式
-        let btnClass = 'py-1.5 px-3.5 rounded text-sm font-medium transition-all duration-300 border ';
-        
-        // 当前选中的标签使用高亮样式
-        if (tag === doubanCurrentTag) {
-            btnClass += 'bg-pink-600 text-white shadow-md border-white';
-        } else {
-            btnClass += 'bg-[#1a1a1a] text-gray-300 hover:bg-pink-700 hover:text-white border-[#333] hover:border-white';
-        }
-        
-        btn.className = btnClass;
-        btn.textContent = tag;
-        
-        btn.onclick = function() {
-            if (doubanCurrentTag !== tag) {
-                doubanCurrentTag = tag;
-                doubanPageStart = 0;
+        const isActive = platform.tag === doubanCurrentTag;
+
+        btn.className = `flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium
+            transition-all duration-200 border whitespace-nowrap ${
+            isActive
+                ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-900/40'
+                : 'bg-[#1a1a1a] text-gray-400 border-[#2a2a2a] hover:text-white hover:border-[#444]'
+        }`;
+        btn.textContent = platform.label;
+
+        btn.onclick = () => {
+            if (doubanCurrentTag !== platform.tag) {
+                doubanCurrentTag = platform.tag;
+                doubanPageStart  = 0;
                 renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart);
                 renderDoubanTags();
             }
         };
-        
         tagContainer.appendChild(btn);
     });
 }
@@ -451,108 +433,187 @@ function renderRecommend(tag, pageLimit, pageStart) {
         });
 }
 
-// 优化版 fetchDoubanData：使用同步 getAuthSuffix 拼接，省去 await addAuthToProxyUrl
-async function fetchDoubanData(url) {
-    const controller = new AbortController();
-    const timeoutId  = setTimeout(() => controller.abort(), 10000);
+// fetchDoubanData：豆瓣 API 已被封（403），改用 TMDB 数据源
+// 将豆瓣 URL 映射为对应的 TMDB 请求，保持接口兼容
+const TMDB_KEY_DB  = 'b91a299b0c1cccf59e8765f913a24da2';
+const TMDB_BASE_DB = 'https://api.themoviedb.org/3';
+const TMDB_IMG_DB  = 'https://image.tmdb.org/t/p/w300';
 
-    const fetchOptions = {
-        signal: controller.signal,
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer':    'https://movie.douban.com/',
-            'Accept':     'application/json, text/plain, */*',
-        }
-    };
+// 豆瓣标签 → TMDB genre_id 映射（中文标签 → TMDB 电影/剧集类型ID）
+const DOUBAN_TAG_TO_TMDB_GENRE = {
+    '热门': null, '最新': null, '经典': null, '豆瓣高分': null, '冷门佳片': null,
+    '华语': null, '欧美': null, '韩国': null, '日本': null,
+    '动作': 28, '喜剧': 35, '爱情': 10749, '科幻': 878,
+    '悬疑': 9648, '恐怖': 27, '治愈': 18, '动画': 16,
+    // TV
+    '美剧': null, '英剧': null, '韩剧': null, '日剧': null,
+    '国产剧': null, '港剧': null, '日本动画': 16, '综艺': 10764, '纪录片': 99,
+};
+
+// 豆瓣标签 → TMDB 语言/地区过滤
+const DOUBAN_TAG_TO_REGION = {
+    '华语': 'zh', '欧美': 'en', '韩国': 'ko', '日本': 'ja',
+    '美剧': 'en', '英剧': 'en', '韩剧': 'ko', '日剧': 'ja', '港剧': 'zh',
+};
+
+async function fetchDoubanData(url) {
+    // 解析豆瓣 URL 参数，映射为 TMDB 请求
+    const urlObj   = new URL(url);
+    const type     = urlObj.searchParams.get('type') || 'movie';   // movie | tv
+    const tag      = urlObj.searchParams.get('tag')  || '热门';
+    const limit    = parseInt(urlObj.searchParams.get('page_limit') || '16');
+    const start    = parseInt(urlObj.searchParams.get('page_start') || '0');
+    const page     = Math.floor(start / limit) + 1;
+    const tmdbType = type === 'movie' ? 'movie' : 'tv';
+
+    let tmdbUrl;
+    const genreId  = DOUBAN_TAG_TO_TMDB_GENRE[tag];
+    const langCode = DOUBAN_TAG_TO_REGION[tag];
+
+    if (tag === '热门' || tag === '最新') {
+        // 当周热门
+        tmdbUrl = `${TMDB_BASE_DB}/trending/${tmdbType}/week?api_key=${TMDB_KEY_DB}&language=zh-CN&page=${page}`;
+    } else if (tag === '经典' || tag === '豆瓣高分') {
+        // 高评分
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=vote_average.desc&vote_count.gte=1000&page=${page}`;
+    } else if (tag === '冷门佳片') {
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=vote_average.desc&vote_count.gte=100&vote_count.lte=999&page=${page}`;
+    } else if (tag === '纪录片' || tag === '综艺' || tag === '日本动画') {
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId || ''}&page=${page}`;
+    } else if (genreId) {
+        // 有类型ID：按类型筛选
+        const langParam = langCode ? `&with_original_language=${langCode}` : '';
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId}${langParam}&sort_by=popularity.desc&page=${page}`;
+    } else if (langCode) {
+        // 仅有语言，无类型
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_original_language=${langCode}&sort_by=popularity.desc&page=${page}`;
+    } else {
+        // 兜底：热门
+        tmdbUrl = `${TMDB_BASE_DB}/trending/${tmdbType}/week?api_key=${TMDB_KEY_DB}&language=zh-CN&page=${page}`;
+    }
 
     try {
-        // await getAuthPrefix()：已缓存时同步解析，确保首次调用时预热完成
-        const authSuffix = window.ProxyAuth?.getAuthPrefix
-            ? await window.ProxyAuth.getAuthPrefix()
-            : '';
-        const proxiedUrl = PROXY_URL + encodeURIComponent(url) + authSuffix;
+        const resp = await fetch(tmdbUrl, {
+            signal: AbortSignal.timeout(8000),
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!resp.ok) throw new Error(`TMDB HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.results?.length) throw new Error('TMDB 无数据');
 
-        const response = await fetch(proxiedUrl, fetchOptions);
-        clearTimeout(timeoutId);
-
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        return await response.json();
+        // 转换为豆瓣格式（renderDoubanCards 期望 { subjects: [...] }）
+        const subjects = data.results.slice(0, limit).map(item => ({
+            title:  item.title || item.name || '未知',
+            rate:   item.vote_average ? item.vote_average.toFixed(1) : '',
+            cover:  item.poster_path ? `${TMDB_IMG_DB}${item.poster_path}` : '',
+            url:    `https://www.themoviedb.org/${tmdbType}/${item.id}`,
+            id:     item.id,
+            _tmdb:  true,  // 标记为 TMDB 数据，封面无需代理
+        }));
+        return { subjects };
     } catch (err) {
-        clearTimeout(timeoutId);
-        console.error("豆瓣 API 请求失败（直接代理）：", err);
-
-        // 备用：allorigins
-        const fallbackUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        try {
-            const fallbackResponse = await fetch(fallbackUrl);
-            if (!fallbackResponse.ok) throw new Error(`备用API请求失败! 状态: ${fallbackResponse.status}`);
-            const data = await fallbackResponse.json();
-            if (data?.contents) return JSON.parse(data.contents);
-            throw new Error("无法获取有效数据");
-        } catch (fallbackErr) {
-            console.error("豆瓣 API 备用请求也失败：", fallbackErr);
-            throw fallbackErr;
-        }
+        console.error('TMDB 请求失败，尝试代理:', err.message);
+        // 代理兜底
+        const authSuffix = window.ProxyAuth?.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : '';
+        const proxied    = PROXY_URL + encodeURIComponent(tmdbUrl) + authSuffix;
+        const r2 = await fetch(proxied, { signal: AbortSignal.timeout(8000) });
+        if (!r2.ok) throw new Error(`代理也失败: ${r2.status}`);
+        const d2 = await r2.json();
+        const subjects = (d2.results || []).slice(0, limit).map(item => ({
+            title: item.title || item.name || '未知',
+            rate:  item.vote_average ? item.vote_average.toFixed(1) : '',
+            cover: item.poster_path ? `${TMDB_IMG_DB}${item.poster_path}` : '',
+            url:   `https://www.themoviedb.org/${tmdbType}/${item.id}`,
+            id:    item.id,
+            _tmdb: true,
+        }));
+        return { subjects };
     }
 }
 
 // 抽取渲染豆瓣卡片的逻辑到单独函数
 // 抽取渲染豆瓣卡片的逻辑到单独函数
-// 优化版 renderDoubanCards：
-// 预取一次鉴权后缀，同步拼接所有封面 URL，消除 N 次串行 await
+// JustWatch 风格卡片渲染
 async function renderDoubanCards(data, container) {
     const fragment = document.createDocumentFragment();
 
     if (!data.subjects || data.subjects.length === 0) {
-        const emptyEl = document.createElement("div");
-        emptyEl.className = "col-span-full text-center py-8";
-        emptyEl.innerHTML = `<div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>`;
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'col-span-full text-center py-12 text-gray-500';
+        emptyEl.innerHTML = '暂无数据，请选择其他分类';
         fragment.appendChild(emptyEl);
-    } else {
-        // ── 预取一次鉴权后缀，复用到所有封面图，无需循环内 await ──────
-        // 必须 await：首次调用时 warmupAuth 可能还未完成，
-        // 同步 getAuthSuffix() 此时会拿到空值导致封面图鉴权失败
-        const authSuffix = window.ProxyAuth?.getAuthPrefix
-            ? await window.ProxyAuth.getAuthPrefix()
-            : '';
-
-        for (const item of data.subjects) {
-            const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-            const safeRate  = (item.rate || "暂无").replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-            // 同步拼接代理 URL，无需 await
-            const secureProxyUrl = PROXY_URL + encodeURIComponent(item.cover) + authSuffix;
-
-            const card = document.createElement("div");
-            card.className = "bg-[#111] hover:bg-[#222] transition-all duration-300 rounded-lg overflow-hidden flex flex-col transform hover:scale-105 shadow-md hover:shadow-lg";
-            card.innerHTML = `
-                <div class="relative w-full aspect-[2/3] overflow-hidden cursor-pointer" onclick="fillAndSearchWithDouban('${safeTitle}')">
-                    <img src="${secureProxyUrl}" alt="${safeTitle}"
-                        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                        loading="lazy" referrerpolicy="no-referrer">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
-                    <div class="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm">
-                        <span class="text-yellow-400">★</span> ${safeRate}
-                    </div>
-                    <div class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-sm hover:bg-[#333] transition-colors">
-                        <a href="${item.url}" target="_blank" rel="noopener noreferrer" title="在豆瓣查看" onclick="event.stopPropagation();">
-                            🔗
-                        </a>
-                    </div>
-                </div>
-                <div class="p-2 text-center bg-[#111]">
-                    <button onclick="fillAndSearchWithDouban('${safeTitle}')"
-                            class="text-sm font-medium text-white truncate w-full hover:text-pink-400 transition"
-                            title="${safeTitle}">
-                        ${safeTitle}
-                    </button>
-                </div>
-            `;
-            fragment.appendChild(card);
-        }
+        container.innerHTML = '';
+        container.appendChild(fragment);
+        return;
     }
 
-    container.innerHTML = "";
+    // TMDB 图片直接引用，不走代理
+    const authSuffix = (!data.subjects[0]?._tmdb && window.ProxyAuth?.getAuthPrefix)
+        ? await window.ProxyAuth.getAuthPrefix()
+        : '';
+
+    data.subjects.forEach((item, idx) => {
+        const safeTitle = (item.title || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const rate      = parseFloat(item.rate) || 0;
+        const showRate  = rate > 0;
+
+        // 封面：TMDB 直接引用，旧豆瓣走代理
+        const imgSrc = item._tmdb
+            ? (item.cover || '')
+            : (item.cover ? PROXY_URL + encodeURIComponent(item.cover) + authSuffix : '');
+
+        const card = document.createElement('div');
+        card.className = 'douban-card group cursor-pointer';
+        card.style.animationDelay = `${idx * 30}ms`;
+        card.onclick = () => fillAndSearchWithDouban(item.title);
+
+        card.innerHTML = `
+            <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-[#181818] shadow-md
+                         group-hover:shadow-xl group-hover:shadow-black/50
+                         group-hover:scale-[1.04] transition-all duration-300">
+                ${imgSrc ? `
+                    <img src="${imgSrc}" alt="${safeTitle}"
+                         class="w-full h-full object-cover"
+                         loading="lazy"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                    <div class="hidden w-full h-full items-center justify-center bg-gradient-to-br from-[#1e2535] to-[#0f0f0f] absolute inset-0">
+                        <span class="text-2xl font-bold text-gray-700">${safeTitle[0]||'?'}</span>
+                    </div>` :
+                    `<div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#1e2535] to-[#0f0f0f]">
+                        <span class="text-2xl font-bold text-gray-700">${safeTitle[0]||'?'}</span>
+                    </div>`
+                }
+                <!-- 评分徽章 -->
+                ${showRate ? `
+                <div class="absolute top-1.5 left-1.5 flex items-center gap-0.5
+                             bg-black/70 backdrop-blur-sm text-yellow-400 text-[10px]
+                             font-bold px-1.5 py-0.5 rounded-md leading-tight">
+                    <svg class="w-2.5 h-2.5 fill-yellow-400" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                    ${rate.toFixed(1)}
+                </div>` : ''}
+                <!-- 悬停搜索提示 -->
+                <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100
+                             transition-opacity duration-300 flex flex-col items-center justify-center gap-2 p-2">
+                    <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <span class="text-white text-xs text-center font-medium leading-tight line-clamp-2">${safeTitle}</span>
+                </div>
+            </div>
+            <!-- 标题 -->
+            <div class="mt-1.5 px-0.5">
+                <p class="text-[11px] text-gray-400 truncate group-hover:text-white transition-colors font-medium leading-snug">
+                    ${safeTitle}
+                </p>
+            </div>`;
+
+        fragment.appendChild(card);
+    });
+
+    container.innerHTML = '';
     container.appendChild(fragment);
 }
      
