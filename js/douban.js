@@ -456,9 +456,11 @@ async function fetchDoubanData(url) {
     };
 
     try {
-        // 优先同步拼接（预热后无 await 开销）
-        const authSuffix   = window.ProxyAuth?.getAuthSuffix ? window.ProxyAuth.getAuthSuffix() : '';
-        const proxiedUrl   = PROXY_URL + encodeURIComponent(url) + authSuffix;
+        // await getAuthPrefix()：已缓存时同步解析，确保首次调用时预热完成
+        const authSuffix = window.ProxyAuth?.getAuthPrefix
+            ? await window.ProxyAuth.getAuthPrefix()
+            : '';
+        const proxiedUrl = PROXY_URL + encodeURIComponent(url) + authSuffix;
 
         const response = await fetch(proxiedUrl, fetchOptions);
         clearTimeout(timeoutId);
@@ -497,12 +499,12 @@ async function renderDoubanCards(data, container) {
         emptyEl.innerHTML = `<div class="text-pink-500">❌ 暂无数据，请尝试其他分类或刷新</div>`;
         fragment.appendChild(emptyEl);
     } else {
-        // ── 预取一次鉴权后缀，后续同步拼接，无需循环内 await ────────────
-        const authSuffix = window.ProxyAuth?.getAuthSuffix
-            ? window.ProxyAuth.getAuthSuffix()           // 同步（已预热）
-            : window.ProxyAuth?.getAuthPrefix
-                ? await window.ProxyAuth.getAuthPrefix() // 异步兜底
-                : '';
+        // ── 预取一次鉴权后缀，复用到所有封面图，无需循环内 await ──────
+        // 必须 await：首次调用时 warmupAuth 可能还未完成，
+        // 同步 getAuthSuffix() 此时会拿到空值导致封面图鉴权失败
+        const authSuffix = window.ProxyAuth?.getAuthPrefix
+            ? await window.ProxyAuth.getAuthPrefix()
+            : '';
 
         for (const item of data.subjects) {
             const safeTitle = item.title.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
