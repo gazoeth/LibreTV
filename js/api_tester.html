@@ -24,10 +24,22 @@ button:disabled { background: #555; cursor: not-allowed; }
 <div id="summary"></div>
 <div id="result-config"></div>
 
+<script src="proxy-auth.js"></script>
 <script>
 const PROXY_URL = '/proxy/';
 const TEST_QUERY = encodeURIComponent('熊出没');
 const TIMEOUT_MS = 8000;
+
+// 获取鉴权后缀（复用 proxy-auth.js 已预热的缓存）
+async function getAuthSuffix() {
+    if (window.ProxyAuth?.getAuthPrefix) return await window.ProxyAuth.getAuthPrefix();
+    if (window.ProxyAuth?.addAuthToProxyUrl) {
+        // 用一个虚拟 URL 提取后缀
+        const full = await window.ProxyAuth.addAuthToProxyUrl('https://x.test');
+        return full.replace('https://x.test', '');
+    }
+    return '';
+}
 
 const APIS = {
     "api_1":  {"name":"TV-1080资源","api":"https://api.1080zyku.com/inc/api_mac10.php","detail":"https://api.1080zyku.com"},
@@ -99,7 +111,8 @@ function log(msg, cls='') {
 
 async function testOne(key, info) {
     const rawUrl = info.api.replace(/\/$/, '') + `?ac=videolist&wd=${TEST_QUERY}`;
-    const proxyUrl = PROXY_URL + encodeURIComponent(rawUrl);
+    const authSuffix = await getAuthSuffix();
+    const proxyUrl = PROXY_URL + encodeURIComponent(rawUrl) + authSuffix;
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
