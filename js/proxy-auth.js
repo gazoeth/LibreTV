@@ -54,7 +54,8 @@ function warmupAuth() {
  */
 function getAuthSuffix() {
     if (!cachedPasswordHash) return '';
-    return `&auth=${encodeURIComponent(cachedPasswordHash)}&t=${Date.now()}`;
+    // 代理 URL 是路径形式（/proxy/...），不含 ?，所以用 ? 而非 &
+    return `?auth=${encodeURIComponent(cachedPasswordHash)}&t=${Date.now()}`;
 }
 
 /**
