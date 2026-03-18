@@ -48,7 +48,7 @@ function saveUserTags() {}
 let doubanMovieTvCurrentSwitch = 'movie';
 let doubanCurrentTag = '热门';
 let doubanPageStart = 0;
-const doubanPageSize = 16; // 一次显示的项目数量
+const doubanPageSize = 24; // 一次显示的项目数量
 
 // 初始化豆瓣功能
 function initDouban() {
@@ -108,10 +108,6 @@ function initDouban() {
         renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart);
     }
 
-    // 初始化热门榜单（与豆瓣同步）
-    if (typeof initTrending === 'function') {
-        initTrending();
-    }
 }
 
 // 根据设置更新豆瓣区域的显示状态
@@ -134,10 +130,6 @@ function updateDoubanVisibility() {
         doubanArea.classList.add('hidden');
     }
 
-    // 同步更新热门榜单显示状态
-    if (typeof updateTrendingVisibility === 'function') {
-        updateTrendingVisibility();
-    }
 }
 
 // 只填充搜索框，不执行搜索，让用户自主决定搜索时机
@@ -470,27 +462,30 @@ async function fetchDoubanData(url) {
     const genreId  = DOUBAN_TAG_TO_TMDB_GENRE[tag];
     const langCode = DOUBAN_TAG_TO_REGION[tag];
 
+    // 年份限制参数（2025-2026，discover 接口用）
+    const yearField  = tmdbType === 'movie' ? 'primary_release_date' : 'first_air_date';
+    const yearFilter = `&${yearField}.gte=2025-01-01&${yearField}.lte=2026-12-31`;
+
     if (tag === '热门' || tag === '最新') {
-        // 当周热门
-        tmdbUrl = `${TMDB_BASE_DB}/trending/${tmdbType}/week?api_key=${TMDB_KEY_DB}&language=zh-CN&page=${page}`;
+        // 最新热门：用 discover + 年份过滤 + 按热度排序
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=popularity.desc${yearFilter}&page=${page}`;
     } else if (tag === '经典' || tag === '豆瓣高分') {
-        // 高评分
+        // 高评分：不限年份，保留经典
         tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=vote_average.desc&vote_count.gte=1000&page=${page}`;
     } else if (tag === '冷门佳片') {
         tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=vote_average.desc&vote_count.gte=100&vote_count.lte=999&page=${page}`;
     } else if (tag === '纪录片' || tag === '综艺' || tag === '日本动画') {
-        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId || ''}&page=${page}`;
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId || ''}${yearFilter}&sort_by=popularity.desc&page=${page}`;
     } else if (genreId) {
-        // 有类型ID：按类型筛选
         const langParam = langCode ? `&with_original_language=${langCode}` : '';
-        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId}${langParam}&sort_by=popularity.desc&page=${page}`;
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_genres=${genreId}${langParam}${yearFilter}&sort_by=popularity.desc&page=${page}`;
     } else if (langCode) {
-        // 仅有语言，无类型
-        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_original_language=${langCode}&sort_by=popularity.desc&page=${page}`;
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&with_original_language=${langCode}${yearFilter}&sort_by=popularity.desc&page=${page}`;
     } else {
-        // 兜底：热门
-        tmdbUrl = `${TMDB_BASE_DB}/trending/${tmdbType}/week?api_key=${TMDB_KEY_DB}&language=zh-CN&page=${page}`;
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=popularity.desc${yearFilter}&page=${page}`;
     }
+
+    const skipYearFilter = ['经典', '豆瓣高分', '冷门佳片'].includes(tag);
 
     try {
         const resp = await fetch(tmdbUrl, {
@@ -501,14 +496,20 @@ async function fetchDoubanData(url) {
         const data = await resp.json();
         if (!data.results?.length) throw new Error('TMDB 无数据');
 
-        // 转换为豆瓣格式（renderDoubanCards 期望 { subjects: [...] }）
-        const subjects = data.results.slice(0, limit).map(item => ({
-            title:  item.title || item.name || '未知',
-            rate:   item.vote_average ? item.vote_average.toFixed(1) : '',
-            cover:  item.poster_path ? `${TMDB_IMG_DB}${item.poster_path}` : '',
-            url:    `https://www.themoviedb.org/${tmdbType}/${item.id}`,
-            id:     item.id,
-            _tmdb:  true,  // 标记为 TMDB 数据，封面无需代理
+        // 转换为豆瓣格式，过滤2025年前的内容（经典/高分标签除外）
+        const filtered = skipYearFilter ? data.results : data.results.filter(item => {
+            const dateStr = item.release_date || item.first_air_date || '';
+            if (!dateStr) return true; // 无日期不过滤
+            const year = parseInt(dateStr.slice(0, 4));
+            return year >= 2025;
+        });
+        const subjects = filtered.slice(0, limit).map(item => ({
+            title: item.title || item.name || '未知',
+            rate:  item.vote_average ? item.vote_average.toFixed(1) : '',
+            cover: item.poster_path ? `${TMDB_IMG_DB}${item.poster_path}` : '',
+            url:   `https://www.themoviedb.org/${tmdbType}/${item.id}`,
+            id:    item.id,
+            _tmdb: true,
         }));
         return { subjects };
     } catch (err) {
@@ -519,7 +520,11 @@ async function fetchDoubanData(url) {
         const r2 = await fetch(proxied, { signal: AbortSignal.timeout(8000) });
         if (!r2.ok) throw new Error(`代理也失败: ${r2.status}`);
         const d2 = await r2.json();
-        const subjects = (d2.results || []).slice(0, limit).map(item => ({
+        const filtered2 = skipYearFilter ? (d2.results || []) : (d2.results || []).filter(item => {
+            const dateStr = item.release_date || item.first_air_date || '';
+            return !dateStr || parseInt(dateStr.slice(0, 4)) >= 2025;
+        });
+        const subjects = filtered2.slice(0, limit).map(item => ({
             title: item.title || item.name || '未知',
             rate:  item.vote_average ? item.vote_average.toFixed(1) : '',
             cover: item.poster_path ? `${TMDB_IMG_DB}${item.poster_path}` : '',
