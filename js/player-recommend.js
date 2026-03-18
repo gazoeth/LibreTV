@@ -3,7 +3,7 @@
 
 const PR_TMDB_KEY  = 'b91a299b0c1cccf59e8765f913a24da2';
 const PR_TMDB_BASE = 'https://api.themoviedb.org/3';
-const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w185';
+const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w300';
 const PR_PER_PAGE  = 12;
 const PR_CACHE_TTL = 60 * 60 * 1000; // 1小时
 
@@ -113,14 +113,14 @@ function renderSideCards(items) {
         const typeColor  = item.type === 'tv' ? 'bg-blue-700' : 'bg-rose-700';
 
         const card = document.createElement('div');
-        card.className = 'side-rec-card flex gap-2.5 cursor-pointer group';
+        card.className = 'side-rec-card flex gap-3 cursor-pointer group';
         card.style.setProperty('--i', idx);
         card.onclick = () => {
             window.location.href = `/?s=${encodeURIComponent(item.title)}`;
         };
 
         card.innerHTML = `
-            <div class="relative flex-shrink-0 w-12 h-[4.5rem] rounded-md overflow-hidden
+            <div class="relative flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden
                          bg-[#1a1a1a] group-hover:scale-105 transition-transform duration-200 shadow-sm">
                 ${item.poster
                     ? `<img src="${item.poster}" alt="${safeTitle}"
@@ -134,7 +134,7 @@ function renderSideCards(items) {
                               text-white ${typeColor} py-0.5 leading-tight">${typeLabel}</span>
             </div>
             <div class="flex-1 min-w-0 py-0.5">
-                <p class="text-xs font-medium text-gray-200 group-hover:text-white
+                <p class="text-sm font-medium text-gray-200 group-hover:text-white
                            transition-colors line-clamp-2 leading-snug mb-1">${safeTitle}</p>
                 <div class="flex items-center gap-1.5 flex-wrap">
                     ${item.year ? `<span class="text-[10px] text-gray-500">${item.year}</span>` : ''}
