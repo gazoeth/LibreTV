@@ -579,6 +579,9 @@ function resetSearchArea() {
     if (typeof updateDoubanVisibility === 'function') {
         updateDoubanVisibility();
     }
+    if (typeof updateTrendingVisibility === 'function') {
+        updateTrendingVisibility();
+    }
 
     // 重置URL为主页
     try {
@@ -643,6 +646,8 @@ async function search() {
         document.getElementById('resultsArea').classList.remove('hidden');
         const doubanArea = document.getElementById('doubanArea');
         if (doubanArea) doubanArea.classList.add('hidden');
+        const trendingArea = document.getElementById('trendingArea');
+        if (trendingArea) trendingArea.classList.add('hidden');
 
         const resultsDiv          = document.getElementById('results');
         const searchResultsCount  = document.getElementById('searchResultsCount');

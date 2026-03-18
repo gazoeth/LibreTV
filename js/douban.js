@@ -110,6 +110,11 @@ function initDouban() {
     if (localStorage.getItem('doubanEnabled') === 'true') {
         renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart);
     }
+
+    // 初始化热门榜单（与豆瓣同步）
+    if (typeof initTrending === 'function') {
+        initTrending();
+    }
 }
 
 // 根据设置更新豆瓣区域的显示状态
@@ -130,6 +135,11 @@ function updateDoubanVisibility() {
         }
     } else {
         doubanArea.classList.add('hidden');
+    }
+
+    // 同步更新热门榜单显示状态
+    if (typeof updateTrendingVisibility === 'function') {
+        updateTrendingVisibility();
     }
 }
 
