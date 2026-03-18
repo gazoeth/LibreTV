@@ -393,3 +393,20 @@ input:checked + .slider:before {
 #username {
     display: none !important;
 }
+
+/* ── 右侧热门推荐侧栏 ─────────────────────────────────────────────── */
+#sideRecommend {
+    max-height: calc(100vh - 5rem);
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+#sideRecommend::-webkit-scrollbar { display: none; }
+
+.side-rec-card {
+    animation: sideRecIn 0.3s ease both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes sideRecIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
