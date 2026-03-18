@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="same-origin">
-    <title>YiWuTV 播放器</title>
+    <title>LibreTV 播放器</title>
 
     <!-- Favicon -->
     <link rel="icon" href="image/logo.png">
@@ -27,7 +27,7 @@
                 <svg class="w-8 h-8 mr-2 text-[#00ccff] logo-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                 </svg>
-                <h1 class="text-xl font-bold gradient-text logo-text">YiWuTV</h1>
+                <h1 class="text-xl font-bold gradient-text logo-text">LibreTV</h1>
             </button>
         </div>
         <h2 id="videoTitle" class="text-xl font-semibold flex-1 text-center overflow-x-auto whitespace-nowrap truncate custom-title-scroll"></h2>
@@ -58,10 +58,10 @@
         </div>
     </div>
 
-    <main class="container mx-auto px-4 py-4">
-        <div class="flex gap-4 items-start">
-        <!-- ── 左栏：播放器主内容 ── -->
-        <div class="flex-1 min-w-0">
+    <main class="px-4 py-4">
+        <div class="flex gap-3 items-start justify-center">
+        <!-- ── 左栏：播放器主内容（最宽1000px，与player-container一致）── -->
+        <div class="flex-1 min-w-0" style="max-width:1000px">
 
         <!-- 视频播放区 -->
         <div id="playerContainer" class="player-container mb-4">
@@ -163,7 +163,7 @@
         </div><!-- end 左栏 -->
 
         <!-- ── 右侧推荐栏（桌面端显示）── -->
-        <aside id="sideRecommend" class="hidden lg:flex flex-col gap-3 w-56 xl:w-64 flex-shrink-0 sticky top-4">
+        <aside id="sideRecommend" class="hidden lg:flex flex-col gap-3 w-52 xl:w-60 flex-shrink-0 sticky top-4 self-start">
             <div class="flex items-center justify-between mb-1">
                 <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
                     <svg class="w-4 h-4 text-rose-400" fill="currentColor" viewBox="0 0 24 24">
@@ -211,9 +211,9 @@
                         <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
                         </svg>
-                        <span class="gradient-text font-bold">YiWuTV</span>
+                        <span class="gradient-text font-bold">LibreTV</span>
                     </div>
-                    <p class="text-gray-500 text-sm mt-2 text-center md:text-left">© 2025 YiWuTV - 自由观影，畅享精彩</p>
+                    <p class="text-gray-500 text-sm mt-2 text-center md:text-left">© 2025 LibreTV - 自由观影，畅享精彩</p>
                 </div>
                 
                 <div class="text-center md:text-right">
