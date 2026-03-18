@@ -48,7 +48,12 @@ async function searchByAPIAndKeyWord(apiId, query) {
 
         if (!response.ok) return [];
 
-        const data = await response.json();
+        // 先读取文本，校验是否为有效 JSON（防止返回"暂不支持搜索"等错误文本）
+        const text = await response.text();
+        if (!text || !text.trimStart().startsWith('{')) return [];
+
+        let data;
+        try { data = JSON.parse(text); } catch { return []; }
         if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) return [];
 
         const customApiUrl = apiId.startsWith('custom_')
@@ -85,7 +90,9 @@ async function searchByAPIAndKeyWord(apiId, query) {
                         });
                         clearTimeout(pt);
                         if (!pr.ok) return [];
-                        const pd = await pr.json();
+                        const pt2 = await pr.text();
+                        if (!pt2 || !pt2.trimStart().startsWith('{')) return [];
+                        let pd; try { pd = JSON.parse(pt2); } catch { return []; }
                         return pd?.list ? pd.list.map(mapItem) : [];
                     } catch {
                         return [];

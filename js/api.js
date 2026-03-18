@@ -136,7 +136,9 @@ async function handleAggregatedSearch(searchQuery) {
             const response = await fetch(proxiedUrl, { headers: API_CONFIG.search.headers, signal: controller.signal });
             clearTimeout(timeoutId);
             if (!response.ok) return [];
-            const data = await response.json();
+            const txt = await response.text();
+            if (!txt || !txt.trimStart().startsWith('{')) return [];
+            let data; try { data = JSON.parse(txt); } catch { return []; }
             return (data?.list || []).map(item => ({ ...item, source_name: API_SITES[source].name, source_code: source }));
         } catch (error) {
             return [];
