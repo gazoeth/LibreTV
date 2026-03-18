@@ -3,7 +3,7 @@
 
 const PR_TMDB_KEY  = 'b91a299b0c1cccf59e8765f913a24da2';
 const PR_TMDB_BASE = 'https://api.themoviedb.org/3';
-const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w185';
+const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w300';
 const PR_PER_PAGE  = 12;
 const PR_CACHE_TTL = 60 * 60 * 1000; // 1小时
 
@@ -104,6 +104,9 @@ function renderSideCards(items) {
         return;
     }
 
+    list.style.gap = '12px';
+    list.style.display = 'flex';
+    list.style.flexDirection = 'column';
     const frag = document.createDocumentFragment();
     items.forEach((item, idx) => {
         const safeTitle = item.title
@@ -113,38 +116,43 @@ function renderSideCards(items) {
         const typeColor  = item.type === 'tv' ? 'bg-blue-700' : 'bg-rose-700';
 
         const card = document.createElement('div');
-        card.className = 'side-rec-card flex gap-3 cursor-pointer group';
+        card.className = 'side-rec-card cursor-pointer group';
         card.style.setProperty('--i', idx);
         card.onclick = () => {
             window.location.href = `/?s=${encodeURIComponent(item.title)}`;
         };
 
         card.innerHTML = `
-            <div class="relative flex-shrink-0 w-14 h-20 rounded-md overflow-hidden
-                         bg-[#1a1a1a] group-hover:scale-105 transition-transform duration-200 shadow-sm">
-                ${item.poster
-                    ? `<img src="${item.poster}" alt="${safeTitle}"
-                             class="w-full h-full object-cover" loading="lazy"
-                             onerror="this.style.display='none'">`
-                    : `<div class="w-full h-full flex items-center justify-center text-lg font-bold text-gray-700">
-                           ${item.title[0]||'?'}
-                       </div>`
-                }
-                <span class="absolute bottom-0 left-0 right-0 text-[9px] text-center font-bold
-                              text-white ${typeColor} py-0.5 leading-tight">${typeLabel}</span>
-            </div>
-            <div class="flex-1 min-w-0 py-0.5">
-                <p class="text-xs font-medium text-gray-200 group-hover:text-white
-                           transition-colors line-clamp-2 leading-snug mb-1">${safeTitle}</p>
-                <div class="flex items-center gap-1.5 flex-wrap">
-                    ${item.year ? `<span class="text-[10px] text-gray-500">${item.year}</span>` : ''}
-                    ${showRating ? `
-                    <span class="flex items-center gap-0.5 text-[10px] text-yellow-500 font-medium">
-                        <svg class="w-2.5 h-2.5 fill-yellow-500" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                        </svg>
-                        ${item.rating}
-                    </span>` : ''}
+            <div class="flex gap-2.5 items-start">
+                <!-- 封面 -->
+                <div class="relative flex-shrink-0 rounded-md overflow-hidden bg-[#1a1a1a]
+                             shadow-md group-hover:shadow-lg transition-shadow duration-200"
+                     style="width:64px;height:88px">
+                    ${item.poster
+                        ? `<img src="${item.poster}" alt="${safeTitle}"
+                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                 loading="lazy" onerror="this.style.display='none'">`
+                        : `<div class="w-full h-full flex items-center justify-center text-xl font-bold text-gray-600">
+                               ${item.title[0]||'?'}
+                           </div>`
+                    }
+                    <span class="absolute bottom-0 left-0 right-0 text-[10px] text-center font-bold
+                                  text-white ${typeColor} py-0.5">${typeLabel}</span>
+                </div>
+                <!-- 信息 -->
+                <div class="flex-1 min-w-0 pt-0.5">
+                    <p class="text-[13px] font-medium text-gray-200 group-hover:text-white
+                               transition-colors line-clamp-3 leading-snug mb-1.5">${safeTitle}</p>
+                    <div class="flex items-center gap-2">
+                        ${item.year ? `<span class="text-xs text-gray-500">${item.year}</span>` : ''}
+                        ${showRating ? `
+                        <span class="flex items-center gap-0.5 text-xs text-yellow-400 font-semibold">
+                            <svg class="w-3 h-3 fill-yellow-400" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            ${item.rating}
+                        </span>` : ''}
+                    </div>
                 </div>
             </div>`;
 
