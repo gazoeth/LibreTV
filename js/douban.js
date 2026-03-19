@@ -2,10 +2,31 @@
 
 // ── JustWatch 风格平台标签配置 ──────────────────────────────────────────────
 // 映射：显示名 → TMDB watch_providers ID（台湾地区）
+// TMDB 台湾地区流媒体平台 provider IDs
+// atp=Apple TV+, nfx=Netflix, ply=Disney+, prv=Prime Video
+// flx=Catchplay, itu=iTunes, ivr=iQIYI, tcv=friDay, tfc=TaiwanPlay
+const STREAMING_PROVIDERS = {
+    'Netflix':      { id: 8,   emoji: '🔴' },
+    'Disney+':      { id: 337, emoji: '🔵' },
+    'Apple TV+':    { id: 350, emoji: '⬛' },
+    'Prime Video':  { id: 119, emoji: '🟦' },
+    'Catchplay':    { id: 248, emoji: '🟡' },
+    'iQIYI':        { id: 118, emoji: '🟢' },
+    'friDay影音':   { id: 390, emoji: '🟣' },
+};
+
 const PLATFORM_TAGS = {
     movie: [
         { label: '🔥 本周热门',  tag: '热门',    icon: '' },
         { label: '🆕 最新上映',  tag: '最新',    icon: '' },
+        // 流媒体平台
+        { label: '🔴 Netflix',   tag: 'Netflix',   provider: 8   },
+        { label: '🔵 Disney+',   tag: 'Disney+',   provider: 337 },
+        { label: '⬛ Apple TV+', tag: 'Apple TV+', provider: 350 },
+        { label: '🟦 Prime',     tag: 'Prime Video', provider: 119 },
+        { label: '🟢 iQIYI',     tag: 'iQIYI',     provider: 118 },
+        { label: '🟡 Catchplay', tag: 'Catchplay',  provider: 248 },
+        // 类型
         { label: '⭐ 高分推荐',  tag: '豆瓣高分', icon: '' },
         { label: '🎬 动作',      tag: '动作',    icon: '' },
         { label: '😄 喜剧',      tag: '喜剧',    icon: '' },
@@ -21,6 +42,14 @@ const PLATFORM_TAGS = {
     tv: [
         { label: '🔥 本周热门',  tag: '热门',    icon: '' },
         { label: '🆕 最新剧集',  tag: '最新',    icon: '' },
+        // 流媒体平台
+        { label: '🔴 Netflix',   tag: 'Netflix',   provider: 8   },
+        { label: '🔵 Disney+',   tag: 'Disney+',   provider: 337 },
+        { label: '⬛ Apple TV+', tag: 'Apple TV+', provider: 350 },
+        { label: '🟦 Prime',     tag: 'Prime Video', provider: 119 },
+        { label: '🟢 iQIYI',     tag: 'iQIYI',     provider: 118 },
+        { label: '🟡 Catchplay', tag: 'Catchplay',  provider: 248 },
+        // 类型/地区
         { label: '🇺🇸 美剧',    tag: '美剧',    icon: '' },
         { label: '🇰🇷 韩剧',    tag: '韩剧',    icon: '' },
         { label: '🇨🇳 国产剧',  tag: '国产剧',  icon: '' },
@@ -176,11 +205,11 @@ function fillAndSearch(title) {
             // 使用HTML5 History API更新URL，不刷新页面
             window.history.pushState(
                 { search: safeTitle }, 
-                `搜索: ${safeTitle} - LibreTV`, 
+                `搜索: ${safeTitle} - YiWuTV`, 
                 `/s=${encodedQuery}`
             );
             // 更新页面标题
-            document.title = `搜索: ${safeTitle} - LibreTV`;
+            document.title = `搜索: ${safeTitle} - YiWuTV`;
         } catch (e) {
             console.error('更新浏览器历史失败:', e);
         }
@@ -236,11 +265,11 @@ async function fillAndSearchWithDouban(title) {
             // 使用HTML5 History API更新URL，不刷新页面
             window.history.pushState(
                 { search: safeTitle }, 
-                `搜索: ${safeTitle} - LibreTV`, 
+                `搜索: ${safeTitle} - YiWuTV`, 
                 `/s=${encodedQuery}`
             );
             // 更新页面标题
-            document.title = `搜索: ${safeTitle} - LibreTV`;
+            document.title = `搜索: ${safeTitle} - YiWuTV`;
         } catch (e) {
             console.error('更新浏览器历史失败:', e);
         }
@@ -466,7 +495,15 @@ async function fetchDoubanData(url) {
     const yearField  = tmdbType === 'movie' ? 'primary_release_date' : 'first_air_date';
     const yearFilter = `&${yearField}.gte=2025-01-01&${yearField}.lte=2026-12-31`;
 
-    if (tag === '热门' || tag === '最新') {
+    // 检查是否为流媒体平台标签
+    const platformList = tmdbType === 'movie' ? PLATFORM_TAGS.movie : PLATFORM_TAGS.tv;
+    const platformEntry = platformList.find(p => p.tag === tag && p.provider);
+    if (platformEntry) {
+        // 按平台 + 年份过滤，watch_region=TW 台湾地区
+        tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN` +
+            `&with_watch_providers=${platformEntry.provider}&watch_region=TW` +
+            `&sort_by=popularity.desc${yearFilter}&page=${page}`;
+    } else if (tag === '热门' || tag === '最新') {
         // 最新热门：用 discover + 年份过滤 + 按热度排序
         tmdbUrl = `${TMDB_BASE_DB}/discover/${tmdbType}?api_key=${TMDB_KEY_DB}&language=zh-CN&sort_by=popularity.desc${yearFilter}&page=${page}`;
     } else if (tag === '经典' || tag === '豆瓣高分') {
