@@ -1,20 +1,20 @@
+/* ============================================================
+   LibreTV 播放器样式 - 重构版
+   ============================================================ */
+
 body, html {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
-    background-color: #0f1622;
+    background-color: #0a0a0f;
     color: white;
-    padding-top: 37px;
+    padding-top: 57px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Critical header and navigation styles */
-.player-header {
-    position: relative;
-    z-index: 2147483647 !important;
-    pointer-events: auto !important;
-}
-
+/* ── Header ─────────────────────────────────────────────────── */
 .player-header-fixed {
     position: fixed !important;
     top: 0;
@@ -22,28 +22,68 @@ body, html {
     width: 100vw;
     z-index: 9000 !important;
     pointer-events: auto !important;
-    background: #111;
-}
-
-#homeButton { 
-    pointer-events: auto !important; 
+    background: rgba(10, 10, 15, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    height: 57px;
 }
 
 .home-button {
     background: none !important;
     border: none !important;
     padding: 0 !important;
+    cursor: pointer;
 }
 
-/* Critical loading styles to prevent FOUC */
+.logo-icon { color: #e50914 !important; }
+
+.logo-text {
+    background: linear-gradient(90deg, #f1f1f1, #a0a0b0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+}
+
+/* gradient-text shim for player page */
+.gradient-text {
+    background: linear-gradient(90deg, #f1f1f1, #a0a0b0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.home-btn {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #c0c0d0 !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease !important;
+    font-size: 0.875rem;
+}
+.home-btn:hover {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: rgba(255,255,255,0.2) !important;
+    color: #f1f1f1 !important;
+}
+
+/* ── Player container ────────────────────────────────────────── */
+.player-container {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
 .player-placeholder {
     width: 100% !important;
     height: auto !important;
     aspect-ratio: 16/9 !important;
-    background-color: #1f2937 !important;
+    background-color: #111118 !important;
     position: relative !important;
     display: block !important;
-    border-radius: 8px !important;
+    border-radius: 12px !important;
     overflow: hidden !important;
 }
 
@@ -52,356 +92,295 @@ body, html {
     height: 0 !important;
     padding-bottom: 56.25% !important;
     position: relative !important;
-    background-color: #1f2937 !important;
-    border-radius: 8px !important;
+    background-color: #111118 !important;
+    border-radius: 12px !important;
     overflow: hidden !important;
     display: block !important;
 }
 
 .player-loading-overlay {
     position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
+    inset: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    background-color: rgba(17, 24, 39, 0.7) !important;
+    background-color: rgba(10, 10, 15, 0.7) !important;
+    gap: 1rem;
 }
 
 .player-loading-spinner {
-    width: 48px !important;
-    height: 48px !important;
-    border: 4px solid rgba(255, 255, 255, 0.1) !important;
+    width: 44px !important;
+    height: 44px !important;
+    border: 3px solid rgba(255,255,255,0.08) !important;
     border-radius: 50% !important;
-    border-top-color: #f97316 !important;
+    border-top-color: #e50914 !important;
+    animation: spin 0.8s linear infinite;
     position: relative !important;
-    margin-bottom: 16px !important;
-    animation: spin 1s linear infinite !important;
 }
 
-/* Critical styles for loading text */
-.player-loading-text,
-.player-loading-overlay div:nth-child(2),
-div.player-loading-text {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    color: #f9fafb !important;
-    font-size: 16px !important;
-    font-weight: 500 !important;
-    margin-bottom: 8px !important;
-    text-align: center !important;
-    font-family: system-ui, -apple-system, sans-serif !important;
-    line-height: 1.4 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-    pointer-events: none !important;
-    z-index: 100 !important;
-    background: transparent !important;
-    max-width: 90% !important;
+.player-loading-text {
+    color: #8a8a9a !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
 }
 
-@keyframes player-spinner-rotate {
-    to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* ArtPlayer specific styles */
-.art-video-player, .art-video-player video {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 150px !important;
-    max-height: 100vh !important;
-    background: #000 !important;
-    object-fit: contain !important;
-    display: block !important;
-}
-
-/* Fix for Chrome-specific issues */
-@media screen and (-webkit-min-device-pixel-ratio: 0) {
-    .art-video-player video {
-        transform: translateZ(0) !important;
-        will-change: transform !important;
-    }
-
-    /* Force visibility of video element */
-    .art-video-player.art-playing video {
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-}
-
-.player-container {
-    width: 100%;
-    max-width: 100%;
-}
-
-#player {
-    width: 100%;
-    height: 60vh; /* 视频播放器高度 */
-}
-
+/* ── Loading / Error overlays ────────────────────────────────── */
 .loading-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    z-index: 100;
     flex-direction: column;
+    gap: 1rem;
+    padding: 3rem;
+    color: #8a8a9a;
+    font-size: 0.875rem;
 }
 
 .loading-spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255,255,255,0.08);
     border-radius: 50%;
-    border-top-color: white;
-    animation: spin 1s ease-in-out infinite;
-    margin-bottom: 10px;
+    border-top-color: #e50914;
+    animation: spin 0.8s linear infinite;
 }
 
 .error-container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
     display: none;
     align-items: center;
     justify-content: center;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    z-index: 100;
     flex-direction: column;
-    text-align: center;
-    padding: 1rem;
+    gap: 0.5rem;
+    padding: 3rem;
+    color: #8a8a9a;
 }
 
-.error-icon {
-    font-size: 48px;
-    margin-bottom: 10px;
+.error-icon { font-size: 2rem; }
+.error-message-sub { font-size: 0.8rem; color: #5a5a6e; margin-top: 4px; }
+
+/* ── Resource info bar ───────────────────────────────────────── */
+#resourceInfoBarContainer {
+    align-items: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.025) !important;
+    border: 1px solid rgba(255,255,255,0.07);
+    padding: 0.6rem 1rem;
+    box-shadow: none;
 }
 
-.error-message-sub {
-    margin-top: 10px;
-    font-size: 14px;
-    color: #aaa;
+.resource-info-bar-left {
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f1f1f1;
+    flex: 1;
 }
 
-.episode-active {
-    background-color: #3b82f6 !important;
-    border-color: #60a5fa !important;
+.resource-info-bar-videos {
+    font-size: 0.8rem;
+    font-weight: 400;
+    margin-left: 8px;
+    color: #8a8a9a;
 }
 
+.resource-switch-btn {
+    align-items: center;
+    background: rgba(229,9,20,0.1);
+    border: 1px solid rgba(229,9,20,0.25);
+    color: #ff8080;
+    font-weight: 600;
+    font-size: 0.825rem;
+    cursor: pointer;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+.resource-switch-btn:hover {
+    background: rgba(229,9,20,0.18);
+    border-color: rgba(229,9,20,0.4);
+}
+.resource-switch-icon {
+    width: 16px;
+    height: 16px;
+    color: #ff8080;
+    vertical-align: middle;
+    transition: transform 0.3s;
+}
+
+/* ── Episode navigation buttons ──────────────────────────────── */
+#prevButton, #nextButton {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #c0c0d0 !important;
+    border-radius: 10px !important;
+    padding: 0.5rem 1rem !important;
+    font-size: 0.875rem;
+    transition: all 0.2s ease !important;
+}
+#prevButton:hover, #nextButton:hover {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: rgba(255,255,255,0.2) !important;
+    color: #f1f1f1 !important;
+}
+
+/* Toolbar buttons (sort, copy, lock) */
+.player-container button:not(#prevButton):not(#nextButton):not(#autoplayToggle) {
+    transition: all 0.2s ease;
+}
+.player-container .flex-wrap button {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    color: #a0a0b0 !important;
+    border-radius: 8px !important;
+    font-size: 0.8rem;
+}
+.player-container .flex-wrap button:hover {
+    background: rgba(255,255,255,0.09) !important;
+    color: #f1f1f1 !important;
+}
+
+/* ── Episode grid ────────────────────────────────────────────── */
 .episode-grid {
     max-height: 30vh;
     overflow-y: auto;
+    padding: 0.75rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.episode-grid::-webkit-scrollbar { width: 4px; }
+.episode-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+
+.episode-active {
+    background: rgba(229,9,20,0.2) !important;
+    border-color: rgba(229,9,20,0.5) !important;
+    color: #ff9090 !important;
 }
 
-/* 恢复播放位置提示样式 */
-.position-restore-hint {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 4px;
-    z-index: 1000;
-    transition: transform 0.3s ease;
-    font-size: 14px;
+/* Episode buttons in the grid */
+#episodesList button {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #a0a0b0;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#episodesList button:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.18);
+    color: #f1f1f1;
 }
 
-.position-restore-hint.show {
-    transform: translateX(-50%) translateY(0);
-}
-
-.hint-content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
+/* ── Autoplay toggle switch ──────────────────────────────────── */
 .switch {
     position: relative;
     display: inline-block;
-    width: 46px;
-    height: 24px;
+    width: 42px;
+    height: 22px;
 }
-
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
+.switch input { opacity: 0; width: 0; height: 0; }
 .slider {
     position: absolute;
     cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #333;
-    transition: .4s;
-    border-radius: 24px;
+    inset: 0;
+    background-color: rgba(255,255,255,0.12);
+    transition: 0.3s;
+    border-radius: 22px;
 }
-
 .slider:before {
     position: absolute;
     content: "";
-    height: 18px;
-    width: 18px;
+    height: 16px;
+    width: 16px;
     left: 3px;
     bottom: 3px;
     background-color: white;
-    transition: .4s;
+    transition: 0.3s;
     border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
+input:checked + .slider { background-color: #e50914; }
+input:checked + .slider:before { transform: translateX(20px); }
 
-input:checked + .slider {
-    background-color: #00ccff;
-}
+/* ── Autoplay label ──────────────────────────────────────────── */
+.text-gray-400 { color: #8a8a9a !important; }
 
-input:checked + .slider:before {
-    transform: translateX(22px);
-}
+/* ── Episode info text ───────────────────────────────────────── */
+#episodeInfo { color: #8a8a9a; font-size: 0.875rem; }
 
-/* 添加快捷键提示样式 */
+/* ── Shortcut hint ───────────────────────────────────────────── */
 .shortcut-hint {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.8);
+    background: rgba(10,10,15,0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
     color: white;
     padding: 1rem 2rem;
-    border-radius: 0.5rem;
-    font-size: 1.5rem;
+    border-radius: 12px;
+    font-size: 1.25rem;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     z-index: 1000;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
 }
+.shortcut-hint.show { opacity: 1; }
 
-.shortcut-hint.show {
-    opacity: 1;
+/* ── Position restore hint ───────────────────────────────────── */
+.position-restore-hint {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    background: rgba(10,10,15,0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 10px;
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    font-size: 0.875rem;
 }
+.position-restore-hint.show { transform: translateX(-50%) translateY(0); }
+.hint-content { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
 
-/* 原生全屏时，播放器容器铺满 */
+/* ── Fullscreen ──────────────────────────────────────────────── */
 .player-container:-webkit-full-screen,
 .player-container:fullscreen {
     position: fixed;
-    top: 0; left: 0;
+    inset: 0;
     width: 100vw; height: 100vh;
     z-index: 10000;
     background-color: #000;
+    border-radius: 0;
 }
-
 .player-container:-webkit-full-screen #player,
-.player-container:fullscreen #player {
-    width: 100%; height: 100%;
-}
+.player-container:fullscreen #player { width: 100%; height: 100%; }
 
-/* 资源信息卡片区 */
-#resourceInfoBarContainer {
-    align-items: center;
-    border-radius: 0.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.resource-info-bar-left {
-    align-items: center;
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #fff;
-    flex: 1;
-}
-
-.resource-info-bar-videos {
-    font-size: 1rem;
-    font-weight: normal;
-    margin-left: 10px;
-    color: #ccc;
-}
-
-.resource-switch-btn {
-    align-items: center;
-    background: none;
-    border: none;
-    color: #a67c2d;
-    font-weight: bold;
-    font-size: 1rem;
-    cursor: pointer;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 0.5rem;
-    transition: background 0.2s;
-}
-
-.resource-switch-btn:hover {
-    background: #f5e9d7;
-}
-
-.resource-switch-btn:active {
-    background: #f5e9d7;
-}
-
-.resource-switch-icon {
-    width: 20px;
-    height: 20px;
-    margin-right: 0;
-    color: #a67c2d;
-    vertical-align: middle;
-    transition: transform 0.3s;
-}
-
-/* 新增：移动端响应式样式 */
-@media (max-width: 640px) {
-    .episode-grid {
-        max-height: 40vh; /* 移动端增加集数列表高度 */
-    }
-
-    /* 改进移动端按钮显示 */
-    button {
-        white-space: nowrap;
-    }
-
-    /* 控制栏在小屏幕上可能需要换行 */
-    .player-container .flex-wrap {
-        margin-bottom: 4px;
-    }
-}
-
-/* 隐藏用户名输入框 */
-#username {
-    display: none !important;
-}
-
-/* ── 右侧热门推荐侧栏 ─────────────────────────────────────────────── */
+/* ── Side recommendations ────────────────────────────────────── */
 #sideRecommend {
     max-height: calc(100vh - 5rem);
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: #333 transparent;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
 }
 #sideRecommend::-webkit-scrollbar { width: 3px; }
-#sideRecommend::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+#sideRecommend::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
 
 .side-rec-card {
     animation: sideRecIn 0.3s ease both;
@@ -411,3 +390,33 @@ input:checked + .slider:before {
     from { opacity: 0; transform: translateX(10px); }
     to   { opacity: 1; transform: translateX(0); }
 }
+
+/* ── Modal overrides for player page ─────────────────────────── */
+#modal .bg-\[\#111\] {
+    background: #16161f !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    border-radius: 16px !important;
+}
+#loading .bg-\[\#111\] {
+    background: #16161f !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    border-radius: 16px !important;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.footer {
+    border-top-color: rgba(255,255,255,0.06) !important;
+    background: #0a0a0f !important;
+}
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    body { padding-top: 53px; }
+    .player-header-fixed { height: 53px; }
+    .episode-grid { max-height: 38vh; }
+    .home-btn-text { display: none; }
+    .home-btn { padding: 0.4rem 0.6rem !important; }
+}
+
+/* ── Misc ────────────────────────────────────────────────────── */
+#username { display: none !important; }

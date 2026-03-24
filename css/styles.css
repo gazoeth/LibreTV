@@ -237,3 +237,147 @@ button, .card-hover { transition: var(--transition); }
     border-radius: var(--radius-lg) !important;
 }
 .animate-spin { border-top-color: var(--accent) !important; }
+
+/* ================================================================
+   面板滑入/滑出（必须存在，JS 依赖 .show 类切换）
+   ================================================================ */
+
+.settings-panel {
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.settings-panel.show {
+    transform: translateX(0);
+}
+
+.history-panel {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 280px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+}
+.history-panel.show {
+    transform: translateX(0);
+}
+
+/* ================================================================
+   搜索结果卡片图片容器 —— 固定宽高比，确保封面不变形
+   ================================================================ */
+
+.search-card-img-container {
+    width: 96px;
+    min-width: 96px;
+    /* 竖版海报 2:3 比例 */
+    aspect-ratio: 2 / 3;
+    height: auto;
+    overflow: hidden;
+    background-color: #1a1a22;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.search-card-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── 搜索结果响应式网格 ─────────────────────────────────────── */
+@media (max-width: 640px) {
+    #results { grid-template-columns: 1fr !important; }
+    .search-card-img-container { width: 80px; min-width: 80px; }
+}
+@media (min-width: 641px) and (max-width: 768px) {
+    #results { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+    #results { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (min-width: 1025px) {
+    #results { grid-template-columns: repeat(4, 1fr) !important; }
+}
+
+/* 卡片内字体 */
+.card-hover h3  { font-size: 0.9rem; line-height: 1.3; }
+.card-hover p   { font-size: 0.78rem; }
+.card-hover .p-2 { padding: 0.65rem; }
+
+/* ================================================================
+   全局响应式优化 —— 手机端
+   ================================================================ */
+
+/* 手机顶部按钮小屏适配 */
+@media (max-width: 480px) {
+    .fixed.top-4.left-4 button,
+    .fixed.top-4.right-4 button {
+        padding: 0.4rem 0.55rem;
+    }
+}
+
+/* 搜索区域手机端 */
+@media (max-width: 480px) {
+    .hero-title { font-size: 2.2rem !important; }
+    .search-box { border-radius: 10px !important; height: 3rem !important; }
+    .search-home-btn,
+    .search-submit-btn { width: 4rem !important; font-size: 0.82rem !important; }
+    .search-input { padding: 0 0.85rem !important; font-size: 0.88rem !important; }
+}
+
+/* 历史/设置侧边栏在手机端占满宽度 */
+@media (max-width: 480px) {
+    .history-panel { width: 100vw !important; }
+    .settings-panel { width: 100vw !important; }
+}
+
+/* 豆瓣区域手机端 */
+@media (max-width: 480px) {
+    #douban-results {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+}
+
+/* 主容器手机端间距 */
+@media (max-width: 640px) {
+    .container { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+}
+
+/* Toast 手机端 */
+#toast {
+    max-width: calc(100vw - 2rem);
+    text-align: center;
+    pointer-events: none;
+}
+
+/* Modal 手机端 */
+@media (max-width: 640px) {
+    #modal > div,
+    #disclaimerModal > div {
+        padding: 1.25rem !important;
+        border-radius: 16px !important;
+    }
+}
+
+/* ================================================================
+   历史记录条目样式
+   ================================================================ */
+.history-item {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+    transition: all 0.2s ease;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+.history-item:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(229,9,20,0.25);
+}
