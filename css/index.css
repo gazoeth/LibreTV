@@ -837,8 +837,8 @@
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: -webkit-linear-gradient(135deg, #e50914, #ff6b35);
-    background: linear-gradient(135deg, #e50914, #ff6b35);
+    background: -webkit-linear-gradient(135deg,#e50914,#c8000b);
+    background: linear-gradient(135deg,#e50914,#c8000b);
     display: -webkit-box;
     display: -ms-flexbox;
     display: flex;
