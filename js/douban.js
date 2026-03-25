@@ -389,14 +389,16 @@ async function renderDoubanCards(data, container) {
         return;
     }
 
+    const authSuffix = window.ProxyAuth?.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : '';
+
     data.subjects.forEach((item, idx) => {
         const safeTitle = (item.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const rate = parseFloat(item.rate) || 0;
         const showRate = rate > 0;
 
-        // 豆瓣图片：直接引用 + no-referrer，失败后用项目自带的 /proxy/ 兜底（适用于 Cloudflare Pages 部署）
+        // 豆瓣图片：直接引用会被豆瓣返回 418，因为无法伪造 Referer，所以直接统一通过有伪造 Referer 逻辑的 CF /proxy/ 服务端路由进行代理加载
         const originalCoverUrl = item.cover || '';
-        const proxiedCoverUrl = originalCoverUrl ? `${PROXY_URL}${encodeURIComponent(originalCoverUrl)}` : '';
+        const proxiedCoverUrl = originalCoverUrl ? `${PROXY_URL}${encodeURIComponent(originalCoverUrl)}${authSuffix}` : '';
 
         const card = document.createElement('div');
         card.className = 'douban-card group cursor-pointer';
@@ -408,11 +410,10 @@ async function renderDoubanCards(data, container) {
                          group-hover:shadow-xl group-hover:shadow-black/50
                          group-hover:scale-[1.04] transition-all duration-300">
                 ${originalCoverUrl ? `
-                    <img src="${originalCoverUrl}" alt="${safeTitle}"
+                    <img src="${proxiedCoverUrl}" alt="${safeTitle}"
                          class="w-full h-full object-cover"
                          loading="lazy"
-                         referrerpolicy="no-referrer"
-                         onerror="this.onerror=function(){this.style.display='none';this.nextElementSibling.style.display='flex'};this.src='${proxiedCoverUrl}';">
+                         onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';">
                     <div class="hidden w-full h-full items-center justify-center bg-gradient-to-br from-[#1e2535] to-[#0f0f0f] absolute inset-0">
                         <span class="text-2xl font-bold text-gray-700">${safeTitle[0] || '?'}</span>
                     </div>` :
