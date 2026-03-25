@@ -135,7 +135,8 @@ function updateSiteStatus(isAvailable) {
 }
 
 function closeModal() {
-    document.getElementById('modal').classList.add('hidden');
+    // NOTE: 使用 style.display 控制，与 HTML 中 style="display:none" 保持一致
+    document.getElementById('modal').style.display = 'none';
     // 清除 iframe 内容
     document.getElementById('modalContent').innerHTML = '';
 }

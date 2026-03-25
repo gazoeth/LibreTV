@@ -3,8 +3,8 @@
 // TMDB API: https://www.themoviedb.org/
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
-const TMDB_IMG  = 'https://image.tmdb.org/t/p/w300';
-const TMDB_KEY  = 'b91a299b0c1cccf59e8765f913a24da2';
+const TMDB_IMG = 'https://image.tmdb.org/t/p/w300';
+const TMDB_KEY = 'b91a299b0c1cccf59e8765f913a24da2';
 
 // 缓存时间：1小时（毫秒），确保数据自动更新
 const TMDB_CACHE_TTL = 60 * 60 * 1000;
@@ -12,45 +12,47 @@ const TMDB_CACHE_TTL = 60 * 60 * 1000;
 // 本地兜底数据（TMDB 请求失败时显示）
 const FALLBACK_TRENDING = {
     movie: [
-        { title: '哪吒之魔童闹海',     year: '2025', poster: '', rating: '9.2' },
-        { title: '飞驰人生3',          year: '2026', poster: '', rating: '7.4' },
-        { title: '疯狂动物城2',        year: '2025', poster: '', rating: '8.1' },
-        { title: '镖人：风起大漠',      year: '2026', poster: '', rating: '7.5' },
-        { title: '惊蛰无声',          year: '2026', poster: '', rating: '6.2' },
-        { title: '熊出没·年年有熊',     year: '2026', poster: '', rating: '6.8' },
-        { title: '阿凡达3',           year: '2025', poster: '', rating: '7.0' },
-        { title: '匿杀',             year: '2026', poster: '', rating: '7.2' },
-        { title: '封神第二部',         year: '2025', poster: '', rating: '7.8' },
-        { title: '流浪地球3',          year: '2026', poster: '', rating: '' },
-        { title: '星河入梦',          year: '2026', poster: '', rating: '6.9' },
-        { title: '功夫熊猫4',          year: '2024', poster: '', rating: '7.5' },
+        { title: '哪吒之魔童闹海', year: '2025', poster: '', rating: '9.2' },
+        { title: '飞驰人生3', year: '2026', poster: '', rating: '7.4' },
+        { title: '疯狂动物城2', year: '2025', poster: '', rating: '8.1' },
+        { title: '镖人：风起大漠', year: '2026', poster: '', rating: '7.5' },
+        { title: '惊蛰无声', year: '2026', poster: '', rating: '6.2' },
+        { title: '熊出没·年年有熊', year: '2026', poster: '', rating: '6.8' },
+        { title: '阿凡达3', year: '2025', poster: '', rating: '7.0' },
+        { title: '匿杀', year: '2026', poster: '', rating: '7.2' },
+        { title: '封神第二部', year: '2025', poster: '', rating: '7.8' },
+        { title: '流浪地球3', year: '2026', poster: '', rating: '' },
+        { title: '星河入梦', year: '2026', poster: '', rating: '6.9' },
+        { title: '功夫熊猫4', year: '2024', poster: '', rating: '7.5' },
     ],
     tv: [
-        { title: '逐玉',       year: '2026', poster: '', rating: '' },
-        { title: '太平年',     year: '2026', poster: '', rating: '' },
+        { title: '逐玉', year: '2026', poster: '', rating: '' },
+        { title: '太平年', year: '2026', poster: '', rating: '' },
         { title: '好好的时光', year: '2026', poster: '', rating: '' },
         { title: '我的山与海', year: '2026', poster: '', rating: '' },
-        { title: '小城大事',   year: '2026', poster: '', rating: '' },
-        { title: '罚罪2',      year: '2025', poster: '', rating: '7.8' },
-        { title: '猎影者',     year: '2026', poster: '', rating: '' },
-        { title: '折腰',       year: '2026', poster: '', rating: '' },
-        { title: '玫瑰丛生',   year: '2026', poster: '', rating: '' },
-        { title: '念无双',     year: '2026', poster: '', rating: '7.5' },
-        { title: '骄阳似我',   year: '2026', poster: '', rating: '' },
-        { title: '生命树',     year: '2026', poster: '', rating: '' },
+        { title: '小城大事', year: '2026', poster: '', rating: '' },
+        { title: '罚罪2', year: '2025', poster: '', rating: '7.8' },
+        { title: '猎影者', year: '2026', poster: '', rating: '' },
+        { title: '折腰', year: '2026', poster: '', rating: '' },
+        { title: '玫瑰丛生', year: '2026', poster: '', rating: '' },
+        { title: '念无双', year: '2026', poster: '', rating: '7.5' },
+        { title: '骄阳似我', year: '2026', poster: '', rating: '' },
+        { title: '生命树', year: '2026', poster: '', rating: '' },
     ]
 };
 
 // 分类标签
 const TRENDING_TABS = [
     { key: 'movie', label: '🎬 电影' },
-    { key: 'tv',    label: '📺 剧集' },
+    { key: 'tv', label: '📺 剧集' },
 ];
 
 let trendingCurrentTab = 'movie';
-// 内存缓存：{ movie: { data: [...], ts: timestamp }, tv: {...} }
-let trendingCache    = {};
-let trendingImgCache = {};
+let trendingCurrentPage = { movie: 1, tv: 1 };
+const TRENDING_MAX_PAGES = 5; // TMDB trending/day has limit, we load up to 5 pages
+
+// 内存缓存：{ movie: { data: [...], pages: { 1: [...], 2: [...] }, ts: timestamp }, tv: {...} }
+let trendingCache = {};
 
 // ── 初始化 ────────────────────────────────────────────────────────────────────
 function initTrending() {
@@ -63,14 +65,14 @@ function initTrending() {
         const isEnabled = localStorage.getItem('trendingEnabled') === 'true';
         toggle.checked = isEnabled;
 
-        const toggleBg  = toggle.nextElementSibling;
+        const toggleBg = toggle.nextElementSibling;
         const toggleDot = toggleBg && toggleBg.nextElementSibling;
         if (isEnabled && toggleBg && toggleDot) {
             toggleBg.classList.add('bg-blue-600');
             toggleDot.classList.add('translate-x-6');
         }
 
-        toggle.addEventListener('change', function(e) {
+        toggle.addEventListener('change', function (e) {
             const checked = e.target.checked;
             localStorage.setItem('trendingEnabled', checked ? 'true' : 'false');
             if (toggleBg && toggleDot) {
@@ -95,17 +97,31 @@ function initTrending() {
 
     area.style.display = '';
     renderTrendingTabs();
-    loadTrending(trendingCurrentTab);
+    setupTrendingRefreshBtn();
+    loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
+}
+
+// ── 设置换一批事件 ────────────────────────────────────────────────────────────
+function setupTrendingRefreshBtn() {
+    const btn = document.getElementById('trending-refresh');
+    if (!btn) return;
+    btn.onclick = function () {
+        trendingCurrentPage[trendingCurrentTab]++;
+        if (trendingCurrentPage[trendingCurrentTab] > TRENDING_MAX_PAGES) {
+            trendingCurrentPage[trendingCurrentTab] = 1;
+        }
+        loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
+    };
 }
 
 // ── 控制外层容器显隐 ──────────────────────────────────────────────────────────
 function updateHotRecommendArea() {
     const hotArea = document.getElementById('hotRecommendArea');
     if (!hotArea) return;
-    const showDouban   = localStorage.getItem('doubanEnabled') === 'true';
+    const showDouban = localStorage.getItem('doubanEnabled') === 'true';
     const showTrending = localStorage.getItem('trendingEnabled') === 'true';
     const resultsAreaEl = document.getElementById('resultsArea');
-    const isSearching   = resultsAreaEl && !resultsAreaEl.classList.contains('hidden');
+    const isSearching = resultsAreaEl && !resultsAreaEl.classList.contains('hidden');
     if ((showDouban || showTrending) && !isSearching) {
         hotArea.style.display = '';
     } else {
@@ -120,11 +136,10 @@ function renderTrendingTabs() {
     container.innerHTML = '';
     TRENDING_TABS.forEach(tab => {
         const btn = document.createElement('button');
-        btn.className = `trending-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${
-            tab.key === trendingCurrentTab
-                ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-900/40'
-                : 'bg-[#1a1a1a] text-gray-400 border-[#333] hover:text-white hover:border-[#555]'
-        }`;
+        btn.className = `trending-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${tab.key === trendingCurrentTab
+            ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-900/40'
+            : 'bg-[#1a1a1a] text-gray-400 border-[#333] hover:text-white hover:border-[#555]'
+            }`;
         btn.textContent = tab.label;
         btn.onclick = () => switchTrendingTab(tab.key);
         container.appendChild(btn);
@@ -135,11 +150,11 @@ function switchTrendingTab(key) {
     if (trendingCurrentTab === key) return;
     trendingCurrentTab = key;
     renderTrendingTabs();
-    loadTrending(key);
+    loadTrending(key, trendingCurrentPage[key]);
 }
 
 // ── 数据加载（带 TTL 缓存，自动更新）─────────────────────────────────────────
-async function loadTrending(type) {
+async function loadTrending(type, page = 1) {
     const grid = document.getElementById('trendingGrid');
     if (!grid) return;
 
@@ -150,34 +165,46 @@ async function loadTrending(type) {
             <div class="h-3 bg-[#222] rounded mt-2 w-3/4 mx-auto"></div>
         </div>`).join('');
 
-    // 检查内存缓存是否有效（1小时内）
+    // 检查内存缓存是否有效（1小时内）及其对应页的数据
     const cached = trendingCache[type];
-    if (cached && (Date.now() - cached.ts) < TMDB_CACHE_TTL) {
-        renderTrendingCards(cached.data);
+    if (cached && (Date.now() - cached.ts) < TMDB_CACHE_TTL && cached.pages && cached.pages[page]) {
+        renderTrendingCards(cached.pages[page]);
         return;
     }
 
     // 尝试从 TMDB 实时获取
     try {
-        const items = await fetchTMDBTrending(type);
-        trendingCache[type] = { data: items, ts: Date.now() };
+        const items = await fetchTMDBTrending(type, page);
+        if (!trendingCache[type] || (Date.now() - trendingCache[type].ts) >= TMDB_CACHE_TTL) {
+            trendingCache[type] = { pages: {}, ts: Date.now() };
+        }
+        trendingCache[type].pages[page] = items;
         renderTrendingCards(items);
     } catch (e) {
         console.warn('TMDB 获取失败，使用兜底数据:', e.message);
         // 即使 TMDB 失败，也检查是否有过期缓存可用
-        if (cached?.data) {
-            renderTrendingCards(cached.data);
+        if (cached?.pages && cached.pages[page]) {
+            renderTrendingCards(cached.pages[page]);
         } else {
-            trendingCache[type] = { data: FALLBACK_TRENDING[type], ts: 0 }; // ts=0 确保下次重试
-            renderTrendingCards(FALLBACK_TRENDING[type]);
+            // 没有缓存时，第一页用大兜底，其它页回到第一页的内容
+            const fallbackData = FALLBACK_TRENDING[type];
+            if (!trendingCache[type]) trendingCache[type] = { pages: {}, ts: 0 };
+            trendingCache[type].pages[1] = fallbackData;
+
+            if (page > 1) {
+                trendingCurrentPage[type] = 1;
+                renderTrendingCards(fallbackData);
+            } else {
+                renderTrendingCards(fallbackData);
+            }
         }
     }
 }
 
 // ── TMDB 实时数据获取 ─────────────────────────────────────────────────────────
-async function fetchTMDBTrending(type) {
-    // 使用 /trending/{type}/week 获取当周热门，语言优先中文
-    const url = `${TMDB_BASE}/trending/${type}/week?api_key=${TMDB_KEY}&language=zh-CN`;
+async function fetchTMDBTrending(type, page = 1) {
+    // 使用 /trending/{type}/day 获取当日热门，与豆瓣区的 discover 端点形成差异
+    const url = `${TMDB_BASE}/trending/${type}/day?api_key=${TMDB_KEY}&language=zh-CN&page=${page}`;
 
     // TMDB 直接请求（不走内部代理，避免代理超时影响体验）
     // 同时也尝试通过代理，以防直连被屏蔽
@@ -202,12 +229,12 @@ async function fetchTMDBTrending(type) {
     if (!data.results?.length) throw new Error('无数据');
 
     return data.results.slice(0, 12).map(item => ({
-        title:  item.title || item.name || '未知',
-        year:   (item.release_date || item.first_air_date || '').slice(0, 4),
+        title: item.title || item.name || '未知',
+        year: (item.release_date || item.first_air_date || '').slice(0, 4),
         // 封面直接使用 TMDB CDN URL（无需代理，图片CDN允许跨域）
         poster: item.poster_path ? `${TMDB_IMG}${item.poster_path}` : '',
         rating: item.vote_average ? item.vote_average.toFixed(1) : '',
-        id:     item.id,
+        id: item.id,
     }));
 }
 
@@ -236,12 +263,12 @@ function renderTrendingCards(items) {
                          group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-blue-900/30
                          transition-all duration-300">
                 ${imgSrc
-                    ? `<img src="${imgSrc}" alt="${safeTitle}"
+                ? `<img src="${imgSrc}" alt="${safeTitle}"
                             class="w-full h-full object-cover"
                             loading="lazy"
                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-                    : ''
-                }
+                : ''
+            }
                 <div class="w-full h-full ${imgSrc ? 'hidden' : 'flex'} items-center justify-center
                              bg-gradient-to-br from-[#1e2a3a] to-[#111] absolute inset-0">
                     <span class="text-3xl font-bold text-gray-600">${item.title[0] || '?'}</span>
@@ -281,21 +308,21 @@ function trendingSearch(title) {
     try {
         window.history.pushState({ search: title }, `搜索: ${title} - LibreTV`, `/s=${encodeURIComponent(title)}`);
         document.title = `搜索: ${title} - LibreTV`;
-    } catch (e) {}
+    } catch (e) { }
     if (window.innerWidth <= 768) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ── 可见性联动 ────────────────────────────────────────────────────────────────
 function updateTrendingVisibility() {
-    const area        = document.getElementById('trendingArea');
+    const area = document.getElementById('trendingArea');
     const resultsArea = document.getElementById('resultsArea');
     if (!area) return;
-    const enabled     = localStorage.getItem('trendingEnabled') === 'true';
+    const enabled = localStorage.getItem('trendingEnabled') === 'true';
     const isSearching = resultsArea && !resultsArea.classList.contains('hidden');
     if (enabled && !isSearching) {
         area.style.display = '';
         renderTrendingTabs();
-        if (!trendingCache[trendingCurrentTab]) loadTrending(trendingCurrentTab);
+        loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
     } else {
         area.style.display = 'none';
     }

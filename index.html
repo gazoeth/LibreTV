@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,416 +14,442 @@
     <link rel="manifest" href="manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
 
     <script src="libs/tailwindcss.min.js"></script>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/index.css">
 </head>
+
 <body class="page-bg text-white">
 
-<!-- ── 历史记录按钮 ─────────────────────────────────────────── -->
-<div class="fixed top-4 left-4 z-10">
-    <button onclick="toggleHistory(event)" class="top-corner-button flex items-center" aria-label="观看历史">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span class="corner-btn-label">历史</span>
-    </button>
-</div>
-
-<!-- ── 设置按钮 ──────────────────────────────────────────────── -->
-<div class="fixed top-4 right-4 z-10">
-    <button onclick="toggleSettings(event)" class="top-corner-button flex items-center" aria-label="打开设置">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        <span class="corner-btn-label">设置</span>
-    </button>
-</div>
-
-<!-- ══════ 历史记录侧边栏 ══════════════════════════════════════ -->
-<div id="historyPanel"
-     class="history-panel fixed left-0 top-0 h-full bg-panel border-r border-panel z-40"
-     aria-label="观看历史" aria-hidden="true">
-    <div class="panel-header">
-        <h3 class="panel-title">
-            <svg class="w-4 h-4" style="color:#e50914" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- ── 历史记录按钮 ─────────────────────────────────────────── -->
+    <div class="fixed top-4 left-4 z-10">
+        <button onclick="toggleHistory(event)" class="top-corner-button flex items-center" aria-label="观看历史">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            观看历史
-        </h3>
-        <button onclick="toggleHistory()" class="close-btn" style="position:static;margin:0;">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-        </button>
-    </div>
-    <div id="historyList" class="history-list">
-        <div class="empty-tip">暂无观看记录</div>
-    </div>
-    <div class="panel-footer">
-        <button onclick="clearViewingHistory()" class="btn-danger-ghost w-full">清空历史记录</button>
-    </div>
-</div>
-
-<!-- ══════ 设置侧边栏 ══════════════════════════════════════════ -->
-<div id="settingsPanel"
-     class="settings-panel fixed right-0 top-0 h-full bg-panel border-l border-panel z-40"
-     aria-label="设置面板" aria-hidden="true">
-    <div class="panel-header">
-        <h3 class="panel-title">
-            <svg class="w-4 h-4" style="color:#e50914" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            设置
-        </h3>
-        <button onclick="toggleSettings()" class="close-btn" style="position:static;margin:0;">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
+            <span class="corner-btn-label">历史</span>
         </button>
     </div>
 
-    <div class="settings-body">
-        <!-- 数据源 -->
-        <div class="settings-section">
-            <label class="settings-section-label">数据源</label>
-            <div class="settings-btn-row">
-                <button onclick="selectAllAPIs(true)"       class="btn-setting-sm">全选</button>
-                <button onclick="selectAllAPIs(false)"      class="btn-setting-sm">全不选</button>
-                <button onclick="selectAllAPIs(true,true)"  class="btn-setting-sm">全选普通</button>
-            </div>
-            <div class="settings-scroll-box">
-                <div id="apiCheckboxes"></div>
-            </div>
-            <div class="settings-meta">
-                <span>已选：<span id="selectedApiCount" class="text-white">0</span></span>
-                <span id="siteStatus"></span>
-            </div>
+    <!-- ── 设置按钮 ──────────────────────────────────────────────── -->
+    <div class="fixed top-4 right-4 z-10">
+        <button onclick="toggleSettings(event)" class="top-corner-button flex items-center" aria-label="打开设置">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span class="corner-btn-label">设置</span>
+        </button>
+    </div>
+
+    <!-- ══════ 历史记录侧边栏 ══════════════════════════════════════ -->
+    <div id="historyPanel" class="history-panel fixed left-0 top-0 h-full bg-panel border-r border-panel z-40"
+        aria-label="观看历史" aria-hidden="true">
+        <div class="panel-header">
+            <h3 class="panel-title">
+                <svg class="w-4 h-4" style="color:#e50914" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                观看历史
+            </h3>
+            <button onclick="toggleHistory()" class="close-btn" style="position:static;margin:0;">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
-
-        <!-- 自定义 API -->
-        <div class="settings-section">
-            <div class="settings-section-header">
-                <label class="settings-section-label" style="margin-bottom:0">自定义 API</label>
-                <button onclick="showAddCustomApiForm()" class="btn-add">+</button>
-            </div>
-            <div id="customApisList" style="max-height:8rem;overflow-y:auto;margin-bottom:.5rem"></div>
-            <div id="addCustomApiForm" style="display:none" class="settings-form-box">
-                <input type="text" id="customApiName"   placeholder="API 名称"      class="settings-input" autocomplete="off">
-                <input type="text" id="customApiUrl"    placeholder="https://abc.com" class="settings-input" autocomplete="off">
-                <input type="text" id="customApiDetail" placeholder="detail 地址（可选）" class="settings-input" autocomplete="off">
-                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-                    <input type="checkbox" id="customApiIsAdult" style="width:14px;height:14px;accent-color:#ec4899">
-                    <label for="customApiIsAdult" style="font-size:.75rem;color:#f9a8d4">黄色资源站</label>
-                </div>
-                <div style="display:flex;gap:.5rem">
-                    <button onclick="addCustomApi()"       class="btn-danger-ghost" style="flex:1;padding:.4rem 0;font-size:.75rem">添加</button>
-                    <button onclick="cancelAddCustomApi()" class="btn-ghost"        style="flex:1;padding:.4rem 0;font-size:.75rem">取消</button>
-                </div>
-            </div>
+        <div id="historyList" class="history-list">
+            <div class="empty-tip">暂无观看记录</div>
         </div>
-
-        <!-- 功能开关 -->
-        <div class="settings-section">
-            <label class="settings-section-label">功能开关</label>
-
-            <div class="toggle-row border-b-section">
-                <div>
-                    <p class="toggle-label">黄色内容过滤</p>
-                    <p class="toggle-desc filter-description">过滤"伦理片"等内容</p>
-                </div>
-                <div class="toggle-wrap">
-                    <input type="checkbox" id="yellowFilterToggle" class="toggle-input">
-                    <div class="toggle-bg"></div>
-                    <div class="toggle-dot"></div>
-                </div>
-            </div>
-
-            <div class="toggle-row border-b-section">
-                <div>
-                    <p class="toggle-label">分片广告过滤</p>
-                    <p class="toggle-desc">关闭可减少旧版浏览器卡顿</p>
-                </div>
-                <div class="toggle-wrap">
-                    <input type="checkbox" id="adFilterToggle" class="toggle-input">
-                    <div class="toggle-bg"></div>
-                    <div class="toggle-dot"></div>
-                </div>
-            </div>
-
-            <div class="toggle-row border-b-section">
-                <div>
-                    <p class="toggle-label">豆瓣热门推荐</p>
-                    <p class="toggle-desc">首页显示热门影视</p>
-                </div>
-                <div class="toggle-wrap">
-                    <input type="checkbox" id="doubanToggle" class="toggle-input">
-                    <div class="toggle-bg"></div>
-                    <div class="toggle-dot"></div>
-                </div>
-            </div>
-
-            <div class="toggle-row">
-                <div>
-                    <p class="toggle-label">TMDB 流媒体热门</p>
-                    <p class="toggle-desc">首页显示全球流媒体热门</p>
-                </div>
-                <div class="toggle-wrap">
-                    <input type="checkbox" id="trendingToggle" class="toggle-input">
-                    <div class="toggle-bg"></div>
-                    <div class="toggle-dot"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 一般功能 -->
-        <div class="settings-section">
-            <label class="settings-section-label">一般功能</label>
-            <button onclick="importConfig()"    class="btn-danger-ghost w-full" style="margin-bottom:.5rem">导入配置</button>
-            <button onclick="exportConfig()"    class="btn-danger-ghost w-full" style="margin-bottom:.5rem">导出配置</button>
-            <button onclick="clearLocalStorage()" class="btn-ghost w-full">清除 Cookie</button>
+        <div class="panel-footer">
+            <button onclick="clearViewingHistory()" class="btn-danger-ghost w-full">清空历史记录</button>
         </div>
     </div>
-</div>
 
-<!-- ══════ 主内容 ═════════════════════════════════════════════ -->
-<div class="container mx-auto px-4 main-wrap">
-    <div class="main-inner">
+    <!-- ══════ 设置侧边栏 ══════════════════════════════════════════ -->
+    <div id="settingsPanel" class="settings-panel fixed right-0 top-0 h-full bg-panel border-l border-panel z-40"
+        aria-label="设置面板" aria-hidden="true">
+        <div class="panel-header">
+            <h3 class="panel-title">
+                <svg class="w-4 h-4" style="color:#e50914" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                设置
+            </h3>
+            <button onclick="toggleSettings()" class="close-btn" style="position:static;margin:0;">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
 
-        <!-- Hero / 搜索区 -->
-        <div id="searchArea" class="search-area">
+        <div class="settings-body">
+            <!-- 数据源 -->
+            <div class="settings-section">
+                <label class="settings-section-label">数据源</label>
+                <div class="settings-btn-row">
+                    <button onclick="selectAllAPIs(true)" class="btn-setting-sm">全选</button>
+                    <button onclick="selectAllAPIs(false)" class="btn-setting-sm">全不选</button>
+                    <button onclick="selectAllAPIs(true,true)" class="btn-setting-sm">全选普通</button>
+                </div>
+                <div class="settings-scroll-box">
+                    <div id="apiCheckboxes"></div>
+                </div>
+                <div class="settings-meta">
+                    <span>已选：<span id="selectedApiCount" class="text-white">0</span></span>
+                    <span id="siteStatus"></span>
+                </div>
+            </div>
 
-            <div class="hero-header w-full">
-                <a href="#" onclick="resetToHome(); return false;" class="hero-logo-wrap">
-                    <div class="hero-icon">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        </svg>
+            <!-- 自定义 API -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <label class="settings-section-label" style="margin-bottom:0">自定义 API</label>
+                    <button onclick="showAddCustomApiForm()" class="btn-add">+</button>
+                </div>
+                <div id="customApisList" style="max-height:8rem;overflow-y:auto;margin-bottom:.5rem"></div>
+                <div id="addCustomApiForm" style="display:none" class="settings-form-box">
+                    <input type="text" id="customApiName" placeholder="API 名称" class="settings-input"
+                        autocomplete="off">
+                    <input type="text" id="customApiUrl" placeholder="https://abc.com" class="settings-input"
+                        autocomplete="off">
+                    <input type="text" id="customApiDetail" placeholder="detail 地址（可选）" class="settings-input"
+                        autocomplete="off">
+                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+                        <input type="checkbox" id="customApiIsAdult"
+                            style="width:14px;height:14px;accent-color:#ec4899">
+                        <label for="customApiIsAdult" style="font-size:.75rem;color:#f9a8d4">黄色资源站</label>
                     </div>
-                    <h1 class="hero-title">YiWuTV</h1>
-                </a>
-                <p class="hero-tagline">自由观影，畅享精彩 · 无需登录 · 无广告</p>
+                    <div style="display:flex;gap:.5rem">
+                        <button onclick="addCustomApi()" class="btn-danger-ghost"
+                            style="flex:1;padding:.4rem 0;font-size:.75rem">添加</button>
+                        <button onclick="cancelAddCustomApi()" class="btn-ghost"
+                            style="flex:1;padding:.4rem 0;font-size:.75rem">取消</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="search-wrap" style="margin-top:1.5rem">
-                <div class="search-box" id="searchBoxEl">
-                    <button onclick="resetToHome()" class="search-side-btn" aria-label="返回首页">首页</button>
-                    <input type="text"
-                           id="searchInput"
-                           class="search-input"
-                           placeholder="搜索电影、电视剧、动漫…"
-                           autocomplete="off"
-                           aria-label="视频搜索框"
-                           oninput="toggleClearButton()">
-                    <button id="clearSearchInput"
-                            class="search-clear-btn"
-                            onclick="clearSearchInput()"
-                            aria-label="清空搜索框"
-                            style="display:none">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                    <button onclick="search()" class="search-side-btn search-submit" aria-label="搜索">搜索</button>
+            <!-- 功能开关 -->
+            <div class="settings-section">
+                <label class="settings-section-label">功能开关</label>
+
+                <div class="toggle-row border-b-section">
+                    <div>
+                        <p class="toggle-label">黄色内容过滤</p>
+                        <p class="toggle-desc filter-description">过滤"伦理片"等内容</p>
+                    </div>
+                    <div class="toggle-wrap">
+                        <input type="checkbox" id="yellowFilterToggle" class="toggle-input">
+                        <div class="toggle-bg"></div>
+                        <div class="toggle-dot"></div>
+                    </div>
                 </div>
-                <div id="recentSearches" class="recent-searches" aria-label="最近搜索记录"></div>
+
+                <div class="toggle-row border-b-section">
+                    <div>
+                        <p class="toggle-label">分片广告过滤</p>
+                        <p class="toggle-desc">关闭可减少旧版浏览器卡顿</p>
+                    </div>
+                    <div class="toggle-wrap">
+                        <input type="checkbox" id="adFilterToggle" class="toggle-input">
+                        <div class="toggle-bg"></div>
+                        <div class="toggle-dot"></div>
+                    </div>
+                </div>
+
+                <div class="toggle-row border-b-section">
+                    <div>
+                        <p class="toggle-label">豆瓣热门推荐</p>
+                        <p class="toggle-desc">首页显示热门影视</p>
+                    </div>
+                    <div class="toggle-wrap">
+                        <input type="checkbox" id="doubanToggle" class="toggle-input">
+                        <div class="toggle-bg"></div>
+                        <div class="toggle-dot"></div>
+                    </div>
+                </div>
+
+                <div class="toggle-row">
+                    <div>
+                        <p class="toggle-label">TMDB 流媒体热门</p>
+                        <p class="toggle-desc">首页显示全球流媒体热门</p>
+                    </div>
+                    <div class="toggle-wrap">
+                        <input type="checkbox" id="trendingToggle" class="toggle-input">
+                        <div class="toggle-bg"></div>
+                        <div class="toggle-dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 一般功能 -->
+            <div class="settings-section">
+                <label class="settings-section-label">一般功能</label>
+                <button onclick="importConfig()" class="btn-danger-ghost w-full"
+                    style="margin-bottom:.5rem">导入配置</button>
+                <button onclick="exportConfig()" class="btn-danger-ghost w-full"
+                    style="margin-bottom:.5rem">导出配置</button>
+                <button onclick="clearLocalStorage()" class="btn-ghost w-full">清除 Cookie</button>
             </div>
         </div>
+    </div>
 
-        <!-- 热门推荐双栏区域 -->
-        <div id="hotRecommendArea" class="w-full hot-recommend-area">
-            <div class="hot-recommend-wrap">
+    <!-- ══════ 主内容 ═════════════════════════════════════════════ -->
+    <div class="container mx-auto px-4 main-wrap">
+        <div class="main-inner">
 
-                <!-- TMDB 流媒体热门 -->
-                <div id="trendingArea" class="hot-section" style="display:none">
-                    <div class="hot-section-inner">
-                        <div class="hot-section-header">
-                            <div class="hot-section-title">
-                                <span class="hot-badge tmdb-badge">TMDB</span>
-                                <span>流媒体热门</span>
-                            </div>
-                            <div id="trendingTabs" class="hot-section-tabs"></div>
+            <!-- Hero / 搜索区 -->
+            <div id="searchArea" class="search-area">
+
+                <div class="hero-header w-full">
+                    <a href="#" onclick="resetToHome(); return false;" class="hero-logo-wrap">
+                        <div class="hero-icon">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
                         </div>
-                        <div id="trendingGrid" class="trending-grid"></div>
-                    </div>
+                        <h1 class="hero-title">YiWuTV</h1>
+                    </a>
+                    <p class="hero-tagline">自由观影，畅享精彩 · 无需登录 · 无广告</p>
                 </div>
 
-                <!-- 豆瓣热门推荐 -->
-                <div id="doubanArea" class="hot-section" style="display:none">
-                    <div class="hot-section-inner">
-                        <div class="hot-section-header">
-                            <div class="hot-section-title">
-                                <span class="hot-badge douban-badge">豆瓣</span>
-                                <span>热门推荐</span>
-                            </div>
-                            <div class="hot-section-controls">
-                                <div class="douban-toggle">
-                                    <button id="douban-movie-toggle" class="douban-toggle-button active">电影</button>
-                                    <button id="douban-tv-toggle"    class="douban-toggle-button">剧集</button>
+                <div class="search-wrap" style="margin-top:1.5rem">
+                    <div class="search-box" id="searchBoxEl">
+                        <button onclick="resetToHome()" class="search-side-btn" aria-label="返回首页">首页</button>
+                        <input type="text" id="searchInput" class="search-input" placeholder="搜索电影、电视剧、动漫…"
+                            autocomplete="off" aria-label="视频搜索框" oninput="toggleClearButton()">
+                        <button id="clearSearchInput" class="search-clear-btn" onclick="clearSearchInput()"
+                            aria-label="清空搜索框" style="display:none">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <button onclick="search()" class="search-side-btn search-submit" aria-label="搜索">搜索</button>
+                    </div>
+                    <div id="recentSearches" class="recent-searches" aria-label="最近搜索记录"></div>
+                </div>
+            </div>
+
+            <!-- 热门推荐双栏区域 -->
+            <div id="hotRecommendArea" class="w-full hot-recommend-area">
+                <div class="hot-recommend-wrap">
+
+                    <!-- TMDB 流媒体热门 -->
+                    <div id="trendingArea" class="hot-section" style="display:none">
+                        <div class="hot-section-inner">
+                            <div class="hot-section-header">
+                                <div class="hot-section-title">
+                                    <span class="hot-badge tmdb-badge">TMDB</span>
+                                    <span>流媒体热门</span>
                                 </div>
-                                <button id="douban-refresh" class="douban-refresh-button">
-                                    <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                    </svg>
-                                    换一批
-                                </button>
+                                <div class="hot-section-controls">
+                                    <div id="trendingTabs" class="hot-section-tabs"></div>
+                                    <button id="trending-refresh" class="douban-refresh-button"
+                                        style="margin-left: 0.5rem">
+                                        <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        换一批
+                                    </button>
+                                </div>
                             </div>
+                            <div id="trendingGrid" class="trending-grid"></div>
                         </div>
-                        <div class="douban-tags-container" style="margin-bottom:.75rem">
-                            <div id="douban-tags" class="douban-tags"></div>
+                    </div>
+
+                    <!-- 豆瓣热门推荐 -->
+                    <div id="doubanArea" class="hot-section" style="display:none">
+                        <div class="hot-section-inner">
+                            <div class="hot-section-header">
+                                <div class="hot-section-title">
+                                    <span class="hot-badge douban-badge">豆瓣</span>
+                                    <span>热门推荐</span>
+                                </div>
+                                <div class="hot-section-controls">
+                                    <div class="douban-toggle">
+                                        <button id="douban-movie-toggle" class="douban-toggle-button active">电影</button>
+                                        <button id="douban-tv-toggle" class="douban-toggle-button">剧集</button>
+                                    </div>
+                                    <button id="douban-refresh" class="douban-refresh-button">
+                                        <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
+                                            stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        换一批
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="douban-tags-container" style="margin-bottom:.75rem">
+                                <div id="douban-tags" class="douban-tags"></div>
+                            </div>
+                            <div id="douban-results" class="douban-grid"></div>
                         </div>
-                        <div id="douban-results" class="douban-grid"></div>
                     </div>
+
                 </div>
-
             </div>
-        </div>
 
-        <!-- 搜索结果 -->
-        <div id="resultsArea" class="w-full hidden">
-            <div class="results-inner">
-                <div class="results-header">
-                    <h2 class="results-label">搜索结果</h2>
-                    <div class="results-count">
-                        共 <span id="searchResultsCount" class="results-count-num">0</span> 个结果
+            <!-- 搜索结果 -->
+            <div id="resultsArea" class="w-full hidden">
+                <div class="results-inner">
+                    <div class="results-header">
+                        <h2 class="results-label">搜索结果</h2>
+                        <div class="results-count">
+                            共 <span id="searchResultsCount" class="results-count-num">0</span> 个结果
+                        </div>
                     </div>
+                    <div id="results" class="results-grid"></div>
                 </div>
-                <div id="results" class="results-grid"></div>
             </div>
-        </div>
 
+        </div>
     </div>
-</div>
 
-<!-- ══════ 页脚 ═══════════════════════════════════════════════ -->
-<footer class="site-footer">
-    <div class="container mx-auto px-4">
-        <div class="footer-inner">
-            <div class="footer-brand">
-                <a href="#" onclick="resetToHome();return false;" class="footer-logo">
-                    <div class="footer-logo-icon">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        </svg>
+    <!-- ══════ 页脚 ═══════════════════════════════════════════════ -->
+    <footer class="site-footer">
+        <div class="container mx-auto px-4">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <a href="#" onclick="resetToHome();return false;" class="footer-logo">
+                        <div class="footer-logo-icon">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                        <span class="footer-logo-text">YiWuTV</span>
+                    </a>
+                    <p class="footer-copy">© 2025 YiWuTV · 自由观影，畅享精彩</p>
+                </div>
+                <div class="footer-right">
+                    <p class="footer-disclaimer">
+                        免责声明：本站仅为视频搜索工具，不存储、上传或分发任何视频内容。所有视频均来自第三方API接口。
+                    </p>
+                    <div class="footer-links">
+                        <a href="about.html" class="footer-link">关于我们</a>
+                        <a href="about.html" class="footer-link">隐私政策</a>
+                        <a href="https://www.msf.hk/zh-hant/donate/general?type=one-off" target="_blank" rel="noopener"
+                            class="footer-link footer-link-red">捐赠</a>
                     </div>
-                    <span class="footer-logo-text">YiWuTV</span>
-                </a>
-                <p class="footer-copy">© 2025 YiWuTV · 自由观影，畅享精彩</p>
+                </div>
             </div>
-            <div class="footer-right">
-                <p class="footer-disclaimer">
-                    免责声明：本站仅为视频搜索工具，不存储、上传或分发任何视频内容。所有视频均来自第三方API接口。
+        </div>
+    </footer>
+
+    <!-- ══════ Modals — 全部用 style="display:none" 代替 hidden class ══════ -->
+
+    <!-- 详情模态框 -->
+    <div id="modal" class="modal-overlay" style="display:none">
+        <div class="modal-box">
+            <div class="modal-head">
+                <h2 id="modalTitle" class="modal-title-text"></h2>
+                <button onclick="closeModal()" class="modal-close">&times;</button>
+            </div>
+            <div id="modalContent" class="modal-content-area">
+                <div class="results-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 密码验证弹窗（已禁用，保留DOM） -->
+    <div id="passwordModal" class="modal-overlay" style="display:none">
+        <div class="modal-box" style="max-width:28rem">
+            <div class="modal-head">
+                <h2 class="modal-title-text">访问验证</h2>
+            </div>
+            <div style="margin-bottom:1.5rem">
+                <p style="color:#a0a0b0;margin-bottom:1rem;font-size:.875rem">请输入密码继续访问</p>
+                <form id="passwordForm" onsubmit="handlePasswordSubmit(); return false;">
+                    <input type="text" name="username" id="username" autocomplete="username" style="display:none"
+                        tabindex="-1" aria-hidden="true">
+                    <input type="password" id="passwordInput" class="settings-input" placeholder="密码…"
+                        autocomplete="new-password">
+                    <div style="display:flex;gap:.75rem;margin-top:1rem">
+                        <button id="passwordSubmitBtn" type="submit" class="btn-primary"
+                            style="flex:1;padding:.625rem 0">提交</button>
+                        <button id="passwordCancelBtn" type="button" onclick="hidePasswordModal()" class="btn-ghost"
+                            style="flex:1;padding:.625rem 0">取消</button>
+                    </div>
+                </form>
+                <p id="passwordError" style="color:#e50914;margin-top:.75rem;font-size:.875rem;display:none">密码错误，请重试
                 </p>
-                <div class="footer-links">
-                    <a href="about.html" class="footer-link">关于我们</a>
-                    <a href="about.html" class="footer-link">隐私政策</a>
-                    <a href="https://www.msf.hk/zh-hant/donate/general?type=one-off" target="_blank" rel="noopener" class="footer-link footer-link-red">捐赠</a>
-                </div>
             </div>
         </div>
     </div>
-</footer>
 
-<!-- ══════ Modals — 全部用 style="display:none" 代替 hidden class ══════ -->
-
-<!-- 详情模态框 -->
-<div id="modal" class="modal-overlay" style="display:none">
-    <div class="modal-box">
-        <div class="modal-head">
-            <h2 id="modalTitle" class="modal-title-text"></h2>
-            <button onclick="closeModal()" class="modal-close">&times;</button>
-        </div>
-        <div id="modalContent" class="modal-content-area">
-            <div class="results-grid"></div>
-        </div>
-    </div>
-</div>
-
-<!-- 密码验证弹窗（已禁用，保留DOM） -->
-<div id="passwordModal" class="modal-overlay" style="display:none">
-    <div class="modal-box" style="max-width:28rem">
-        <div class="modal-head">
-            <h2 class="modal-title-text">访问验证</h2>
-        </div>
-        <div style="margin-bottom:1.5rem">
-            <p style="color:#a0a0b0;margin-bottom:1rem;font-size:.875rem">请输入密码继续访问</p>
-            <form id="passwordForm" onsubmit="handlePasswordSubmit(); return false;">
-                <input type="text" name="username" id="username" autocomplete="username" style="display:none" tabindex="-1" aria-hidden="true">
-                <input type="password" id="passwordInput" class="settings-input" placeholder="密码…" autocomplete="new-password">
-                <div style="display:flex;gap:.75rem;margin-top:1rem">
-                    <button id="passwordSubmitBtn" type="submit"   class="btn-primary" style="flex:1;padding:.625rem 0">提交</button>
-                    <button id="passwordCancelBtn" type="button" onclick="hidePasswordModal()" class="btn-ghost" style="flex:1;padding:.625rem 0">取消</button>
-                </div>
-            </form>
-            <p id="passwordError" style="color:#e50914;margin-top:.75rem;font-size:.875rem;display:none">密码错误，请重试</p>
+    <!-- 版权声明弹窗 -->
+    <div id="disclaimerModal" class="modal-overlay" style="display:none">
+        <div class="modal-box" style="max-width:38rem;overflow-y:auto;max-height:90vh">
+            <h2 style="font-size:1.25rem;font-weight:700;color:white;margin-bottom:1.5rem;text-align:center">使用声明</h2>
+            <div style="color:#a0a0b0;font-size:.875rem;line-height:1.7">
+                <p style="margin-bottom:.75rem">欢迎使用 YiWuTV。在开始使用前，请您了解并同意以下条款：</p>
+                <p style="margin-bottom:.75rem"><strong style="color:#e50914">服务性质：</strong>YiWuTV
+                    仅提供视频搜索服务，不直接提供、存储或上传任何视频内容。所有搜索结果均来自第三方公开接口。</p>
+                <p style="margin-bottom:.75rem"><strong
+                        style="color:#e50914">用户责任：</strong>用户在使用本站服务时，须遵守相关法律法规，不得利用搜索结果从事侵权行为。</p>
+                <p><strong style="color:#e50914">广告风险提示：</strong>本站所有视频均来自第三方采集站，视频中出现的广告与本站无关，请勿相信或点击视频中的任何广告内容，谨防上当受骗。
+                </p>
+            </div>
+            <div style="margin-top:1.5rem;text-align:center">
+                <button id="acceptDisclaimerBtn" class="btn-primary"
+                    style="padding:.75rem 2.5rem;font-size:.9375rem">我已了解并接受</button>
+            </div>
         </div>
     </div>
-</div>
 
-<!-- 版权声明弹窗 -->
-<div id="disclaimerModal" class="modal-overlay" style="display:none">
-    <div class="modal-box" style="max-width:38rem;overflow-y:auto;max-height:90vh">
-        <h2 style="font-size:1.25rem;font-weight:700;color:white;margin-bottom:1.5rem;text-align:center">使用声明</h2>
-        <div style="color:#a0a0b0;font-size:.875rem;line-height:1.7">
-            <p style="margin-bottom:.75rem">欢迎使用 YiWuTV。在开始使用前，请您了解并同意以下条款：</p>
-            <p style="margin-bottom:.75rem"><strong style="color:#e50914">服务性质：</strong>YiWuTV 仅提供视频搜索服务，不直接提供、存储或上传任何视频内容。所有搜索结果均来自第三方公开接口。</p>
-            <p style="margin-bottom:.75rem"><strong style="color:#e50914">用户责任：</strong>用户在使用本站服务时，须遵守相关法律法规，不得利用搜索结果从事侵权行为。</p>
-            <p><strong style="color:#e50914">广告风险提示：</strong>本站所有视频均来自第三方采集站，视频中出现的广告与本站无关，请勿相信或点击视频中的任何广告内容，谨防上当受骗。</p>
-        </div>
-        <div style="margin-top:1.5rem;text-align:center">
-            <button id="acceptDisclaimerBtn" class="btn-primary" style="padding:.75rem 2.5rem;font-size:.9375rem">我已了解并接受</button>
+    <!-- Toast -->
+    <div id="toast" class="toast-bar" style="opacity:0;transform:translateX(-50%) translateY(-100%)">
+        <p id="toastMessage"></p>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="modal-overlay" style="display:none">
+        <div class="loading-box">
+            <div class="loading-spinner"></div>
+            <p style="color:white;font-size:.875rem;font-weight:500">加载中…</p>
         </div>
     </div>
-</div>
 
-<!-- Toast -->
-<div id="toast" class="toast-bar" style="opacity:0;transform:translateX(-50%) translateY(-100%)">
-    <p id="toastMessage"></p>
-</div>
-
-<!-- Loading -->
-<div id="loading" class="modal-overlay" style="display:none">
-    <div class="loading-box">
-        <div class="loading-spinner"></div>
-        <p style="color:white;font-size:.875rem;font-weight:500">加载中…</p>
-    </div>
-</div>
-
-<!-- ── Scripts ──────────────────────────────────────────────── -->
-<script type="application/ld+json">
+    <!-- ── Scripts ──────────────────────────────────────────────── -->
+    <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebSite","name":"YiWuTV","url":"https://YiWutv.is-an.org/","description":"免费在线视频搜索与观看平台","potentialAction":{"@type":"SearchAction","target":"https://YiWutv.is-an.org/?s={search_term_string}","query-input":"required name=search_term_string"}}
 </script>
 
-<script src="libs/sha256.min.js"></script>
-<script>window._jsSha256 = window.sha256;</script>
-<script src="js/config.js"></script>
-<script src="js/proxy-auth.js"></script>
-<script src="js/customer_site.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/api.js"></script>
-<script src="js/trending.js"></script>
-<script src="js/douban.js"></script>
-<script src="js/password.js"></script>
-<script src="js/search.js"></script>
-<script src="js/app.js"></script>
-<script src="js/pwa-register.js"></script>
+    <script src="libs/sha256.min.js"></script>
+    <script>window._jsSha256 = window.sha256;</script>
+    <script src="js/config.js"></script>
+    <script src="js/proxy-auth.js"></script>
+    <script src="js/customer_site.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/trending.js"></script>
+    <script src="js/douban.js"></script>
+    <script src="js/password.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/pwa-register.js"></script>
 
-<script>
-    window.__ENV__ = window.__ENV__ || {};
-    window.__ENV__.PASSWORD = "{{PASSWORD}}";
-</script>
+    <script>
+        window.__ENV__ = window.__ENV__ || {};
+        window.__ENV__.PASSWORD = "{{PASSWORD}}";
+    </script>
 
-<script src="js/index-page.js"></script>
+    <script src="js/index-page.js"></script>
 </body>
+
 </html>

@@ -655,12 +655,12 @@ async function search() {
         const hotRecommendAreaEl = document.getElementById('hotRecommendArea');
         if (hotRecommendAreaEl) hotRecommendAreaEl.style.display = 'none';
 
-        const resultsDiv          = document.getElementById('results');
-        const searchResultsCount  = document.getElementById('searchResultsCount');
+        const resultsDiv = document.getElementById('results');
+        const searchResultsCount = document.getElementById('searchResultsCount');
         const yellowFilterEnabled = localStorage.getItem('yellowFilterEnabled') === 'true';
-        const banned = ['伦理片','福利','里番动漫','门事件','萝莉少女','制服诱惑','国产传媒','cosplay','黑丝诱惑','无码','日本无码','有码','日本有码','SWAG','网红主播','色情片','同性片','福利视频','福利片'];
+        const banned = ['伦理片', '福利', '里番动漫', '门事件', '萝莉少女', '制服诱惑', '国产传媒', 'cosplay', '黑丝诱惑', '无码', '日本无码', '有码', '日本有码', 'SWAG', '网红主播', '色情片', '同性片', '福利视频', '福利片'];
 
-        let totalCount  = 0;
+        let totalCount = 0;
         let hasAnyResult = false;
 
         // 流式渲染：每个 API 返回结果立刻追加到页面
@@ -680,43 +680,50 @@ async function search() {
             }
 
             const fragment = document.createDocumentFragment();
-            filtered.forEach(item => {
-                const safeId     = item.vod_id ? item.vod_id.toString().replace(/[^\w-]/g, '') : '';
-                const safeName   = (item.vod_name || '').toString()
-                    .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                const sourceInfo = item.source_name
-                    ? `<span class="bg-[#222] text-xs px-1.5 py-0.5 rounded-full">${item.source_name}</span>` : '';
+            filtered.forEach((item, idx) => {
+                const safeId = item.vod_id ? item.vod_id.toString().replace(/[^\w-]/g, '') : '';
+                const safeName = (item.vod_name || '').toString()
+                    .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                const sourceInfo = item.source_name || '';
                 const sourceCode = item.source_code || '';
-                const hasCover   = item.vod_pic && item.vod_pic.startsWith('http');
+                const hasCover = item.vod_pic && item.vod_pic.startsWith('http');
 
                 const div = document.createElement('div');
-                div.className = 'result-card card-hover bg-[#111] rounded-lg overflow-hidden cursor-pointer transition-all hover:scale-[1.02] h-full shadow-sm hover:shadow-md';
+                div.className = 'result-card group cursor-pointer';
+                div.style.animationDelay = `${idx * 40}ms`;
                 div.setAttribute('onclick', `showDetails('${safeId}','${safeName}','${sourceCode}')`);
-                if (item.api_url) div.setAttribute('data-api-url', item.api_url.replace(/"/g,'&quot;'));
+                if (item.api_url) div.setAttribute('data-api-url', item.api_url.replace(/"/g, '&quot;'));
                 div.innerHTML = `
-                    <div class="flex h-full">
+                    <div class="result-poster">
                         ${hasCover ? `
-                        <div class="relative flex-shrink-0 search-card-img-container">
-                            <img src="${item.vod_pic}" alt="${safeName}"
-                                 class="h-full w-full object-cover transition-transform hover:scale-110"
-                                 onerror="this.onerror=null;this.src='https://via.placeholder.com/300x450?text=无封面';this.classList.add('object-contain');"
-                                 loading="lazy">
-                            <div class="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent"></div>
-                        </div>` : ''}
-                        <div class="p-2 flex flex-col flex-grow">
-                            <div class="flex-grow">
-                                <h3 class="font-semibold mb-2 break-words line-clamp-2 ${hasCover ? '' : 'text-center'}" title="${safeName}">${safeName}</h3>
-                                <div class="flex flex-wrap ${hasCover ? '' : 'justify-center'} gap-1 mb-2">
-                                    ${(item.type_name||'').toString().replace(/</g,'&lt;')
-                                        ? `<span class="text-xs py-0.5 px-1.5 rounded bg-opacity-20 bg-blue-500 text-blue-300">${(item.type_name||'').toString().replace(/</g,'&lt;')}</span>` : ''}
-                                    ${item.vod_year ? `<span class="text-xs py-0.5 px-1.5 rounded bg-opacity-20 bg-purple-500 text-purple-300">${item.vod_year}</span>` : ''}
-                                </div>
-                                <p class="text-gray-400 line-clamp-2 overflow-hidden ${hasCover ? '' : 'text-center'} mb-2">${(item.vod_remarks||'暂无介绍').toString().replace(/</g,'&lt;')}</p>
-                            </div>
-                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-gray-800">
-                                ${sourceInfo ? `<div>${sourceInfo}</div>` : '<div></div>'}
-                            </div>
+                        <img src="${item.vod_pic}" alt="${safeName}"
+                             class="result-poster-img"
+                             loading="lazy"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <div class="result-poster-fallback" style="display:none">
+                            <span>${safeName[0] || '?'}</span>
+                        </div>` : `
+                        <div class="result-poster-fallback">
+                            <span>${safeName[0] || '?'}</span>
+                        </div>`}
+                        <!-- 悬浮遮罩 -->
+                        <div class="result-poster-overlay">
+                            <svg class="w-10 h-10 text-white/90" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
                         </div>
+                        <!-- 底部渐变信息 -->
+                        <div class="result-poster-info">
+                            ${sourceInfo ? `<span class="result-source-tag">${sourceInfo}</span>` : ''}
+                            ${item.vod_year ? `<span class="result-year-tag">${item.vod_year}</span>` : ''}
+                        </div>
+                        <!-- 类型标签 -->
+                        ${(item.type_name || '').toString().replace(/</g, '&lt;') ? `
+                        <div class="result-type-badge">${(item.type_name || '').toString().replace(/</g, '&lt;')}</div>` : ''}
+                    </div>
+                    <div class="result-card-title">
+                        <p class="result-card-name" title="${safeName}">${safeName}</p>
+                        <p class="result-card-remarks">${(item.vod_remarks || '').toString().replace(/</g, '&lt;')}</p>
                     </div>`;
                 fragment.appendChild(div);
             });
@@ -816,8 +823,8 @@ async function showDetails(id, vod_name, sourceCode) {
     if (!id) { showToast('视频ID无效', 'error'); return; }
 
     // ── 优化：立刻显示模态框 + 骨架屏，消除点击无响应感 ────────────────────
-    const modal        = document.getElementById('modal');
-    const modalTitle   = document.getElementById('modalTitle');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
 
     currentVideoTitle = vod_name || '未知视频';
@@ -830,14 +837,14 @@ async function showDetails(id, vod_name, sourceCode) {
                 ${Array(8).fill('<div class="h-8 bg-gray-700 rounded"></div>').join('')}
             </div>
         </div>`;
-    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
     showLoading();
 
     try {
         let apiParams = '';
         if (sourceCode.startsWith('custom_')) {
             const customIndex = sourceCode.replace('custom_', '');
-            const customApi   = getCustomApiInfo(customIndex);
+            const customApi = getCustomApiInfo(customIndex);
             if (!customApi) { showToast('自定义API配置无效', 'error'); hideLoading(); return; }
             apiParams = customApi.detail
                 ? `&customApi=${encodeURIComponent(customApi.url)}&customDetail=${encodeURIComponent(customApi.detail)}&source=custom`
@@ -847,7 +854,7 @@ async function showDetails(id, vod_name, sourceCode) {
         }
 
         const response = await fetch(`/api/detail?id=${encodeURIComponent(id)}${apiParams}`);
-        const data     = await response.json();
+        const data = await response.json();
 
         // 来源信息
         const sourceName = data.videoInfo?.source_name
@@ -971,7 +978,7 @@ function showVideoPlayer(url) {
     // 在打开播放器前，隐藏详情弹窗
     const detailModal = document.getElementById('modal');
     if (detailModal) {
-        detailModal.classList.add('hidden');
+        detailModal.style.display = 'none';
     }
     // 临时隐藏搜索结果和豆瓣区域，防止高度超出播放器而出现滚动条
     document.getElementById('resultsArea').classList.add('hidden');
@@ -998,7 +1005,7 @@ function closeVideoPlayer(home = false) {
         // 关闭播放器时也隐藏详情弹窗
         const detailModal = document.getElementById('modal');
         if (detailModal) {
-            detailModal.classList.add('hidden');
+            detailModal.style.display = 'none';
         }
         // 如果启用豆瓣或TMDB区域则显示
         const showDouban = localStorage.getItem('doubanEnabled') === 'true';
