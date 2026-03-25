@@ -539,7 +539,7 @@
 
 /* ── Results section ─────────────────────────────────────────── */
 .results-inner {
-    max-width: 1280px;
+    max-width: 960px;
     margin: 0 auto;
     padding: 0 .5rem;
 }
@@ -579,26 +579,14 @@
 /* 搜索结果海报卡片网格 */
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: .75rem;
-}
-
-@media (max-width: 1280px) {
-    .results-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-}
-
-@media (max-width: 1024px) {
-    .results-grid {
-        grid-template-columns: repeat(5, 1fr);
-    }
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
 }
 
 @media (max-width: 768px) {
     .results-grid {
         grid-template-columns: repeat(4, 1fr);
-        gap: .6rem;
+        gap: .75rem;
     }
 }
 
