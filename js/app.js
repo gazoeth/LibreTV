@@ -35,8 +35,9 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('yellowFilterEnabled', 'true');
         localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
 
-        // 默认启用豆瓣功能
+        // 默认启用豆瓣和TMDB功能
         localStorage.setItem('doubanEnabled', 'true');
+        localStorage.setItem('trendingEnabled', 'true');
 
         // 标记已初始化默认值
         localStorage.setItem('hasInitializedDefaults', 'true');
@@ -579,6 +580,12 @@ function resetSearchArea() {
     if (typeof updateDoubanVisibility === 'function') {
         updateDoubanVisibility();
     }
+    if (typeof updateTrendingVisibility === 'function') {
+        updateTrendingVisibility();
+    }
+    if (typeof updateHotRecommendArea === 'function') {
+        updateHotRecommendArea();
+    }
 
     // 重置URL为主页
     try {
@@ -643,6 +650,10 @@ async function search() {
         document.getElementById('resultsArea').classList.remove('hidden');
         const doubanArea = document.getElementById('doubanArea');
         if (doubanArea) doubanArea.classList.add('hidden');
+        const trendingAreaEl = document.getElementById('trendingArea');
+        if (trendingAreaEl) trendingAreaEl.classList.add('hidden');
+        const hotRecommendAreaEl = document.getElementById('hotRecommendArea');
+        if (hotRecommendAreaEl) hotRecommendAreaEl.style.display = 'none';
 
         const resultsDiv          = document.getElementById('results');
         const searchResultsCount  = document.getElementById('searchResultsCount');
@@ -965,6 +976,8 @@ function showVideoPlayer(url) {
     // 临时隐藏搜索结果和豆瓣区域，防止高度超出播放器而出现滚动条
     document.getElementById('resultsArea').classList.add('hidden');
     document.getElementById('doubanArea').classList.add('hidden');
+    const hotArea2 = document.getElementById('hotRecommendArea');
+    if (hotArea2) hotArea2.style.display = 'none';
     // 在框架中打开播放页面
     videoPlayerFrame = document.createElement('iframe');
     videoPlayerFrame.id = 'VideoPlayerFrame';
@@ -987,9 +1000,20 @@ function closeVideoPlayer(home = false) {
         if (detailModal) {
             detailModal.classList.add('hidden');
         }
-        // 如果启用豆瓣区域则显示豆瓣区域
-        if (localStorage.getItem('doubanEnabled') === 'true') {
-            document.getElementById('doubanArea').classList.remove('hidden');
+        // 如果启用豆瓣或TMDB区域则显示
+        const showDouban = localStorage.getItem('doubanEnabled') === 'true';
+        const showTmdb = localStorage.getItem('trendingEnabled') === 'true';
+        if (showDouban || showTmdb) {
+            const hotArea = document.getElementById('hotRecommendArea');
+            if (hotArea) hotArea.style.display = '';
+        }
+        if (showDouban) {
+            const da = document.getElementById('doubanArea');
+            if (da) { da.style.display = ''; da.classList.remove('hidden'); }
+        }
+        if (showTmdb) {
+            const ta = document.getElementById('trendingArea');
+            if (ta) { ta.style.display = ''; ta.classList.remove('hidden'); }
         }
     }
     if (home) {
@@ -1234,6 +1258,7 @@ async function exportConfig() {
         'yellowFilterEnabled',
         'adFilteringEnabled',
         'doubanEnabled',
+        'trendingEnabled',
         'hasInitializedDefaults'
     ];
 

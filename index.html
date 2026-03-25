@@ -158,13 +158,25 @@
                 </div>
             </div>
 
-            <div class="toggle-row">
+            <div class="toggle-row border-b-section">
                 <div>
                     <p class="toggle-label">豆瓣热门推荐</p>
                     <p class="toggle-desc">首页显示热门影视</p>
                 </div>
                 <div class="toggle-wrap">
                     <input type="checkbox" id="doubanToggle" class="toggle-input">
+                    <div class="toggle-bg"></div>
+                    <div class="toggle-dot"></div>
+                </div>
+            </div>
+
+            <div class="toggle-row">
+                <div>
+                    <p class="toggle-label">TMDB 流媒体热门</p>
+                    <p class="toggle-desc">首页显示全球流媒体热门</p>
+                </div>
+                <div class="toggle-wrap">
+                    <input type="checkbox" id="trendingToggle" class="toggle-input">
                     <div class="toggle-bg"></div>
                     <div class="toggle-dot"></div>
                 </div>
@@ -226,41 +238,58 @@
             </div>
         </div>
 
-        <!-- 豆瓣热门 -->
-        <div id="doubanArea" class="w-full my-8" style="display:none">
-            <div class="douban-inner">
-                <div style="margin-bottom:1.25rem">
-                    <div class="douban-topbar">
-                        <h2 class="douban-heading">
-                            <svg class="w-4 h-4" style="color:#e50914" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-                            </svg>
-                            流媒体热门
-                        </h2>
-                        <div class="douban-controls">
-                            <div class="douban-toggle">
-                                <button id="douban-movie-toggle" class="douban-toggle-button active">电影</button>
-                                <button id="douban-tv-toggle"    class="douban-toggle-button">剧集</button>
+        <!-- 热门推荐双栏区域 -->
+        <div id="hotRecommendArea" class="w-full hot-recommend-area">
+            <div class="hot-recommend-wrap">
+
+                <!-- TMDB 流媒体热门 -->
+                <div id="trendingArea" class="hot-section" style="display:none">
+                    <div class="hot-section-inner">
+                        <div class="hot-section-header">
+                            <div class="hot-section-title">
+                                <span class="hot-badge tmdb-badge">TMDB</span>
+                                <span>流媒体热门</span>
                             </div>
-                            <button id="douban-refresh" class="douban-refresh-button">
-                                <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                </svg>
-                                换一批
-                            </button>
+                            <div id="trendingTabs" class="hot-section-tabs"></div>
                         </div>
-                    </div>
-                    <div class="douban-tags-container">
-                        <div id="douban-tags" class="douban-tags"></div>
+                        <div id="trendingGrid" class="trending-grid"></div>
                     </div>
                 </div>
-                <div id="douban-results" class="douban-grid"></div>
+
+                <!-- 豆瓣热门推荐 -->
+                <div id="doubanArea" class="hot-section" style="display:none">
+                    <div class="hot-section-inner">
+                        <div class="hot-section-header">
+                            <div class="hot-section-title">
+                                <span class="hot-badge douban-badge">豆瓣</span>
+                                <span>热门推荐</span>
+                            </div>
+                            <div class="hot-section-controls">
+                                <div class="douban-toggle">
+                                    <button id="douban-movie-toggle" class="douban-toggle-button active">电影</button>
+                                    <button id="douban-tv-toggle"    class="douban-toggle-button">剧集</button>
+                                </div>
+                                <button id="douban-refresh" class="douban-refresh-button">
+                                    <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    换一批
+                                </button>
+                            </div>
+                        </div>
+                        <div class="douban-tags-container" style="margin-bottom:.75rem">
+                            <div id="douban-tags" class="douban-tags"></div>
+                        </div>
+                        <div id="douban-results" class="douban-grid"></div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
         <!-- 搜索结果 -->
-        <div id="resultsArea" class="w-full" style="display:none">
+        <div id="resultsArea" class="w-full hidden">
             <div class="results-inner">
                 <div class="results-header">
                     <h2 class="results-label">搜索结果</h2>
@@ -382,6 +411,7 @@
 <script src="js/customer_site.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/api.js"></script>
+<script src="js/trending.js"></script>
 <script src="js/douban.js"></script>
 <script src="js/password.js"></script>
 <script src="js/search.js"></script>

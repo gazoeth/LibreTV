@@ -143,22 +143,24 @@ function initDouban() {
 function updateDoubanVisibility() {
     const doubanArea = document.getElementById('doubanArea');
     if (!doubanArea) return;
-    
+
     const isEnabled = localStorage.getItem('doubanEnabled') === 'true';
-    const isSearching = document.getElementById('resultsArea') && 
-        !document.getElementById('resultsArea').classList.contains('hidden');
-    
-    // 只有在启用且没有搜索结果显示时才显示豆瓣区域
+    const resultsEl = document.getElementById('resultsArea');
+    const isSearching = resultsEl && !resultsEl.classList.contains('hidden');
+
     if (isEnabled && !isSearching) {
+        doubanArea.style.display = '';
         doubanArea.classList.remove('hidden');
-        // 如果豆瓣结果为空，重新加载
         if (document.getElementById('douban-results').children.length === 0) {
             renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart);
         }
     } else {
+        doubanArea.style.display = 'none';
         doubanArea.classList.add('hidden');
     }
 
+    // 联动外层容器
+    if (typeof updateHotRecommendArea === 'function') updateHotRecommendArea();
 }
 
 // 只填充搜索框，不执行搜索，让用户自主决定搜索时机

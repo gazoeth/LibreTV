@@ -57,11 +57,60 @@ function initTrending() {
     const area = document.getElementById('trendingArea');
     if (!area) return;
 
-    const enabled = localStorage.getItem('trendingEnabled') !== 'false';
-    if (!enabled) { area.classList.add('hidden'); return; }
+    // 绑定设置面板中的 toggle 开关
+    const toggle = document.getElementById('trendingToggle');
+    if (toggle) {
+        const isEnabled = localStorage.getItem('trendingEnabled') === 'true';
+        toggle.checked = isEnabled;
 
+        const toggleBg  = toggle.nextElementSibling;
+        const toggleDot = toggleBg && toggleBg.nextElementSibling;
+        if (isEnabled && toggleBg && toggleDot) {
+            toggleBg.classList.add('bg-blue-600');
+            toggleDot.classList.add('translate-x-6');
+        }
+
+        toggle.addEventListener('change', function(e) {
+            const checked = e.target.checked;
+            localStorage.setItem('trendingEnabled', checked ? 'true' : 'false');
+            if (toggleBg && toggleDot) {
+                if (checked) {
+                    toggleBg.classList.add('bg-blue-600');
+                    toggleDot.classList.add('translate-x-6');
+                } else {
+                    toggleBg.classList.remove('bg-blue-600');
+                    toggleDot.classList.remove('translate-x-6');
+                }
+            }
+            updateTrendingVisibility();
+            updateHotRecommendArea();
+        });
+    }
+
+    const enabled = localStorage.getItem('trendingEnabled') === 'true';
+    if (!enabled) {
+        area.style.display = 'none';
+        return;
+    }
+
+    area.style.display = '';
     renderTrendingTabs();
     loadTrending(trendingCurrentTab);
+}
+
+// ── 控制外层容器显隐 ──────────────────────────────────────────────────────────
+function updateHotRecommendArea() {
+    const hotArea = document.getElementById('hotRecommendArea');
+    if (!hotArea) return;
+    const showDouban   = localStorage.getItem('doubanEnabled') === 'true';
+    const showTrending = localStorage.getItem('trendingEnabled') === 'true';
+    const resultsAreaEl = document.getElementById('resultsArea');
+    const isSearching   = resultsAreaEl && !resultsAreaEl.classList.contains('hidden');
+    if ((showDouban || showTrending) && !isSearching) {
+        hotArea.style.display = '';
+    } else {
+        hotArea.style.display = 'none';
+    }
 }
 
 // ── 标签切换 ──────────────────────────────────────────────────────────────────
@@ -241,13 +290,16 @@ function updateTrendingVisibility() {
     const area        = document.getElementById('trendingArea');
     const resultsArea = document.getElementById('resultsArea');
     if (!area) return;
-    const enabled     = localStorage.getItem('trendingEnabled') !== 'false';
+    const enabled     = localStorage.getItem('trendingEnabled') === 'true';
     const isSearching = resultsArea && !resultsArea.classList.contains('hidden');
     if (enabled && !isSearching) {
-        area.classList.remove('hidden');
+        area.style.display = '';
+        renderTrendingTabs();
+        if (!trendingCache[trendingCurrentTab]) loadTrending(trendingCurrentTab);
     } else {
-        area.classList.add('hidden');
+        area.style.display = 'none';
     }
+    updateHotRecommendArea();
 }
 
 document.addEventListener('DOMContentLoaded', initTrending);
