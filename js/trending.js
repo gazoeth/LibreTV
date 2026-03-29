@@ -186,17 +186,14 @@ async function loadTrending(type, page = 1) {
         if (cached?.pages && cached.pages[page]) {
             renderTrendingCards(cached.pages[page]);
         } else {
-            // 没有缓存时，第一页用大兜底，其它页回到第一页的内容
-            const fallbackData = FALLBACK_TRENDING[type];
-            if (!trendingCache[type]) trendingCache[type] = { pages: {}, ts: 0 };
-            trendingCache[type].pages[1] = fallbackData;
-
+            // 没有缓存时，模拟换一批效果
+            let fallbackData = [...FALLBACK_TRENDING[type]];
             if (page > 1) {
-                trendingCurrentPage[type] = 1;
-                renderTrendingCards(fallbackData);
-            } else {
-                renderTrendingCards(fallbackData);
+                fallbackData = fallbackData.sort(() => 0.5 - Math.random());
             }
+            if (!trendingCache[type]) trendingCache[type] = { pages: {}, ts: 0 };
+            trendingCache[type].pages[page] = fallbackData;
+            renderTrendingCards(fallbackData);
         }
     }
 }
@@ -321,10 +318,12 @@ function updateTrendingVisibility() {
     const isSearching = resultsArea && !resultsArea.classList.contains('hidden');
     if (enabled && !isSearching) {
         area.style.display = '';
+        area.classList.remove('hidden');
         renderTrendingTabs();
         loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
     } else {
         area.style.display = 'none';
+        area.classList.add('hidden');
     }
     updateHotRecommendArea();
 }
