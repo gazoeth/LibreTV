@@ -26,6 +26,7 @@
     cursor: pointer;
     font-family: inherit;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .top-corner-button:hover {
@@ -90,8 +91,8 @@
 .hero-icon {
     width: 44px;
     height: 44px;
-    background: -webkit-linear-gradient(135deg,#e50914,#c8000b);
-    background: linear-gradient(135deg,#e50914,#c8000b);
+    background: -webkit-linear-gradient(135deg, #e50914, #ff6b35);
+    background: linear-gradient(135deg, #e50914, #ff6b35);
     border-radius: 12px;
     display: -webkit-box;
     display: -ms-flexbox;
@@ -244,6 +245,7 @@
     outline: none;
     min-width: 0;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .search-input::-webkit-input-placeholder {
@@ -579,20 +581,27 @@
 /* 搜索结果海报卡片网格 */
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+    .results-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+    }
 }
 
 @media (max-width: 600px) {
     .results-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: .75rem;
     }
 }
 
 @media (max-width: 400px) {
     .results-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: .5rem;
     }
 }
@@ -837,8 +846,8 @@
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: -webkit-linear-gradient(135deg,#e50914,#c8000b);
-    background: linear-gradient(135deg,#e50914,#c8000b);
+    background: -webkit-linear-gradient(135deg, #e50914, #ff6b35);
+    background: linear-gradient(135deg, #e50914, #ff6b35);
     display: -webkit-box;
     display: -ms-flexbox;
     display: flex;
