@@ -1678,7 +1678,15 @@ async function showSwitchResourceModal() {
                 await fetch(detail.episodes[0], { method: 'HEAD', mode: 'no-cors', cache: 'no-cache', signal: AbortSignal.timeout(3000) });
             } catch {}
 
-            return { speed: Math.round(performance.now() - t0), episodes: detail.episodes.length, error: null };
+            const measuredSpeed = Math.round(performance.now() - t0);
+            if (window.updateSourceSpeedCache) {
+                window.updateSourceSpeedCache(sourceKey, measuredSpeed, {
+                    measurement: 'detail',
+                    vodId,
+                    episodes: detail.episodes.length
+                });
+            }
+            return { speed: measuredSpeed, episodes: detail.episodes.length, error: null };
         } catch (e) {
             return { speed: -1, error: e.name === 'TimeoutError' || e.name === 'AbortError' ? '超时' : '测试失败' };
         }
