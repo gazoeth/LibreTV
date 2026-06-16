@@ -662,6 +662,8 @@ async function search() {
 
         let totalCount = 0;
         let hasAnyResult = false;
+        let arrivalCounter = 0;
+        const resultBuckets = new Map();
 
         // 流式渲染：每个 API 返回结果立刻追加到页面
         function appendResults(results) {
@@ -733,13 +735,84 @@ async function search() {
             if (searchResultsCount) searchResultsCount.textContent = totalCount;
         }
 
+        function renderSortedResults() {
+            const mergedResults = [];
+            resultBuckets.forEach(items => mergedResults.push(...items));
+
+            const sortedResults = sortSearchResultsBySpeed(mergedResults);
+            resultsDiv.innerHTML = '';
+            totalCount = 0;
+
+            if (sortedResults.length === 0) {
+                if (searchResultsCount) searchResultsCount.textContent = '0';
+                return;
+            }
+
+            appendResults(sortedResults);
+        }
+
+        function collectResults(results, sourceCode, sourceIndex) {
+            if (!Array.isArray(results) || results.length === 0) return;
+
+            const filtered = yellowFilterEnabled
+                ? results.filter(item => !banned.some(kw => (item.type_name || '').includes(kw)))
+                : results;
+            if (filtered.length === 0) return;
+
+            hasAnyResult = true;
+
+            const existingBucket = resultBuckets.get(sourceCode) || [];
+            const normalizedResults = filtered.map(item => ({
+                ...item,
+                __groupIndex: Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode),
+                __arrivalIndex: arrivalCounter++,
+                __sourceSpeedScore: getCachedSourceSpeed(sourceCode)
+                    ?? item.__sourceSpeedScore
+                    ?? item.__searchResponseTime
+                    ?? Number.POSITIVE_INFINITY
+            }));
+
+            resultBuckets.set(sourceCode, existingBucket.concat(normalizedResults));
+            renderSortedResults();
+
+            const cacheEntry = window.getSourceSpeedCacheEntry
+                ? window.getSourceSpeedCacheEntry(sourceCode)
+                : null;
+            if (cacheEntry?.measurement === 'detail') return;
+
+            if (!window.__pendingSearchSpeedTests) {
+                window.__pendingSearchSpeedTests = new Set();
+            }
+            if (window.__pendingSearchSpeedTests.has(sourceCode)) return;
+
+            const firstResult = normalizedResults[0];
+            if (!firstResult?.vod_id) return;
+
+            window.__pendingSearchSpeedTests.add(sourceCode);
+            window.testSourceConnectionSpeed(sourceCode, firstResult.vod_id)
+                .then(speedResult => {
+                    if (!speedResult || speedResult.speed < 0) return;
+
+                    const bucket = resultBuckets.get(sourceCode);
+                    if (!bucket || bucket.length === 0) return;
+
+                    bucket.forEach(item => {
+                        item.__sourceSpeedScore = speedResult.speed;
+                    });
+                    renderSortedResults();
+                })
+                .finally(() => {
+                    window.__pendingSearchSpeedTests.delete(sourceCode);
+                });
+        }
+
         // 初始占位
         resultsDiv.innerHTML = `<div class="col-span-full text-center py-8 text-gray-500">搜索中...</div>`;
 
         // 并发搜索，各 API 搜到即渲染
         await Promise.allSettled(
-            selectedAPIs.map(apiId =>
-                searchByAPIAndKeyWord(apiId, query).then(appendResults)
+            selectedAPIs.map((apiId, sourceIndex) =>
+                searchByAPIAndKeyWord(apiId, query).then(results => collectResults(results, apiId, sourceIndex))
             )
         );
 
