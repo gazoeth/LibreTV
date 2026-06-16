@@ -1,115 +1,430 @@
-// ── search.js（优化版）────────────────────────────────────────────────────────
-// 核心改进：
-//  1. 预热鉴权前缀：复用 ProxyAuth.getAuthPrefix()，同一搜索只 await 一次
-//  2. 超时从 15s 收紧至 10s，减少慢 API 的等待
-//  3. 分页请求复用已缓存前缀，无额外 await
-//  4. Promise.allSettled 保证单页失败不影响其他页
+const SOURCE_SPEED_CACHE_KEY = 'sourceSpeedCache.v1';
+const SOURCE_SPEED_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function getNowMs() {
+    return Date.now();
+}
+
+function normalizeSpeedValue(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return null;
+    }
+    return Math.round(numeric);
+}
+
+function loadSourceSpeedCache() {
+    try {
+        const raw = localStorage.getItem(SOURCE_SPEED_CACHE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {};
+        }
+
+        const now = getNowMs();
+        const cache = {};
+
+        Object.entries(parsed).forEach(([sourceKey, entry]) => {
+            if (!entry || typeof entry !== 'object') {
+                return;
+            }
+
+            const speed = normalizeSpeedValue(entry.speed);
+            const updatedAt = Number(entry.updatedAt);
+            if (speed === null || !Number.isFinite(updatedAt)) {
+                return;
+            }
+
+            if (now - updatedAt > SOURCE_SPEED_CACHE_TTL) {
+                return;
+            }
+
+            cache[sourceKey] = {
+                speed,
+                updatedAt,
+                measurement: entry.measurement || 'unknown',
+                vodId: typeof entry.vodId === 'string' ? entry.vodId : '',
+                episodes: Number.isFinite(Number(entry.episodes)) ? Number(entry.episodes) : null
+            };
+        });
+
+        return cache;
+    } catch (error) {
+        console.warn('Failed to read source speed cache:', error);
+        return {};
+    }
+}
+
+function getSourceSpeedCache() {
+    if (!window.__sourceSpeedCache) {
+        window.__sourceSpeedCache = loadSourceSpeedCache();
+    }
+    return window.__sourceSpeedCache;
+}
+
+function persistSourceSpeedCache() {
+    try {
+        localStorage.setItem(SOURCE_SPEED_CACHE_KEY, JSON.stringify(getSourceSpeedCache()));
+    } catch (error) {
+        console.warn('Failed to persist source speed cache:', error);
+    }
+}
+
+function getSourceSpeedCacheEntry(sourceKey) {
+    if (!sourceKey) {
+        return null;
+    }
+
+    const entry = getSourceSpeedCache()[sourceKey];
+    if (!entry) {
+        return null;
+    }
+
+    const speed = normalizeSpeedValue(entry.speed);
+    if (speed === null) {
+        return null;
+    }
+
+    return {
+        ...entry,
+        speed
+    };
+}
+
+function getCachedSourceSpeed(sourceKey) {
+    const entry = getSourceSpeedCacheEntry(sourceKey);
+    return entry ? entry.speed : null;
+}
+
+function updateSourceSpeedCache(sourceKey, speed, options = {}) {
+    const normalizedSpeed = normalizeSpeedValue(speed);
+    if (!sourceKey || normalizedSpeed === null) {
+        return null;
+    }
+
+    const cache = getSourceSpeedCache();
+    const existing = cache[sourceKey] || null;
+    const incomingMeasurement = options.measurement || existing?.measurement || 'unknown';
+    const incomingIsDetail = incomingMeasurement === 'detail';
+    const existingIsDetail = existing?.measurement === 'detail';
+
+    let nextSpeed = normalizedSpeed;
+
+    if (existing && normalizeSpeedValue(existing.speed) !== null) {
+        if (existingIsDetail && !incomingIsDetail) {
+            nextSpeed = existing.speed;
+        } else if (incomingIsDetail && !existingIsDetail) {
+            nextSpeed = Math.round(existing.speed * 0.35 + normalizedSpeed * 0.65);
+        } else {
+            nextSpeed = Math.round(existing.speed * 0.4 + normalizedSpeed * 0.6);
+        }
+    }
+
+    cache[sourceKey] = {
+        speed: nextSpeed,
+        updatedAt: getNowMs(),
+        measurement: incomingMeasurement,
+        vodId: typeof options.vodId === 'string' ? options.vodId : existing?.vodId || '',
+        episodes: Number.isFinite(Number(options.episodes)) ? Number(options.episodes) : existing?.episodes || null
+    };
+
+    persistSourceSpeedCache();
+    return cache[sourceKey];
+}
+
+function getItemSourceSpeedScore(item) {
+    if (!item || typeof item !== 'object') {
+        return Number.POSITIVE_INFINITY;
+    }
+
+    const directSpeed = normalizeSpeedValue(item.__sourceSpeedScore);
+    if (directSpeed !== null) {
+        return directSpeed;
+    }
+
+    const cachedSpeed = getCachedSourceSpeed(item.source_code);
+    if (cachedSpeed !== null) {
+        return cachedSpeed;
+    }
+
+    const searchLatency = normalizeSpeedValue(item.__searchResponseTime);
+    if (searchLatency !== null) {
+        return searchLatency;
+    }
+
+    return Number.POSITIVE_INFINITY;
+}
+
+function sortSearchResultsBySpeed(items) {
+    return [...items].sort((left, right) => {
+        const leftGroup = Number.isFinite(left?.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
+        const rightGroup = Number.isFinite(right?.__groupIndex) ? right.__groupIndex : Number.MAX_SAFE_INTEGER;
+        if (leftGroup !== rightGroup) {
+            return leftGroup - rightGroup;
+        }
+
+        const leftSpeed = getItemSourceSpeedScore(left);
+        const rightSpeed = getItemSourceSpeedScore(right);
+        if (leftSpeed !== rightSpeed) {
+            return leftSpeed - rightSpeed;
+        }
+
+        const leftArrival = Number.isFinite(left?.__arrivalIndex) ? left.__arrivalIndex : Number.MAX_SAFE_INTEGER;
+        const rightArrival = Number.isFinite(right?.__arrivalIndex) ? right.__arrivalIndex : Number.MAX_SAFE_INTEGER;
+        if (leftArrival !== rightArrival) {
+            return leftArrival - rightArrival;
+        }
+
+        return 0;
+    });
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function buildDetailApiParams(sourceKey) {
+    if (String(sourceKey).startsWith('custom_')) {
+        const customApi = getCustomApiInfo(String(sourceKey).replace('custom_', ''));
+        if (!customApi) {
+            return null;
+        }
+
+        return customApi.detail
+            ? `&customApi=${encodeURIComponent(customApi.url)}&customDetail=${encodeURIComponent(customApi.detail)}&source=custom`
+            : `&customApi=${encodeURIComponent(customApi.url)}&source=custom`;
+    }
+
+    return `&source=${encodeURIComponent(sourceKey)}`;
+}
+
+async function testSourceConnectionSpeed(sourceKey, vodId, options = {}) {
+    const { force = false } = options;
+    const cacheEntry = getSourceSpeedCacheEntry(sourceKey);
+
+    if (!force && cacheEntry && cacheEntry.measurement === 'detail') {
+        return {
+            speed: cacheEntry.speed,
+            episodes: cacheEntry.episodes,
+            error: null,
+            cached: true
+        };
+    }
+
+    if (!vodId) {
+        return { speed: -1, error: 'missing-vod-id', cached: false };
+    }
+
+    const apiParams = buildDetailApiParams(sourceKey);
+    if (apiParams === null) {
+        return { speed: -1, error: 'invalid-source-config', cached: false };
+    }
+
+    try {
+        const startedAt = performance.now();
+        const response = await fetchWithTimeout(
+            `/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`,
+            {},
+            6000
+        );
+
+        if (!response.ok) {
+            return { speed: -1, error: 'detail-request-failed', cached: false };
+        }
+
+        const detail = await response.json();
+        if (!Array.isArray(detail.episodes) || detail.episodes.length === 0) {
+            return { speed: -1, error: 'no-playable-episodes', cached: false };
+        }
+
+        const firstEpisodeUrl = detail.episodes[0];
+        if (firstEpisodeUrl && /^https?:\/\//i.test(firstEpisodeUrl)) {
+            try {
+                await fetchWithTimeout(firstEpisodeUrl, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                }, 3000);
+            } catch (error) {
+                // Best-effort probe only.
+            }
+        }
+
+        const speed = Math.max(1, Math.round(performance.now() - startedAt));
+        updateSourceSpeedCache(sourceKey, speed, {
+            measurement: 'detail',
+            vodId,
+            episodes: detail.episodes.length
+        });
+
+        return {
+            speed,
+            episodes: detail.episodes.length,
+            error: null,
+            cached: false
+        };
+    } catch (error) {
+        return {
+            speed: -1,
+            error: error?.name === 'AbortError' ? 'timeout' : 'speed-test-failed',
+            cached: false
+        };
+    }
+}
+
+window.getSourceSpeedCacheEntry = getSourceSpeedCacheEntry;
+window.getCachedSourceSpeed = getCachedSourceSpeed;
+window.updateSourceSpeedCache = updateSourceSpeedCache;
+window.getItemSourceSpeedScore = getItemSourceSpeedScore;
+window.sortSearchResultsBySpeed = sortSearchResultsBySpeed;
+window.testSourceConnectionSpeed = testSourceConnectionSpeed;
 
 async function searchByAPIAndKeyWord(apiId, query) {
     try {
-        let apiName, apiBaseUrl;
+        let apiName;
+        let apiBaseUrl;
 
         if (apiId.startsWith('custom_')) {
             const customApi = getCustomApiInfo(apiId.replace('custom_', ''));
-            if (!customApi) return [];
+            if (!customApi) {
+                return [];
+            }
             apiBaseUrl = customApi.url;
-            apiName    = customApi.name;
+            apiName = customApi.name;
         } else {
-            if (!API_SITES[apiId]) return [];
+            if (!API_SITES[apiId]) {
+                return [];
+            }
             apiBaseUrl = API_SITES[apiId].api;
-            apiName    = API_SITES[apiId].name;
+            apiName = API_SITES[apiId].name;
         }
 
-        // ── 优化1：预取鉴权前缀（已缓存则同步，首次才 await 一次）──────────
         const authSuffix = window.ProxyAuth?.getAuthPrefix
             ? await window.ProxyAuth.getAuthPrefix()
             : null;
 
-        // 构造代理 URL 的辅助函数（复用已拿到的 authSuffix）
         async function proxyUrl(rawUrl) {
             if (authSuffix !== null) {
                 return PROXY_URL + encodeURIComponent(rawUrl) + authSuffix;
             }
+
             return window.ProxyAuth?.addAuthToProxyUrl
                 ? await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(rawUrl))
                 : PROXY_URL + encodeURIComponent(rawUrl);
         }
 
-        // ── 第一页 ───────────────────────────────────────────────────────────
-        const apiUrl     = apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
-        const controller = new AbortController();
-        const timeoutId  = setTimeout(() => controller.abort(), 10000); // 15s→10s
+        const apiUrl = apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
+        const searchStartedAt = performance.now();
+        const response = await fetchWithTimeout(
+            await proxyUrl(apiUrl),
+            { headers: API_CONFIG.search.headers },
+            10000
+        );
 
-        const response = await fetch(await proxyUrl(apiUrl), {
-            headers: API_CONFIG.search.headers,
-            signal:  controller.signal
-        });
-        clearTimeout(timeoutId);
+        const searchLatency = Math.max(1, Math.round(performance.now() - searchStartedAt));
+        updateSourceSpeedCache(apiId, searchLatency, { measurement: 'search' });
 
-        if (!response.ok) return [];
+        if (!response.ok) {
+            return [];
+        }
 
-        // 先读取文本，校验是否为有效 JSON（防止返回"暂不支持搜索"等错误文本）
         const text = await response.text();
-        if (!text || !text.trimStart().startsWith('{')) return [];
+        if (!text || !text.trimStart().startsWith('{')) {
+            return [];
+        }
 
         let data;
-        try { data = JSON.parse(text); } catch { return []; }
-        if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) return [];
+        try {
+            data = JSON.parse(text);
+        } catch (error) {
+            return [];
+        }
+
+        if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) {
+            return [];
+        }
 
         const customApiUrl = apiId.startsWith('custom_')
             ? getCustomApiInfo(apiId.replace('custom_', ''))?.url
             : undefined;
 
-        const mapItem = item => ({
+        const cacheEntry = getSourceSpeedCacheEntry(apiId);
+        const speedScore = cacheEntry?.speed ?? searchLatency;
+        const speedSource = cacheEntry?.measurement || 'search';
+
+        const mapItem = (item) => ({
             ...item,
             source_name: apiName,
             source_code: apiId,
-            ...(customApiUrl ? { api_url: customApiUrl } : {})
+            ...(customApiUrl ? { api_url: customApiUrl } : {}),
+            __searchResponseTime: searchLatency,
+            __sourceSpeedScore: speedScore,
+            __speedSource: speedSource
         });
 
         const results = data.list.map(mapItem);
 
-        // ── 优化2：并发分页，复用 authSuffix ────────────────────────────────
-        const pageCount    = data.pagecount || 1;
+        const pageCount = data.pagecount || 1;
         const pagesToFetch = Math.min(pageCount - 1, (API_CONFIG.search.maxPages || 1) - 1);
 
         if (pagesToFetch > 0) {
-            const pagePromises = Array.from({ length: pagesToFetch }, (_, i) => {
-                const page    = i + 2;
+            const pagePromises = Array.from({ length: pagesToFetch }, (_, index) => {
+                const page = index + 2;
                 const pageUrl = apiBaseUrl + API_CONFIG.search.pagePath
                     .replace('{query}', encodeURIComponent(query))
                     .replace('{page}', page);
 
                 return (async () => {
                     try {
-                        const pc = new AbortController();
-                        const pt = setTimeout(() => pc.abort(), 10000);
-                        const pr = await fetch(await proxyUrl(pageUrl), {
-                            headers: API_CONFIG.search.headers,
-                            signal:  pc.signal
-                        });
-                        clearTimeout(pt);
-                        if (!pr.ok) return [];
-                        const pt2 = await pr.text();
-                        if (!pt2 || !pt2.trimStart().startsWith('{')) return [];
-                        let pd; try { pd = JSON.parse(pt2); } catch { return []; }
-                        return pd?.list ? pd.list.map(mapItem) : [];
-                    } catch {
+                        const pageResponse = await fetchWithTimeout(
+                            await proxyUrl(pageUrl),
+                            { headers: API_CONFIG.search.headers },
+                            10000
+                        );
+                        if (!pageResponse.ok) {
+                            return [];
+                        }
+
+                        const pageText = await pageResponse.text();
+                        if (!pageText || !pageText.trimStart().startsWith('{')) {
+                            return [];
+                        }
+
+                        let pageData;
+                        try {
+                            pageData = JSON.parse(pageText);
+                        } catch (error) {
+                            return [];
+                        }
+
+                        return pageData?.list ? pageData.list.map(mapItem) : [];
+                    } catch (error) {
                         return [];
                     }
                 })();
             });
 
-            // allSettled：单页失败不中断其他页
             const settled = await Promise.allSettled(pagePromises);
-            settled.forEach(r => {
-                if (r.status === 'fulfilled' && r.value.length > 0) results.push(...r.value);
+            settled.forEach((result) => {
+                if (result.status === 'fulfilled' && result.value.length > 0) {
+                    results.push(...result.value);
+                }
             });
         }
 
         return results;
     } catch (error) {
-        console.warn(`API ${apiId} 搜索失败:`, error);
+        console.warn(`API ${apiId} search failed:`, error);
         return [];
     }
 }
