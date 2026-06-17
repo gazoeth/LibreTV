@@ -155,6 +155,43 @@ function getItemSourceSpeedScore(item) {
     return Number.POSITIVE_INFINITY;
 }
 
+function formatSourceSpeedText(item) {
+    const explicitSpeed = normalizeSpeedValue(item?.__sourceSpeedScore);
+    const searchSpeed = normalizeSpeedValue(item?.__searchResponseTime);
+    const cacheEntry = item?.source_code ? getSourceSpeedCacheEntry(item.source_code) : null;
+    const displaySpeed = explicitSpeed ?? cacheEntry?.speed ?? searchSpeed;
+
+    if (displaySpeed === null) {
+        return {
+            className: 'pending',
+            text: '测速中'
+        };
+    }
+
+    if (item?.__speedTestFailed) {
+        return {
+            className: 'error',
+            text: '测速失败'
+        };
+    }
+
+    let className = 'good';
+    if (displaySpeed > 2000) {
+        className = 'poor';
+    } else if (displaySpeed > 1000) {
+        className = 'medium';
+    }
+
+    const suffix = item?.__speedSource === 'search' && !cacheEntry?.measurement
+        ? ' 估算'
+        : '';
+
+    return {
+        className,
+        text: `${displaySpeed}ms${suffix}`
+    };
+}
+
 function sortSearchResultsBySpeed(items) {
     return [...items].sort((left, right) => {
         const leftGroup = Number.isFinite(left?.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
@@ -286,6 +323,7 @@ window.getSourceSpeedCacheEntry = getSourceSpeedCacheEntry;
 window.getCachedSourceSpeed = getCachedSourceSpeed;
 window.updateSourceSpeedCache = updateSourceSpeedCache;
 window.getItemSourceSpeedScore = getItemSourceSpeedScore;
+window.formatSourceSpeedText = formatSourceSpeedText;
 window.sortSearchResultsBySpeed = sortSearchResultsBySpeed;
 window.testSourceConnectionSpeed = testSourceConnectionSpeed;
 
