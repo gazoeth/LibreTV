@@ -689,6 +689,9 @@ async function search() {
                 const sourceInfo = item.source_name || '';
                 const sourceCode = item.source_code || '';
                 const hasCover = item.vod_pic && item.vod_pic.startsWith('http');
+                const speedInfo = window.formatSourceSpeedText
+                    ? window.formatSourceSpeedText(item)
+                    : { className: 'pending', text: '测速中' };
 
                 const div = document.createElement('div');
                 div.className = 'result-card group cursor-pointer';
@@ -718,6 +721,9 @@ async function search() {
                         <div class="result-poster-info">
                             ${sourceInfo ? `<span class="result-source-tag">${sourceInfo}</span>` : ''}
                             ${item.vod_year ? `<span class="result-year-tag">${item.vod_year}</span>` : ''}
+                        </div>
+                        <div class="result-speed-badge">
+                            <span class="result-speed-indicator ${speedInfo.className}">${speedInfo.text}</span>
                         </div>
                         <!-- 类型标签 -->
                         ${(item.type_name || '').toString().replace(/</g, '&lt;') ? `
@@ -791,13 +797,21 @@ async function search() {
             window.__pendingSearchSpeedTests.add(sourceCode);
             window.testSourceConnectionSpeed(sourceCode, firstResult.vod_id)
                 .then(speedResult => {
-                    if (!speedResult || speedResult.speed < 0) return;
-
                     const bucket = resultBuckets.get(sourceCode);
                     if (!bucket || bucket.length === 0) return;
 
+                    if (!speedResult || speedResult.speed < 0) {
+                        bucket.forEach(item => {
+                            item.__speedTestFailed = true;
+                        });
+                        renderSortedResults();
+                        return;
+                    }
+
                     bucket.forEach(item => {
                         item.__sourceSpeedScore = speedResult.speed;
+                        item.__speedSource = 'detail';
+                        item.__speedTestFailed = false;
                     });
                     renderSortedResults();
                 })
