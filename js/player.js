@@ -64,7 +64,7 @@ window.addEventListener('load', function () {
     // 提取当前URL中的重要参数，以便在需要时能够恢复当前页面
     const urlParams = new URLSearchParams(window.location.search);
     const videoId = urlParams.get('id');
-    const sourceCode = urlParams.get('source');
+    const sourceCode = getCurrentSourceCode(urlParams);
 
     if (videoId && sourceCode) {
         // 保存当前播放状态，以便其他页面可以返回
@@ -94,6 +94,10 @@ let currentVideoUrl = ''; // 记录当前实际的视频URL
 const isWebkit = (typeof window.webkitConvertPointFromNodeToPage === 'function')
 Artplayer.FULLSCREEN_WEB_IN_BODY = true;
 
+function getCurrentSourceCode(params = new URLSearchParams(window.location.search)) {
+    return params.get('source_code') || params.get('source') || '';
+}
+
 // 页面加载
 document.addEventListener('DOMContentLoaded', function () {
     // 先检查用户是否已通过密码验证
@@ -120,7 +124,7 @@ function initializePageContent() {
     const urlParams = new URLSearchParams(window.location.search);
     let videoUrl = urlParams.get('url');
     const title = urlParams.get('title');
-    const sourceCode = urlParams.get('source');
+    const sourceCode = getCurrentSourceCode(urlParams);
     let index = parseInt(urlParams.get('index') || '0');
     const episodesList = urlParams.get('episodes'); // 从URL获取集数信息
     const savedPosition = parseInt(urlParams.get('position') || '0'); // 获取保存的播放位置
@@ -913,7 +917,7 @@ function playEpisode(index) {
 
     // 获取 sourceCode
     const urlParams2 = new URLSearchParams(window.location.search);
-    const sourceCode = urlParams2.get('source_code');
+    const sourceCode = getCurrentSourceCode(urlParams2);
 
     // 准备切换剧集的URL
     const url = currentEpisodes[index];
@@ -1081,8 +1085,11 @@ function saveToHistory() {
 
     // 尝试从URL中获取参数
     const urlParams = new URLSearchParams(window.location.search);
-    const sourceName = urlParams.get('source') || '';
-    const sourceCode = urlParams.get('source') || '';
+    const sourceCode = getCurrentSourceCode(urlParams);
+    let sourceName = urlParams.get('source') || '';
+    if (!sourceName && sourceCode) {
+        sourceName = sourceCode;
+    }
     const id_from_params = urlParams.get('id'); // Get video ID from player URL (passed as 'id')
 
     // 获取当前播放进度
@@ -1442,7 +1449,7 @@ function renderResourceInfoBar() {
     
     // 获取当前视频 source_code
     const urlParams = new URLSearchParams(window.location.search);
-    const currentSource = urlParams.get('source') || '';
+    const currentSource = getCurrentSourceCode(urlParams);
     
     // 显示临时加载状态
     container.innerHTML = `
@@ -1599,7 +1606,7 @@ const _FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 // 流式资源切换弹窗（优化版）：搜到即显卡片，速测完即更新徽章
 async function showSwitchResourceModal() {
     const urlParams         = new URLSearchParams(window.location.search);
-    const currentSourceCode = urlParams.get('source');
+    const currentSourceCode = getCurrentSourceCode(urlParams);
     const currentVideoId    = urlParams.get('id');
 
     const modal        = document.getElementById('modal');
