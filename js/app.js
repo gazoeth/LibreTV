@@ -1036,7 +1036,7 @@ function playVideo(url, vod_name, sourceCode, episodeIndex = 0, vodId = '') {
     let currentPath = window.location.href;
 
     // 构建播放页面URL，使用watch.html作为中间跳转页
-    let watchUrl = `watch.html?id=${vodId || ''}&source=${sourceCode || ''}&url=${encodeURIComponent(url)}&index=${episodeIndex}&title=${encodeURIComponent(vod_name || '')}`;
+    let watchUrl = `watch.html?id=${vodId || ''}&source=${sourceCode || ''}&source_code=${sourceCode || ''}&url=${encodeURIComponent(url)}&index=${episodeIndex}&title=${encodeURIComponent(vod_name || '')}`;
 
     // 添加返回URL参数
     if (currentPath.includes('index.html') || currentPath.endsWith('/')) {
@@ -1062,6 +1062,11 @@ function playVideo(url, vod_name, sourceCode, episodeIndex = 0, vodId = '') {
 
 // 弹出播放器页面
 function showVideoPlayer(url) {
+    const existingFrame = document.getElementById('VideoPlayerFrame');
+    if (existingFrame) {
+        existingFrame.remove();
+    }
+
     // 在打开播放器前，隐藏详情弹窗
     const detailModal = document.getElementById('modal');
     if (detailModal) {
@@ -1075,8 +1080,15 @@ function showVideoPlayer(url) {
     // 在框架中打开播放页面
     videoPlayerFrame = document.createElement('iframe');
     videoPlayerFrame.id = 'VideoPlayerFrame';
-    videoPlayerFrame.className = 'fixed w-full h-screen z-40';
-    videoPlayerFrame.src = url;
+    videoPlayerFrame.className = 'fixed inset-0 w-full h-screen z-50';
+    videoPlayerFrame.src = new URL(url, window.location.origin).toString();
+    videoPlayerFrame.style.border = '0';
+    videoPlayerFrame.style.top = '0';
+    videoPlayerFrame.style.left = '0';
+    videoPlayerFrame.style.backgroundColor = '#000';
+    videoPlayerFrame.setAttribute('allowfullscreen', 'true');
+    videoPlayerFrame.setAttribute('title', 'Video Player');
+    document.body.style.overflow = 'hidden';
     document.body.appendChild(videoPlayerFrame);
     // 将焦点移入iframe
     videoPlayerFrame.focus();
@@ -1087,6 +1099,7 @@ function closeVideoPlayer(home = false) {
     videoPlayerFrame = document.getElementById('VideoPlayerFrame');
     if (videoPlayerFrame) {
         videoPlayerFrame.remove();
+        document.body.style.overflow = '';
         // 恢复搜索结果显示
         document.getElementById('resultsArea').classList.remove('hidden');
         // 关闭播放器时也隐藏详情弹窗
