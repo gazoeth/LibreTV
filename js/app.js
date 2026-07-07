@@ -1,6 +1,53 @@
 // 全局变量
-let selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '["ruyi","bfzy","jisu","wolong"]'); // 默认选中资源
+const DEFAULT_SETTINGS_VERSION = '2026-07-home-defaults';
+let selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '[]'); // default selected APIs
 let customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]'); // 存储自定义API列表
+
+function getDefaultNormalAPISelection() {
+    return Object.keys(API_SITES).filter(apiKey => !API_SITES[apiKey].adult);
+}
+
+function hasLegacyDefaultAPISelection(apiSelection) {
+    const legacyDefaultAPIs = ['ruyi', 'bfzy', 'jisu', 'wolong'];
+    return Array.isArray(apiSelection)
+        && apiSelection.length === legacyDefaultAPIs.length
+        && legacyDefaultAPIs.every(apiKey => apiSelection.includes(apiKey));
+}
+
+function applyDefaultSettings(force = false) {
+    const defaultNormalAPIs = getDefaultNormalAPISelection();
+    const hasInitializedDefaults = localStorage.getItem('hasInitializedDefaults') === 'true';
+    const currentSettingsVersion = localStorage.getItem('defaultSettingsVersion');
+    const shouldResetSelection = force
+        || !hasInitializedDefaults
+        || !Array.isArray(selectedAPIs)
+        || selectedAPIs.length === 0
+        || (currentSettingsVersion !== DEFAULT_SETTINGS_VERSION && hasLegacyDefaultAPISelection(selectedAPIs));
+
+    if (shouldResetSelection) {
+        selectedAPIs = defaultNormalAPIs;
+        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+    }
+
+    if (force || !hasInitializedDefaults || localStorage.getItem('yellowFilterEnabled') === null) {
+        localStorage.setItem('yellowFilterEnabled', 'true');
+    }
+
+    if (force || !hasInitializedDefaults || localStorage.getItem(PLAYER_CONFIG.adFilteringStorage) === null) {
+        localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
+    }
+
+    if (force || !hasInitializedDefaults || localStorage.getItem('doubanEnabled') === null) {
+        localStorage.setItem('doubanEnabled', 'true');
+    }
+
+    if (force || !hasInitializedDefaults || localStorage.getItem('trendingEnabled') === null) {
+        localStorage.setItem('trendingEnabled', 'true');
+    }
+
+    localStorage.setItem('hasInitializedDefaults', 'true');
+    localStorage.setItem('defaultSettingsVersion', DEFAULT_SETTINGS_VERSION);
+}
 
 // 添加当前播放的集数索引
 let currentEpisodeIndex = 0;
@@ -13,6 +60,8 @@ let episodesReversed = false;
 
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function () {
+    applyDefaultSettings();
+
     // 初始化API复选框
     initAPICheckboxes();
 
@@ -26,22 +75,6 @@ document.addEventListener('DOMContentLoaded', function () {
     renderSearchHistory();
 
     // 设置默认API选择（如果是第一次加载）
-    if (!localStorage.getItem('hasInitializedDefaults')) {
-        // 默认选中资源
-        selectedAPIs = ["ruyi", "bfzy", "jisu", "wolong"];
-        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
-
-        // 默认选中过滤开关
-        localStorage.setItem('yellowFilterEnabled', 'true');
-        localStorage.setItem(PLAYER_CONFIG.adFilteringStorage, 'true');
-
-        // 默认启用豆瓣和TMDB功能
-        localStorage.setItem('doubanEnabled', 'true');
-        localStorage.setItem('trendingEnabled', 'true');
-
-        // 标记已初始化默认值
-        localStorage.setItem('hasInitializedDefaults', 'true');
-    }
 
     // 设置黄色内容过滤器开关初始状态
     const yellowFilterToggle = document.getElementById('yellowFilterToggle');
@@ -57,6 +90,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 设置事件监听器
     setupEventListeners();
+
+    if (typeof initDouban === 'function') {
+        initDouban();
+    }
+    if (typeof initTrending === 'function') {
+        initTrending();
+    }
 
     // 初始检查成人API选中状态
     setTimeout(checkAdultAPIsSelected, 100);
@@ -1366,7 +1406,8 @@ async function exportConfig() {
         'adFilteringEnabled',
         'doubanEnabled',
         'trendingEnabled',
-        'hasInitializedDefaults'
+        'hasInitializedDefaults',
+        'defaultSettingsVersion'
     ];
 
     // 导出设置项
