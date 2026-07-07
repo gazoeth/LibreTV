@@ -420,3 +420,138 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 /* ── Misc ────────────────────────────────────────────────────── */
 #username { display: none !important; }
+
+/* Mobile adaptation refinements */
+@media (max-width: 767px) {
+    body,
+    html {
+        padding-top: 53px;
+    }
+
+    .player-header-fixed {
+        height: 53px;
+        padding-left: .75rem !important;
+        padding-right: .75rem !important;
+        gap: .5rem !important;
+    }
+
+    #videoTitle {
+        font-size: .78rem !important;
+        padding-left: .35rem !important;
+        padding-right: .35rem !important;
+    }
+
+    .home-btn {
+        padding: .4rem .65rem !important;
+        border-radius: 9px !important;
+    }
+
+    main {
+        padding: .75rem .75rem 1rem !important;
+    }
+
+    main > div {
+        gap: .75rem !important;
+        flex-direction: column;
+    }
+
+    #resourceInfoBarContainer {
+        flex-wrap: wrap;
+        gap: .65rem;
+        padding: .75rem .85rem;
+    }
+
+    .resource-info-bar-left {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .resource-info-bar-videos {
+        display: block;
+        margin-left: 0;
+        margin-top: .2rem;
+    }
+
+    .resource-switch-btn {
+        width: 100%;
+        justify-content: center;
+        padding: .55rem .85rem;
+    }
+
+    #prevButton,
+    #nextButton {
+        min-width: 5.25rem;
+        justify-content: center;
+        padding: .55rem .75rem !important;
+        font-size: .82rem;
+    }
+
+    #episodeInfo {
+        font-size: .78rem;
+        text-align: center;
+        padding: 0 .45rem;
+    }
+
+    .player-container .flex.flex-wrap.justify-end.items-center.gap-2 {
+        justify-content: flex-start !important;
+        gap: .5rem !important;
+    }
+
+    .player-container .flex.items-center.gap-2.mr-auto {
+        width: 100%;
+        margin-right: 0 !important;
+        justify-content: space-between;
+        padding-bottom: .15rem;
+    }
+
+    .player-container .flex.flex-wrap.justify-end.gap-2 {
+        width: 100%;
+        justify-content: flex-start !important;
+    }
+
+    .episode-grid {
+        max-height: 42vh;
+        padding: .65rem;
+    }
+
+    #episodesList {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: .5rem !important;
+    }
+
+    #episodesList button {
+        font-size: .78rem;
+        padding: .42rem .4rem;
+    }
+
+    #modal > div {
+        width: calc(100vw - 1.25rem) !important;
+        max-height: 86vh !important;
+        padding: 1rem !important;
+        border-radius: 16px !important;
+    }
+
+    #modalTitle {
+        font-size: 1rem !important;
+        max-width: none !important;
+    }
+
+    #loading > div {
+        padding: 1rem 1.25rem !important;
+        gap: .75rem !important;
+    }
+
+    #sideRecommend {
+        display: none !important;
+    }
+}
+
+@media (max-width: 380px) {
+    #episodesList {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .resource-switch-btn {
+        font-size: .78rem;
+    }
+}
