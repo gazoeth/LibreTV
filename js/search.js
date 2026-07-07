@@ -132,6 +132,168 @@ function updateSourceSpeedCache(sourceKey, speed, options = {}) {
     return cache[sourceKey];
 }
 
+function normalizeGeoEnvValue(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    const normalizedValue = value.trim();
+    return normalizedValue && !/^\{\{.+\}\}$/.test(normalizedValue)
+        ? normalizedValue
+        : '';
+}
+
+function getRuntimeTimezone() {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+function inferRegionFromBrowser() {
+    const timezone = getRuntimeTimezone();
+    const browserLanguages = Array.from(new Set([
+        navigator.language,
+        ...(Array.isArray(navigator.languages) ? navigator.languages : [])
+    ].filter(Boolean).map(language => String(language).toLowerCase())));
+    const looksMainland = timezone === 'Asia/Shanghai'
+        || timezone === 'Asia/Urumqi'
+        || browserLanguages.some(language => language === 'zh-cn' || language.startsWith('zh-hans'));
+
+    return {
+        region: looksMainland ? 'mainland' : 'overseas',
+        label: looksMainland ? '中国大陆' : '海外',
+        timezone,
+        languages: browserLanguages,
+        detection: 'browser',
+        source: 'browser'
+    };
+}
+
+function getUserPlaybackRegion() {
+    if (window.__userPlaybackRegion) {
+        return window.__userPlaybackRegion;
+    }
+
+    const countryCode = normalizeGeoEnvValue(window.__ENV__?.GEO_COUNTRY).toUpperCase();
+    const regionCode = normalizeGeoEnvValue(window.__ENV__?.GEO_REGION).toUpperCase();
+    const geoSource = normalizeGeoEnvValue(window.__ENV__?.GEO_SOURCE);
+    const fallback = inferRegionFromBrowser();
+    const region = countryCode === 'CN'
+        ? 'mainland'
+        : countryCode
+            ? 'overseas'
+            : fallback.region;
+    const label = countryCode === 'CN'
+        ? '中国大陆'
+        : countryCode
+            ? `${countryCode} / 海外`
+            : fallback.label;
+
+    window.__userPlaybackRegion = {
+        countryCode,
+        regionCode,
+        region,
+        label,
+        detection: countryCode ? 'ip' : fallback.detection,
+        source: geoSource || (countryCode ? 'ip' : fallback.source),
+        timezone: fallback.timezone,
+        languages: fallback.languages,
+        recommendationLabel: region === 'mainland' ? '大陆优先' : '海外优先'
+    };
+
+    return window.__userPlaybackRegion;
+}
+
+function getSourceRegionSupport(sourceKey) {
+    if (String(sourceKey).startsWith('custom_')) {
+        return 'custom';
+    }
+
+    return API_SITES[sourceKey]?.regionSupport === 'overseas'
+        ? 'overseas'
+        : 'mainland';
+}
+
+function getSourceRegionLabel(sourceKey) {
+    const regionSupport = getSourceRegionSupport(sourceKey);
+    if (regionSupport === 'overseas') {
+        return '支持国外播放';
+    }
+    if (regionSupport === 'custom') {
+        return '自定义资源';
+    }
+    return '大陆优先';
+}
+
+function getSourcePriority(sourceKey, playbackRegion = getUserPlaybackRegion().region) {
+    const regionSupport = getSourceRegionSupport(sourceKey);
+
+    if (playbackRegion === 'overseas') {
+        if (regionSupport === 'overseas') {
+            return 0;
+        }
+        if (regionSupport === 'custom') {
+            return 1;
+        }
+        return 2;
+    }
+
+    if (regionSupport === 'mainland') {
+        return 0;
+    }
+    if (regionSupport === 'custom') {
+        return 1;
+    }
+    return 2;
+}
+
+function getCachedSourceSpeedFromOptions(sourceKey, speedMap) {
+    if (speedMap instanceof Map) {
+        return normalizeSpeedValue(speedMap.get(sourceKey));
+    }
+    if (speedMap && typeof speedMap === 'object') {
+        return normalizeSpeedValue(speedMap[sourceKey]);
+    }
+    return getCachedSourceSpeed(sourceKey);
+}
+
+function getPreferredSourceOrder(sourceKeys, options = {}) {
+    const uniqueSourceKeys = Array.from(new Set((Array.isArray(sourceKeys) ? sourceKeys : []).filter(Boolean)));
+    const sourceOrderMap = new Map(uniqueSourceKeys.map((sourceKey, index) => [sourceKey, index]));
+    const playbackRegion = options.playbackRegion || getUserPlaybackRegion().region;
+    const speedMap = options.speedMap || null;
+    const allowSpeedSort = options.allowSpeedSort !== false;
+
+    return uniqueSourceKeys.sort((left, right) => {
+        const leftPriority = getSourcePriority(left, playbackRegion);
+        const rightPriority = getSourcePriority(right, playbackRegion);
+        if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+        }
+
+        if (allowSpeedSort) {
+            const leftSpeed = getCachedSourceSpeedFromOptions(left, speedMap);
+            const rightSpeed = getCachedSourceSpeedFromOptions(right, speedMap);
+            if (leftSpeed !== null && rightSpeed !== null && leftSpeed !== rightSpeed) {
+                return leftSpeed - rightSpeed;
+            }
+            if (leftSpeed !== null && rightSpeed === null) {
+                return -1;
+            }
+            if (leftSpeed === null && rightSpeed !== null) {
+                return 1;
+            }
+        }
+
+        return (sourceOrderMap.get(left) ?? 0) - (sourceOrderMap.get(right) ?? 0);
+    });
+}
+
+function getRecommendedSourceKey(sourceKeys, options = {}) {
+    return getPreferredSourceOrder(sourceKeys, options)[0] || '';
+}
 function getItemSourceSpeedScore(item) {
     if (!item || typeof item !== 'object') {
         return Number.POSITIVE_INFINITY;
@@ -326,6 +488,11 @@ window.getItemSourceSpeedScore = getItemSourceSpeedScore;
 window.formatSourceSpeedText = formatSourceSpeedText;
 window.sortSearchResultsBySpeed = sortSearchResultsBySpeed;
 window.testSourceConnectionSpeed = testSourceConnectionSpeed;
+window.getUserPlaybackRegion = getUserPlaybackRegion;
+window.getSourceRegionSupport = getSourceRegionSupport;
+window.getSourceRegionLabel = getSourceRegionLabel;
+window.getPreferredSourceOrder = getPreferredSourceOrder;
+window.getRecommendedSourceKey = getRecommendedSourceKey;
 
 async function searchByAPIAndKeyWord(apiId, query) {
     try {
