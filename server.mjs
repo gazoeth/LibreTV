@@ -52,15 +52,55 @@ function sha256Hash(input) {
   });
 }
 
-async function renderPage(filePath, password) {
-  let content = fs.readFileSync(filePath, 'utf8');
-  if (password !== '') {
-    const sha256 = await sha256Hash(password);
-    content = content.replace('{{PASSWORD}}', sha256);
-  } else {
-    content = content.replace('{{PASSWORD}}', '');
-  }
-  return content;
+function normalizeGeoValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function escapeInlineValue(value) {
+  return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function getHeaderValue(headers, name) {
+  const lowerName = name.toLowerCase();
+  const rawValue = headers?.[lowerName] ?? headers?.[name] ?? '';
+  return normalizeGeoValue(Array.isArray(rawValue) ? rawValue[0] : rawValue);
+}
+
+function getClientGeo(headers) {
+  const country = (
+    getHeaderValue(headers, 'x-vercel-ip-country')
+    || getHeaderValue(headers, 'cf-ipcountry')
+    || getHeaderValue(headers, 'x-country-code')
+    || getHeaderValue(headers, 'x-country')
+  ).toUpperCase();
+  const region = (
+    getHeaderValue(headers, 'x-vercel-ip-country-region')
+    || getHeaderValue(headers, 'cf-region-code')
+    || getHeaderValue(headers, 'x-region-code')
+    || getHeaderValue(headers, 'x-region')
+  ).toUpperCase();
+
+  return {
+    country,
+    region,
+    source: country ? 'ip' : ''
+  };
+}
+
+function buildInlineEnvScript(passwordHash, geo) {
+  return [
+    `window.__ENV__.PASSWORD = "${escapeInlineValue(passwordHash)}";`,
+    `window.__ENV__.GEO_COUNTRY = "${escapeInlineValue(geo.country)}";`,
+    `window.__ENV__.GEO_REGION = "${escapeInlineValue(geo.region)}";`,
+    `window.__ENV__.GEO_SOURCE = "${escapeInlineValue(geo.source)}";`
+  ].join('\n        ');
+}
+
+async function renderPage(filePath, password, geo = { country: '', region: '', source: '' }) {
+  const passwordHash = password !== '' ? await sha256Hash(password) : '';
+  const envScript = buildInlineEnvScript(passwordHash, geo);
+  const content = fs.readFileSync(filePath, 'utf8');
+  return content.replace('window.__ENV__.PASSWORD = "{{PASSWORD}}";', envScript);
 }
 
 app.get(['/', '/index.html', '/player.html'], async (req, res) => {
@@ -70,12 +110,12 @@ app.get(['/', '/index.html', '/player.html'], async (req, res) => {
       case '/player.html':
         filePath = path.join(__dirname, 'player.html');
         break;
-      default: // '/' 和 '/index.html'
+      default:
         filePath = path.join(__dirname, 'index.html');
         break;
     }
-    
-    const content = await renderPage(filePath, config.password);
+
+    const content = await renderPage(filePath, config.password, getClientGeo(req.headers));
     res.send(content);
   } catch (error) {
     console.error('页面渲染错误:', error);
@@ -86,7 +126,7 @@ app.get(['/', '/index.html', '/player.html'], async (req, res) => {
 app.get('/s=:keyword', async (req, res) => {
   try {
     const filePath = path.join(__dirname, 'index.html');
-    const content = await renderPage(filePath, config.password);
+    const content = await renderPage(filePath, config.password, getClientGeo(req.headers));
     res.send(content);
   } catch (error) {
     console.error('搜索页面渲染错误:', error);
@@ -98,63 +138,55 @@ function isValidUrl(urlString) {
   try {
     const parsed = new URL(urlString);
     const allowedProtocols = ['http:', 'https:'];
-    
-    // 从环境变量获取阻止的主机名列表
+
     const blockedHostnames = (process.env.BLOCKED_HOSTS || 'localhost,127.0.0.1,0.0.0.0,::1').split(',');
-    
-    // 从环境变量获取阻止的 IP 前缀
     const blockedPrefixes = (process.env.BLOCKED_IP_PREFIXES || '192.168.,10.,172.').split(',');
-    
+
     if (!allowedProtocols.includes(parsed.protocol)) return false;
     if (blockedHostnames.includes(parsed.hostname)) return false;
-    
+
     for (const prefix of blockedPrefixes) {
       if (parsed.hostname.startsWith(prefix)) return false;
     }
-    
+
     return true;
   } catch {
     return false;
   }
 }
 
-// 验证代理请求的鉴权
 function validateProxyAuth(req) {
   const authHash = req.query.auth;
   const timestamp = req.query.t;
-  
-  // 获取服务器端密码哈希
+
   const serverPassword = config.password;
   if (!serverPassword) {
     console.error('服务器未设置 PASSWORD 环境变量，代理访问被拒绝');
     return false;
   }
-  
-  // 使用 crypto 模块计算 SHA-256 哈希
+
   const serverPasswordHash = crypto.createHash('sha256').update(serverPassword).digest('hex');
-  
+
   if (!authHash || authHash !== serverPasswordHash) {
     console.warn('代理请求鉴权失败：密码哈希不匹配');
     console.warn(`期望: ${serverPasswordHash}, 收到: ${authHash}`);
     return false;
   }
-  
-  // 验证时间戳（10分钟有效期）
+
   if (timestamp) {
     const now = Date.now();
-    const maxAge = 10 * 60 * 1000; // 10分钟
-    if (now - parseInt(timestamp) > maxAge) {
+    const maxAge = 10 * 60 * 1000;
+    if (now - parseInt(timestamp, 10) > maxAge) {
       console.warn('代理请求鉴权失败：时间戳过期');
       return false;
     }
   }
-  
+
   return true;
 }
 
 app.get('/proxy/:encodedUrl', async (req, res) => {
   try {
-    // 验证鉴权
     if (!validateProxyAuth(req)) {
       return res.status(401).json({
         success: false,
@@ -165,17 +197,15 @@ app.get('/proxy/:encodedUrl', async (req, res) => {
     const encodedUrl = req.params.encodedUrl;
     const targetUrl = decodeURIComponent(encodedUrl);
 
-    // 安全验证
     if (!isValidUrl(targetUrl)) {
       return res.status(400).send('无效的 URL');
     }
 
     log(`代理请求: ${targetUrl}`);
 
-    // 添加请求超时和重试逻辑
     const maxRetries = config.maxRetries;
     let retries = 0;
-    
+
     const makeRequest = async () => {
       try {
         return await axios({
@@ -198,18 +228,14 @@ app.get('/proxy/:encodedUrl', async (req, res) => {
     };
 
     const response = await makeRequest();
-
-    // 转发响应头（过滤敏感头）
     const headers = { ...response.headers };
     const sensitiveHeaders = (
-      process.env.FILTERED_HEADERS || 
-      'content-security-policy,cookie,set-cookie,x-frame-options,access-control-allow-origin'
+      process.env.FILTERED_HEADERS
+      || 'content-security-policy,cookie,set-cookie,x-frame-options,access-control-allow-origin'
     ).split(',');
-    
+
     sensitiveHeaders.forEach(header => delete headers[header]);
     res.set(headers);
-
-    // 管道传输响应流
     response.data.pipe(res);
   } catch (error) {
     console.error('代理请求错误:', error.message);
@@ -235,7 +261,6 @@ app.use((req, res) => {
   res.status(404).send('页面未找到');
 });
 
-// 启动服务器
 app.listen(config.port, () => {
   console.log(`服务器运行在 http://localhost:${config.port}`);
   if (config.password !== '') {
