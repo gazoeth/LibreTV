@@ -1605,87 +1605,170 @@ const _FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 
 // 流式资源切换弹窗（优化版）：搜到即显卡片，速测完即更新徽章
 async function showSwitchResourceModal() {
-    const urlParams         = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
     const currentSourceCode = getCurrentSourceCode(urlParams);
-    const currentVideoId    = urlParams.get('id');
+    const currentVideoId = urlParams.get('id');
+    const playbackRegion = window.getUserPlaybackRegion
+        ? window.getUserPlaybackRegion()
+        : { region: 'overseas', recommendationLabel: '海外优先' };
 
-    const modal        = document.getElementById('modal');
-    const modalTitle   = document.getElementById('modalTitle');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
 
     modalTitle.innerHTML = `<span class="break-words">${currentVideoTitle}</span>`;
     modal.classList.remove('hidden');
 
-    const resourceOptions = selectedAPIs.map(curr => {
-        if (API_SITES[curr]) return { key: curr, name: API_SITES[curr].name };
+    const orderedSourceKeys = window.getPreferredSourceOrder
+        ? window.getPreferredSourceOrder(selectedAPIs)
+        : [...selectedAPIs];
+    const resourceOptions = orderedSourceKeys.map(curr => {
+        if (API_SITES[curr]) {
+            return { key: curr, name: API_SITES[curr].name };
+        }
         const idx = parseInt(curr.replace('custom_', ''), 10);
         return { key: curr, name: customAPIs[idx]?.name || '自定义资源' };
     });
-    const nameMap = Object.fromEntries(resourceOptions.map(o => [o.key, o.name]));
+    const nameMap = Object.fromEntries(resourceOptions.map(option => [option.key, option.name]));
+    const availableResults = new Map();
+    const speedSnapshot = {};
+    resourceOptions.forEach(option => {
+        const cachedSpeed = window.getCachedSourceSpeed ? window.getCachedSourceSpeed(option.key) : null;
+        if (cachedSpeed !== null) {
+            speedSnapshot[option.key] = cachedSpeed;
+        }
+    });
 
-    // 立刻渲染 grid 容器
-    modalContent.innerHTML = '<div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>';
+    modalContent.innerHTML = `
+        <div class="resource-grid-note">
+            ${playbackRegion.region === 'mainland'
+                ? '当前按大陆网络优先推荐线路，测速完成后会继续刷新顺序。'
+                : '当前按海外网络优先推荐线路，测速完成后会继续刷新顺序。'}
+        </div>
+        <div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>
+    `;
     const grid = document.getElementById('resource-grid');
 
+    function getOrderedGridKeys() {
+        const availableKeys = Array.from(availableResults.keys());
+        return window.getPreferredSourceOrder
+            ? window.getPreferredSourceOrder(availableKeys, { speedMap: speedSnapshot })
+            : availableKeys;
+    }
+
+    function syncCardOrder() {
+        getOrderedGridKeys().forEach(sourceKey => {
+            const card = document.getElementById(`rcard-${sourceKey}`);
+            if (card) {
+                grid.appendChild(card);
+            }
+        });
+    }
+
+    function getRecommendedSourceKeyForGrid() {
+        const availableKeys = Array.from(availableResults.keys());
+        return window.getRecommendedSourceKey
+            ? window.getRecommendedSourceKey(availableKeys, { speedMap: speedSnapshot })
+            : (availableKeys[0] || '');
+    }
+
     function upsertCard(sourceKey, result, speedResult) {
-        const isCurrent  = String(sourceKey) === String(currentSourceCode)
-                        && String(result.vod_id) === String(currentVideoId);
+        const existingState = availableResults.get(sourceKey) || {};
+        const nextSpeedResult = speedResult || existingState.speedResult || null;
+        availableResults.set(sourceKey, {
+            result,
+            speedResult: nextSpeedResult
+        });
+
+        if (nextSpeedResult && nextSpeedResult.speed >= 0) {
+            speedSnapshot[sourceKey] = nextSpeedResult.speed;
+        }
+
+        const isCurrent = String(sourceKey) === String(currentSourceCode)
+            && String(result.vod_id) === String(currentVideoId);
         const sourceName = nameMap[sourceKey] || '未知资源';
-        const speedHtml  = speedResult
-            ? `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75">${formatSpeedDisplay(speedResult)}</div>`
+        const sourceRegionLabel = window.getSourceRegionLabel
+            ? window.getSourceRegionLabel(sourceKey)
+            : '普通线路';
+        const isRecommended = getRecommendedSourceKeyForGrid() === sourceKey;
+        const speedHtml = nextSpeedResult
+            ? `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75">${formatSpeedDisplay(nextSpeedResult)}</div>`
             : `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75"><span class="speed-indicator" style="color:#aaa">⏳</span></div>`;
 
         let card = document.getElementById(`rcard-${sourceKey}`);
         if (!card) {
             card = document.createElement('div');
-            card.id        = `rcard-${sourceKey}`;
-            card.className = `relative group ${isCurrent ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 transition-transform'}`;
-            if (!isCurrent) card.onclick = () => switchToResource(sourceKey, result.vod_id);
+            card.id = `rcard-${sourceKey}`;
             grid.appendChild(card);
         }
+
+        card.className = `relative group ${isCurrent ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 transition-transform'}`;
+        card.onclick = isCurrent ? null : (() => switchToResource(sourceKey, result.vod_id));
         card.innerHTML = `
             <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
                 <img src="${result.vod_pic}" alt="${result.vod_name}" class="w-full h-full object-cover"
                      onerror="this.src='${_FALLBACK_IMG}'">
+                ${isRecommended ? '<div class="resource-recommend-badge">推荐</div>' : ''}
                 ${speedHtml}
             </div>
             <div class="mt-2">
                 <div class="text-xs font-medium text-gray-200 truncate">${result.vod_name}</div>
                 <div class="text-[10px] text-gray-400 truncate">${sourceName}</div>
-                <div class="text-[10px] text-gray-500 mt-1">${speedResult?.episodes ? speedResult.episodes+'集' : ''}</div>
+                <div class="resource-region-tag">${sourceRegionLabel}</div>
+                <div class="text-[10px] text-gray-500 mt-1">${nextSpeedResult?.episodes ? nextSpeedResult.episodes + '集' : ''}</div>
             </div>
             ${isCurrent ? `<div class="absolute inset-0 flex items-center justify-center">
                 <div class="bg-blue-600 bg-opacity-75 rounded-lg px-2 py-0.5 text-xs text-white font-medium">当前播放</div>
             </div>` : ''}`;
+
+        syncCardOrder();
     }
 
-    // 速测函数（收紧超时至 6s）
     async function testSpeedFast(sourceKey, vodId) {
-        try {
-            const t0 = performance.now();
-            let ap = sourceKey.startsWith('custom_')
-                ? (() => {
-                    const ca = getCustomApiInfo(sourceKey.replace('custom_', ''));
-                    if (!ca) return null;
-                    return ca.detail
-                        ? `&customApi=${encodeURIComponent(ca.url)}&customDetail=${encodeURIComponent(ca.detail)}&source=custom`
-                        : `&customApi=${encodeURIComponent(ca.url)}&source=custom`;
-                  })()
-                : `&source=${sourceKey}`;
-            if (ap === null) return { speed: -1, error: 'API配置无效' };
+        if (window.testSourceConnectionSpeed) {
+            const speedResult = await window.testSourceConnectionSpeed(sourceKey, vodId);
+            if (!speedResult || speedResult.speed < 0) {
+                return {
+                    speed: -1,
+                    error: speedResult?.error === 'timeout' ? '超时' : '测试失败'
+                };
+            }
+            return {
+                speed: speedResult.speed,
+                episodes: speedResult.episodes,
+                error: null,
+                note: speedResult.cached ? '缓存' : ''
+            };
+        }
 
-            const resp = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${ap}`, {
+        try {
+            const startAt = performance.now();
+            const apiParams = sourceKey.startsWith('custom_')
+                ? (() => {
+                    const customApi = getCustomApiInfo(sourceKey.replace('custom_', ''));
+                    if (!customApi) return null;
+                    return customApi.detail
+                        ? `&customApi=${encodeURIComponent(customApi.url)}&customDetail=${encodeURIComponent(customApi.detail)}&source=custom`
+                        : `&customApi=${encodeURIComponent(customApi.url)}&source=custom`;
+                })()
+                : `&source=${sourceKey}`;
+            if (apiParams === null) {
+                return { speed: -1, error: 'API配置无效' };
+            }
+
+            const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`, {
                 signal: AbortSignal.timeout(6000)
             });
-            if (!resp.ok) return { speed: -1, error: '获取失败' };
-            const detail = await resp.json();
-            if (!detail.episodes?.length) return { speed: -1, error: '无播放源' };
+            if (!response.ok) {
+                return { speed: -1, error: '获取失败' };
+            }
 
-            try {
-                await fetch(detail.episodes[0], { method: 'HEAD', mode: 'no-cors', cache: 'no-cache', signal: AbortSignal.timeout(3000) });
-            } catch {}
+            const detail = await response.json();
+            if (!detail.episodes?.length) {
+                return { speed: -1, error: '无播放源' };
+            }
 
-            const measuredSpeed = Math.round(performance.now() - t0);
+            const measuredSpeed = Math.round(performance.now() - startAt);
             if (window.updateSourceSpeedCache) {
                 window.updateSourceSpeedCache(sourceKey, measuredSpeed, {
                     measurement: 'detail',
@@ -1693,25 +1776,36 @@ async function showSwitchResourceModal() {
                     episodes: detail.episodes.length
                 });
             }
-            return { speed: measuredSpeed, episodes: detail.episodes.length, error: null };
-        } catch (e) {
-            return { speed: -1, error: e.name === 'TimeoutError' || e.name === 'AbortError' ? '超时' : '测试失败' };
+
+            return {
+                speed: measuredSpeed,
+                episodes: detail.episodes.length,
+                error: null
+            };
+        } catch (error) {
+            return {
+                speed: -1,
+                error: error.name === 'TimeoutError' || error.name === 'AbortError' ? '超时' : '测试失败'
+            };
         }
     }
 
     let foundAny = false;
-    await Promise.all(resourceOptions.map(async opt => {
-        const queryResult = await searchByAPIAndKeyWord(opt.key, currentVideoTitle);
+    await Promise.all(resourceOptions.map(async option => {
+        const queryResult = await searchByAPIAndKeyWord(option.key, currentVideoTitle);
         if (!queryResult.length) return;
 
         let result = queryResult[0];
-        for (const r of queryResult) { if (r.vod_name === currentVideoTitle) { result = r; break; } }
+        for (const currentResult of queryResult) {
+            if (currentResult.vod_name === currentVideoTitle) {
+                result = currentResult;
+                break;
+            }
+        }
 
         foundAny = true;
-        upsertCard(opt.key, result, null);  // 立刻显示卡片，速度 ⏳
-
-        // 速测与其他搜索并行，完成后更新徽章
-        testSpeedFast(opt.key, result.vod_id).then(sr => upsertCard(opt.key, result, sr));
+        upsertCard(option.key, result, null);
+        testSpeedFast(option.key, result.vod_id).then(speedResult => upsertCard(option.key, result, speedResult));
     }));
 
     if (!foundAny) {
