@@ -1,10 +1,17 @@
 // 全局变量
-const DEFAULT_SETTINGS_VERSION = '2026-07-home-defaults';
+const DEFAULT_SETTINGS_VERSION = '2026-07-smart-routing';
 let selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '[]'); // default selected APIs
 let customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]'); // 存储自定义API列表
 
-function getDefaultNormalAPISelection() {
+function getAllNormalAPIKeys() {
     return Object.keys(API_SITES).filter(apiKey => !API_SITES[apiKey].adult);
+}
+
+function getDefaultNormalAPISelection() {
+    const normalApiKeys = getAllNormalAPIKeys();
+    return window.getPreferredSourceOrder
+        ? window.getPreferredSourceOrder(normalApiKeys)
+        : normalApiKeys;
 }
 
 function hasLegacyDefaultAPISelection(apiSelection) {
@@ -12,6 +19,13 @@ function hasLegacyDefaultAPISelection(apiSelection) {
     return Array.isArray(apiSelection)
         && apiSelection.length === legacyDefaultAPIs.length
         && legacyDefaultAPIs.every(apiKey => apiSelection.includes(apiKey));
+}
+
+function hasFullBuiltInSelection(apiSelection) {
+    const normalApiKeys = getAllNormalAPIKeys();
+    return Array.isArray(apiSelection)
+        && apiSelection.length === normalApiKeys.length
+        && normalApiKeys.every(apiKey => apiSelection.includes(apiKey));
 }
 
 function applyDefaultSettings(force = false) {
@@ -22,7 +36,8 @@ function applyDefaultSettings(force = false) {
         || !hasInitializedDefaults
         || !Array.isArray(selectedAPIs)
         || selectedAPIs.length === 0
-        || (currentSettingsVersion !== DEFAULT_SETTINGS_VERSION && hasLegacyDefaultAPISelection(selectedAPIs));
+        || (currentSettingsVersion !== DEFAULT_SETTINGS_VERSION
+            && (hasLegacyDefaultAPISelection(selectedAPIs) || hasFullBuiltInSelection(selectedAPIs)));
 
     if (shouldResetSelection) {
         selectedAPIs = defaultNormalAPIs;
@@ -102,45 +117,104 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(checkAdultAPIsSelected, 100);
 });
 
+function createBuiltInAPICheckbox(apiKey, checked, labelClassName = 'text-gray-400') {
+    const api = API_SITES[apiKey];
+    const checkbox = document.createElement('div');
+    checkbox.className = 'api-checkbox-item';
+    checkbox.innerHTML = `
+        <input type="checkbox" id="api_${apiKey}" 
+               class="form-checkbox h-3 w-3 text-blue-600 bg-[#222] border border-[#333]" 
+               ${checked ? 'checked' : ''} 
+               data-api="${apiKey}">
+        <label for="api_${apiKey}" class="text-xs ${labelClassName} truncate">${api.name}</label>
+    `;
+
+    checkbox.querySelector('input').addEventListener('change', function () {
+        updateSelectedAPIs();
+        checkAdultAPIsSelected();
+    });
+
+    return checkbox;
+}
+
+function getNormalSourceGroups() {
+    const orderedNormalApis = getDefaultNormalAPISelection();
+    return {
+        overseas: orderedNormalApis.filter(apiKey => window.getSourceRegionSupport && window.getSourceRegionSupport(apiKey) === 'overseas'),
+        mainland: orderedNormalApis.filter(apiKey => !window.getSourceRegionSupport || window.getSourceRegionSupport(apiKey) !== 'overseas')
+    };
+}
+
+function updateSourceRecommendationStatus() {
+    const statusEl = document.getElementById('siteStatus');
+    if (!statusEl || !window.getUserPlaybackRegion) {
+        return;
+    }
+
+    const regionInfo = window.getUserPlaybackRegion();
+    const detectionLabel = regionInfo.detection === 'ip' ? 'IP识别' : '浏览器推断';
+    statusEl.innerHTML = `<span class="text-amber-300">${regionInfo.recommendationLabel}</span><span class="text-gray-500"> · ${detectionLabel}</span>`;
+}
+
 // 初始化API复选框
 function initAPICheckboxes() {
     const container = document.getElementById('apiCheckboxes');
     container.innerHTML = '';
 
-    // 添加普通API组标题
-    const normaldiv = document.createElement('div');
-    normaldiv.id = 'normaldiv';
-    normaldiv.className = 'grid grid-cols-2 gap-2';
-    const normalTitle = document.createElement('div');
-    normalTitle.className = 'api-group-title';
-    normalTitle.textContent = '普通资源';
-    normaldiv.appendChild(normalTitle);
+    const regionInfo = window.getUserPlaybackRegion ? window.getUserPlaybackRegion() : null;
+    const sourceGroups = getNormalSourceGroups();
+    const groupConfig = {
+        overseas: {
+            title: '支持国外播放',
+            description: '海外网络优先推荐这些线路，测速后会继续动态调整顺序。'
+        },
+        mainland: {
+            title: '不支持国外播放 / 大陆优先',
+            description: '这组线路更适合中国大陆网络，海外访问时更容易受限或无法播放。'
+        }
+    };
 
-    // 创建普通API源的复选框
-    Object.keys(API_SITES).forEach(apiKey => {
-        const api = API_SITES[apiKey];
-        if (api.adult) return; // 跳过成人内容API，稍后添加
+    ['overseas', 'mainland'].forEach(groupKey => {
+        const apiKeys = sourceGroups[groupKey];
+        if (!apiKeys || apiKeys.length === 0) {
+            return;
+        }
 
-        const checked = selectedAPIs.includes(apiKey);
+        const groupMeta = groupConfig[groupKey];
+        const groupSection = document.createElement('section');
+        groupSection.className = 'api-group-shell';
+        const isRecommendedGroup = regionInfo && (
+            (regionInfo.region === 'overseas' && groupKey === 'overseas')
+            || (regionInfo.region === 'mainland' && groupKey === 'mainland')
+        );
 
-        const checkbox = document.createElement('div');
-        checkbox.className = 'flex items-center';
-        checkbox.innerHTML = `
-            <input type="checkbox" id="api_${apiKey}" 
-                   class="form-checkbox h-3 w-3 text-blue-600 bg-[#222] border border-[#333]" 
-                   ${checked ? 'checked' : ''} 
-                   data-api="${apiKey}">
-            <label for="api_${apiKey}" class="ml-1 text-xs text-gray-400 truncate">${api.name}</label>
+        groupSection.innerHTML = `
+            <div class="api-group-head">
+                <div>
+                    <div class="api-group-title">${groupMeta.title}</div>
+                    <div class="api-group-desc">${groupMeta.description}</div>
+                </div>
+                <span class="api-group-badge ${isRecommendedGroup ? '' : 'secondary'}">${isRecommendedGroup ? '当前优先' : `${apiKeys.length}条`}</span>
+            </div>
+            <div class="api-group-grid"></div>
         `;
-        normaldiv.appendChild(checkbox);
 
-        // 添加事件监听器
-        checkbox.querySelector('input').addEventListener('change', function () {
-            updateSelectedAPIs();
-            checkAdultAPIsSelected();
+        const groupGrid = groupSection.querySelector('.api-group-grid');
+        apiKeys.forEach(apiKey => {
+            groupGrid.appendChild(createBuiltInAPICheckbox(apiKey, selectedAPIs.includes(apiKey)));
         });
+
+        container.appendChild(groupSection);
     });
-    container.appendChild(normaldiv);
+
+    const note = document.createElement('div');
+    note.className = 'api-group-note';
+    note.textContent = regionInfo && regionInfo.detection === 'ip'
+        ? `已根据 ${regionInfo.label} 自动优先推荐更快线路，测速结果会继续刷新顺序。`
+        : '未读取到 IP 归属地，当前先按浏览器时区推荐线路，测速结果会继续刷新顺序。';
+    container.appendChild(note);
+
+    updateSourceRecommendationStatus();
 
     // 添加成人API列表
     addAdultAPI();
@@ -379,13 +453,16 @@ function updateSelectedAPIs() {
 
     // 获取选中的内置API
     const builtInApis = Array.from(builtInApiCheckboxes).map(input => input.dataset.api);
+    const orderedBuiltInApis = window.getPreferredSourceOrder
+        ? window.getPreferredSourceOrder(builtInApis)
+        : builtInApis;
 
     // 获取选中的自定义API
     const customApiCheckboxes = document.querySelectorAll('#customApisList input:checked');
     const customApiIndices = Array.from(customApiCheckboxes).map(input => 'custom_' + input.dataset.customIndex);
 
     // 合并内置和自定义API
-    selectedAPIs = [...builtInApis, ...customApiIndices];
+    selectedAPIs = [...orderedBuiltInApis, ...customApiIndices];
 
     // 保存到localStorage
     localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
@@ -704,6 +781,10 @@ async function search() {
         let hasAnyResult = false;
         let arrivalCounter = 0;
         const resultBuckets = new Map();
+        const orderedSelectedAPIs = window.getPreferredSourceOrder
+            ? window.getPreferredSourceOrder(selectedAPIs)
+            : [...selectedAPIs];
+        const sourceRankMap = new Map(orderedSelectedAPIs.map((apiId, index) => [apiId, index]));
 
         // 流式渲染：每个 API 返回结果立刻追加到页面
         function appendResults(results) {
@@ -810,7 +891,9 @@ async function search() {
             const existingBucket = resultBuckets.get(sourceCode) || [];
             const normalizedResults = filtered.map(item => ({
                 ...item,
-                __groupIndex: Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode),
+                __groupIndex: sourceRankMap.has(sourceCode)
+                    ? sourceRankMap.get(sourceCode)
+                    : (Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode)),
                 __arrivalIndex: arrivalCounter++,
                 __sourceSpeedScore: getCachedSourceSpeed(sourceCode)
                     ?? item.__sourceSpeedScore
@@ -865,7 +948,7 @@ async function search() {
 
         // 并发搜索，各 API 搜到即渲染
         await Promise.allSettled(
-            selectedAPIs.map((apiId, sourceIndex) =>
+            orderedSelectedAPIs.map((apiId, sourceIndex) =>
                 searchByAPIAndKeyWord(apiId, query).then(results => collectResults(results, apiId, sourceIndex))
             )
         );
