@@ -23,18 +23,36 @@ export default async function middleware(request) {
   // Get the HTML content
   const originalHtml = await response.text();
   
-  // Replace the placeholder with actual environment variable
-  // If PASSWORD is not set, replace with empty string
   const password = process.env.PASSWORD || '';
   let passwordHash = '';
   if (password) {
     passwordHash = await sha256(password);
   }
+
+  const country = (
+    request.headers.get('x-vercel-ip-country')
+    || request.headers.get('cf-ipcountry')
+    || request.headers.get('x-country-code')
+    || request.headers.get('x-country')
+    || ''
+  ).trim().toUpperCase();
+  const region = (
+    request.headers.get('x-vercel-ip-country-region')
+    || request.headers.get('cf-region-code')
+    || request.headers.get('x-region-code')
+    || request.headers.get('x-region')
+    || ''
+  ).trim().toUpperCase();
+  const geoSource = country ? 'ip' : '';
   
-  // 替换密码占位符
   let modifiedHtml = originalHtml.replace(
     'window.__ENV__.PASSWORD = "{{PASSWORD}}";',
-    `window.__ENV__.PASSWORD = "${passwordHash}"; // SHA-256 hash`
+    [
+      `window.__ENV__.PASSWORD = "${passwordHash}";`,
+      `window.__ENV__.GEO_COUNTRY = "${country}";`,
+      `window.__ENV__.GEO_REGION = "${region}";`,
+      `window.__ENV__.GEO_SOURCE = "${geoSource}";`
+    ].join('\n        ')
   );
 
   // 修复Response构造
