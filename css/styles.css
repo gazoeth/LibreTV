@@ -597,3 +597,82 @@ body {
 }
 .trending-card { -webkit-animation: fadeUp .4s ease both; animation: fadeUp .4s ease both; }
 .douban-card   { -webkit-animation: fadeUp .35s ease both; animation: fadeUp .35s ease both; }
+
+/* Mobile adaptation refinements */
+@media (max-width: 767px) {
+    .settings-panel,
+    .history-panel {
+        width: 100vw !important;
+        max-width: 100vw;
+    }
+
+    .panel-header {
+        padding: 1rem 1rem .875rem;
+    }
+
+    .settings-body {
+        padding: .875rem 1rem 1.5rem;
+    }
+
+    .settings-section {
+        padding: .875rem;
+        margin-bottom: .875rem;
+        border-radius: 14px;
+    }
+
+    .settings-btn-row {
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
+    .settings-btn-row button,
+    .settings-btn-row button + button {
+        margin-left: 0;
+    }
+
+    .settings-btn-row button {
+        flex: 1 1 calc(50% - .25rem);
+        min-width: 0;
+    }
+
+    .settings-btn-row button:last-child {
+        flex-basis: 100%;
+    }
+
+    .settings-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .25rem;
+    }
+
+    .toggle-row {
+        align-items: flex-start;
+        gap: .75rem;
+    }
+
+    .toggle-row > div:first-child {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .toggle-label,
+    .toggle-desc {
+        line-height: 1.4;
+    }
+
+    .history-list {
+        padding: .75rem 1rem;
+        max-height: calc(100vh - 132px);
+    }
+
+    .panel-footer {
+        padding: .75rem 1rem 1rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .settings-btn-row button,
+    .settings-btn-row button:last-child {
+        flex-basis: 100%;
+    }
+}
