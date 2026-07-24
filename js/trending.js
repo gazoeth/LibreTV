@@ -62,7 +62,9 @@ function initTrending() {
     // 绑定设置面板中的 toggle 开关
     const toggle = document.getElementById('trendingToggle');
     if (toggle) {
-        const isEnabled = localStorage.getItem('trendingEnabled') === 'true';
+        const storedTrendingEnabled = localStorage.getItem('trendingEnabled');
+        const isEnabled = storedTrendingEnabled === null || storedTrendingEnabled === 'true';
+        if (storedTrendingEnabled === null) localStorage.setItem('trendingEnabled', 'true');
         toggle.checked = isEnabled;
 
         const toggleBg = toggle.nextElementSibling;
@@ -182,7 +184,7 @@ async function loadTrending(type, page = 1) {
     } catch (e) {
         console.warn('TMDB 获取失败，使用兜底数据:', e.message);
         // 即使 TMDB 失败，也检查是否有过期缓存可用
-        if (cached?.pages && cached.pages[page]) {
+        if (cached && cached.pages && cached.pages[page]) {
             renderTrendingCards(cached.pages[page]);
         } else {
             // 没有缓存时，模拟换一批效果
@@ -207,22 +209,21 @@ async function fetchTMDBTrending(type, page = 1) {
     let resp;
     try {
         // 先尝试直连 TMDB（速度更快）
-        resp = await fetch(url, {
-            signal: AbortSignal.timeout(6000),
+        resp = await window.fetchWithLegacyTimeout(url, {
             headers: { 'Accept': 'application/json' }
-        });
+        }, 6000);
     } catch {
         // 直连失败，走代理
-        const authSuffix = window.ProxyAuth?.getAuthPrefix
+        const authSuffix = window.ProxyAuth && window.ProxyAuth.getAuthPrefix
             ? await window.ProxyAuth.getAuthPrefix()
             : '';
         const proxyUrl = PROXY_URL + encodeURIComponent(url) + authSuffix;
-        resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+        resp = await window.fetchWithLegacyTimeout(proxyUrl, {}, 8000);
     }
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    if (!data.results?.length) throw new Error('无数据');
+    if (!data.results && data.results.length) throw new Error('无数据');
 
     return data.results.slice(0, 12).map(item => ({
         title: item.title || item.name || '未知',

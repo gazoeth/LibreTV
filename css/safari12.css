@@ -1,0 +1,64 @@
+/* Static utility fallbacks for WebKit versions that cannot parse the bundled Tailwind runtime. */
+.legacy-browser .container { width: 100%; margin-left: auto; margin-right: auto; }
+.legacy-browser .mx-auto { margin-left: auto; margin-right: auto; }
+.legacy-browser .px-4 { padding-left: 1rem; padding-right: 1rem; }
+.legacy-browser .fixed { position: fixed; }
+.legacy-browser .relative { position: relative; }
+.legacy-browser .absolute { position: absolute; }
+.legacy-browser .top-0 { top: 0; }
+.legacy-browser .top-4 { top: 1rem; }
+.legacy-browser .left-0 { left: 0; }
+.legacy-browser .left-4 { left: 1rem; }
+.legacy-browser .right-0 { right: 0; }
+.legacy-browser .right-4 { right: 1rem; }
+.legacy-browser .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.legacy-browser .z-10 { z-index: 10; }
+.legacy-browser .z-40 { z-index: 40; }
+.legacy-browser .w-full { width: 100%; }
+.legacy-browser .h-full { height: 100%; }
+.legacy-browser .hidden { display: none !important; }
+.legacy-browser .flex { display: -webkit-box; display: -ms-flexbox; display: flex; }
+.legacy-browser .items-center { -webkit-box-align: center; -ms-flex-align: center; align-items: center; }
+.legacy-browser .items-end { -webkit-box-align: end; -ms-flex-align: end; align-items: flex-end; }
+.legacy-browser .justify-center { -webkit-box-pack: center; -ms-flex-pack: center; justify-content: center; }
+.legacy-browser .overflow-hidden { overflow: hidden; }
+.legacy-browser .object-cover { -o-object-fit: cover; object-fit: cover; }
+.legacy-browser .cursor-pointer { cursor: pointer; }
+.legacy-browser .text-center { text-align: center; }
+.legacy-browser .text-white { color: #fff; }
+.legacy-browser .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legacy-browser .aspect-\[2\/3\] { height: 0; padding-bottom: 150%; }
+.legacy-browser .aspect-\[2\/3\] > img,
+.legacy-browser .aspect-\[2\/3\] > div { position: absolute; }
+.legacy-browser .trending-grid { display: -ms-grid; display: grid; }
+.legacy-browser .trending-card,
+.legacy-browser .douban-card { min-width: 0; }
+.legacy-browser .hot-hub-actions > * + *,
+.legacy-browser .hot-source-switch > * + *,
+.legacy-browser .hot-source-toolbar > * + *,
+.legacy-browser .hot-section-controls > * + *,
+.legacy-browser .hot-source-caption > * + * { margin-left: 1rem; }
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    .legacy-browser .app-shell { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+    .legacy-browser .search-area { min-height: 24rem; padding-top: 2rem; padding-bottom: 1.5rem; }
+    .legacy-browser .hot-hub-header {
+        -webkit-box-align: start; -ms-flex-align: start; align-items: flex-start;
+        -webkit-box-orient: vertical; -webkit-box-direction: normal;
+        -ms-flex-direction: column; flex-direction: column;
+    }
+    .legacy-browser .hot-hub-header > * + * { margin-left: 0; margin-top: 1rem; }
+    .legacy-browser .hot-hub-actions {
+        width: 100%; -webkit-box-pack: justify; -ms-flex-pack: justify; justify-content: space-between;
+    }
+    .legacy-browser .hot-recommend-hub .trending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .legacy-browser .hot-recommend-hub .douban-grid > * { width: calc(25% - 1rem); }
+    .legacy-browser .settings-panel { width: 24rem; max-width: 88vw; }
+}
+
+@media (max-width: 767px) {
+    .legacy-browser .hot-hub-actions { display: block; }
+    .legacy-browser .hot-hub-actions > * + * { margin-left: 0; margin-top: .75rem; }
+    .legacy-browser .hot-source-switch { display: -webkit-box; display: -ms-flexbox; display: flex; }
+    .legacy-browser .hot-source-tab { -webkit-box-flex: 1; -ms-flex: 1 1 0; flex: 1 1 0; }
+}

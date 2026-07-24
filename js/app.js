@@ -848,17 +848,23 @@ async function search() {
             hasAnyResult = true;
 
             const existingBucket = resultBuckets.get(sourceCode) || [];
-            const normalizedResults = filtered.map(item => ({
-                ...item,
-                __groupIndex: sourceRankMap.has(sourceCode)
-                    ? sourceRankMap.get(sourceCode)
-                    : (Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode)),
-                __arrivalIndex: arrivalCounter++,
-                __sourceSpeedScore: getCachedSourceSpeed(sourceCode)
-                    ?? item.__sourceSpeedScore
-                    ?? item.__searchResponseTime
-                    ?? Number.POSITIVE_INFINITY
-            }));
+            const normalizedResults = filtered.map(item => {
+                const cachedSpeed = getCachedSourceSpeed(sourceCode);
+                const sourceSpeed = cachedSpeed != null
+                    ? cachedSpeed
+                    : (item.__sourceSpeedScore != null
+                        ? item.__sourceSpeedScore
+                        : (item.__searchResponseTime != null ? item.__searchResponseTime : Number.POSITIVE_INFINITY));
+
+                return {
+                    ...item,
+                    __groupIndex: sourceRankMap.has(sourceCode)
+                        ? sourceRankMap.get(sourceCode)
+                        : (Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode)),
+                    __arrivalIndex: arrivalCounter++,
+                    __sourceSpeedScore: sourceSpeed
+                };
+            });
 
             resultBuckets.set(sourceCode, existingBucket.concat(normalizedResults));
             renderSortedResults();
@@ -866,7 +872,7 @@ async function search() {
             const cacheEntry = window.getSourceSpeedCacheEntry
                 ? window.getSourceSpeedCacheEntry(sourceCode)
                 : null;
-            if (cacheEntry?.measurement === 'detail') return;
+            if (cacheEntry && cacheEntry.measurement === 'detail') return;
 
             if (!window.__pendingSearchSpeedTests) {
                 window.__pendingSearchSpeedTests = new Set();
@@ -874,7 +880,7 @@ async function search() {
             if (window.__pendingSearchSpeedTests.has(sourceCode)) return;
 
             const firstResult = normalizedResults[0];
-            if (!firstResult?.vod_id) return;
+            if (!firstResult || !firstResult.vod_id) return;
 
             window.__pendingSearchSpeedTests.add(sourceCode);
             window.testSourceConnectionSpeed(sourceCode, firstResult.vod_id)
@@ -1026,7 +1032,7 @@ async function showDetails(id, vod_name, sourceCode) {
         const data = await response.json();
 
         // 来源信息
-        const sourceName = data.videoInfo?.source_name
+        const sourceName = data.videoInfo && data.videoInfo.source_name
             ? ` <span class="text-sm font-normal text-gray-400">(${data.videoInfo.source_name})</span>` : '';
         modalTitle.innerHTML = `<span class="break-words">${vod_name || '未知视频'}</span>${sourceName}`;
 
@@ -1519,8 +1525,10 @@ function saveStringAsFile(content, fileName) {
     }
 
     function hidePanels() {
-        document.getElementById('settingsPanel')?.classList.remove('show');
-        document.getElementById('historyPanel')?.classList.remove('show');
+        const settingsPanel = document.getElementById('settingsPanel');
+        const historyPanel = document.getElementById('historyPanel');
+        if (settingsPanel) settingsPanel.classList.remove('show');
+        if (historyPanel) historyPanel.classList.remove('show');
     }
 
     function setScrollLock(shouldLock) {
@@ -1588,15 +1596,15 @@ function saveStringAsFile(content, fileName) {
         syncPanelChrome();
 
         if (restoreFocus && openPanel && focusTarget) {
-            setTimeout(() => focusTarget.focus?.(), 0);
+            setTimeout(() => { if (typeof focusTarget.focus === 'function') focusTarget.focus(); }, 0);
         }
 
         lastPanelTrigger = null;
     };
 
     function togglePanel(panelId, legacyToggle, event) {
-        event?.preventDefault();
-        event?.stopPropagation();
+        if (event) event.preventDefault();
+        if (event) event.stopPropagation();
 
         const panel = document.getElementById(panelId);
         if (!panel) return;
@@ -1608,7 +1616,7 @@ function saveStringAsFile(content, fileName) {
         }
 
         hidePanels();
-        lastPanelTrigger = getPanelTriggers()[panelId] || event?.currentTarget || null;
+        lastPanelTrigger = getPanelTriggers()[panelId] || (event && event.currentTarget) || null;
 
         if (typeof legacyToggle === 'function') {
             legacyToggle(event);
@@ -1619,7 +1627,7 @@ function saveStringAsFile(content, fileName) {
         syncPanelChrome();
 
         if (panel.classList.contains('show')) {
-            setTimeout(() => panel.querySelector('.close-btn')?.focus(), 320);
+            setTimeout(() => { const closeButton = panel.querySelector('.close-btn'); if (closeButton) closeButton.focus(); }, 320);
         } else {
             lastPanelTrigger = null;
         }

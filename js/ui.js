@@ -544,8 +544,8 @@ function buildHistoryPlayerUrl(historyUrl, title, episodeIndex, playbackPosition
 }
 
 async function syncHistoryEpisodesInBackground(historyItem, historyUrl) {
-    const sourceCode = historyItem?.sourceCode || historyItem?.sourceName;
-    if (!historyItem?.vod_id || !sourceCode) return;
+    const sourceCode = historyItem && (historyItem.sourceCode || historyItem.sourceName);
+    if ((!historyItem || !historyItem.vod_id) || !sourceCode) return;
 
     try {
         const timestamp = new Date().getTime();

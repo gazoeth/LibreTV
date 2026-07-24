@@ -19,7 +19,7 @@ async function handleApiRequest(url) {
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
             try {
-                const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                const proxiedUrl = await window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl ? 
                     await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(apiUrl)) :
                     PROXY_URL + encodeURIComponent(apiUrl);
                     
@@ -52,7 +52,7 @@ async function handleApiRequest(url) {
             if (!id) throw new Error('缺少视频ID参数');
             if (!/^[\w-]+$/.test(id)) throw new Error('无效的视频ID格式');
 
-            if (sourceCode !== 'custom' && API_SITES[sourceCode]?.detail) {
+            if (sourceCode !== 'custom' && API_SITES[sourceCode] && API_SITES[sourceCode].detail) {
                 return await handleSpecialSourceDetail(id, sourceCode);
             }
             
@@ -68,7 +68,7 @@ async function handleApiRequest(url) {
             const timeoutId = setTimeout(() => controller.abort(), 10000);
             
             try {
-                const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl ? 
+                const proxiedUrl = await window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl ? 
                     await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(detailUrl)) :
                     PROXY_URL + encodeURIComponent(detailUrl);
                     
@@ -123,7 +123,7 @@ async function handleAggregatedSearch(searchQuery) {
     if (availableSources.length === 0) throw new Error('没有可用的API源');
     
     // 预取鉴权前缀，提升并发效率
-    const authPrefix = window.ProxyAuth?.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : "";
+    const authPrefix = window.ProxyAuth && window.ProxyAuth.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : "";
     
     const searchPromises = availableSources.map(async (source) => {
         try {
@@ -139,7 +139,7 @@ async function handleAggregatedSearch(searchQuery) {
             const txt = await response.text();
             if (!txt || !txt.trimStart().startsWith('{')) return [];
             let data; try { data = JSON.parse(txt); } catch { return []; }
-            return (data?.list || []).map(item => ({ ...item, source_name: API_SITES[source].name, source_code: source }));
+            return (data && data.list ? data.list : []).map(item => ({ ...item, source_name: API_SITES[source].name, source_code: source }));
         } catch (error) {
             return [];
         }

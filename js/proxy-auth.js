@@ -40,7 +40,7 @@ async function getPasswordHash() {
         } catch (e) { console.error('生成密码哈希失败:', e); }
     }
 
-    if (window.__ENV__?.PASSWORD) {
+    if (window.__ENV__ && window.__ENV__.PASSWORD) {
         cachedPasswordHash = window.__ENV__.PASSWORD;
         return cachedPasswordHash;
     }

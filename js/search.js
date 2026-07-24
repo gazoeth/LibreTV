@@ -104,9 +104,9 @@ function updateSourceSpeedCache(sourceKey, speed, options = {}) {
 
     const cache = getSourceSpeedCache();
     const existing = cache[sourceKey] || null;
-    const incomingMeasurement = options.measurement || existing?.measurement || 'unknown';
+    const incomingMeasurement = options.measurement || (existing && existing.measurement) || 'unknown';
     const incomingIsDetail = incomingMeasurement === 'detail';
-    const existingIsDetail = existing?.measurement === 'detail';
+    const existingIsDetail = (existing && existing.measurement) === 'detail';
 
     let nextSpeed = normalizedSpeed;
 
@@ -124,8 +124,8 @@ function updateSourceSpeedCache(sourceKey, speed, options = {}) {
         speed: nextSpeed,
         updatedAt: getNowMs(),
         measurement: incomingMeasurement,
-        vodId: typeof options.vodId === 'string' ? options.vodId : existing?.vodId || '',
-        episodes: Number.isFinite(Number(options.episodes)) ? Number(options.episodes) : existing?.episodes || null
+        vodId: typeof options.vodId === 'string' ? options.vodId : (existing && existing.vodId) || '',
+        episodes: Number.isFinite(Number(options.episodes)) ? Number(options.episodes) : (existing && existing.episodes) || null
     };
 
     persistSourceSpeedCache();
@@ -176,9 +176,9 @@ function getUserPlaybackRegion() {
         return window.__userPlaybackRegion;
     }
 
-    const countryCode = normalizeGeoEnvValue(window.__ENV__?.GEO_COUNTRY).toUpperCase();
-    const regionCode = normalizeGeoEnvValue(window.__ENV__?.GEO_REGION).toUpperCase();
-    const geoSource = normalizeGeoEnvValue(window.__ENV__?.GEO_SOURCE);
+    const countryCode = normalizeGeoEnvValue((window.__ENV__ && window.__ENV__.GEO_COUNTRY)).toUpperCase();
+    const regionCode = normalizeGeoEnvValue((window.__ENV__ && window.__ENV__.GEO_REGION)).toUpperCase();
+    const geoSource = normalizeGeoEnvValue((window.__ENV__ && window.__ENV__.GEO_SOURCE));
     const fallback = inferRegionFromBrowser();
     const region = countryCode === 'CN'
         ? 'mainland'
@@ -211,7 +211,7 @@ function getSourceRegionSupport(sourceKey) {
         return 'custom';
     }
 
-    return API_SITES[sourceKey]?.regionSupport === 'overseas'
+    return API_SITES[sourceKey] && API_SITES[sourceKey].regionSupport === 'overseas'
         ? 'overseas'
         : 'mainland';
 }
@@ -287,7 +287,9 @@ function getPreferredSourceOrder(sourceKeys, options = {}) {
             }
         }
 
-        return (sourceOrderMap.get(left) ?? 0) - (sourceOrderMap.get(right) ?? 0);
+        const leftOrder = sourceOrderMap.get(left);
+        const rightOrder = sourceOrderMap.get(right);
+        return (leftOrder == null ? 0 : leftOrder) - (rightOrder == null ? 0 : rightOrder);
     });
 }
 
@@ -318,10 +320,11 @@ function getItemSourceSpeedScore(item) {
 }
 
 function formatSourceSpeedText(item) {
-    const explicitSpeed = normalizeSpeedValue(item?.__sourceSpeedScore);
-    const searchSpeed = normalizeSpeedValue(item?.__searchResponseTime);
-    const cacheEntry = item?.source_code ? getSourceSpeedCacheEntry(item.source_code) : null;
-    const displaySpeed = explicitSpeed ?? cacheEntry?.speed ?? searchSpeed;
+    const explicitSpeed = normalizeSpeedValue(item && item.__sourceSpeedScore);
+    const searchSpeed = normalizeSpeedValue(item && item.__searchResponseTime);
+    const cacheEntry = item && item.source_code ? getSourceSpeedCacheEntry(item.source_code) : null;
+    const cachedSpeed = cacheEntry && cacheEntry.speed != null ? cacheEntry.speed : null;
+    const displaySpeed = explicitSpeed !== null ? explicitSpeed : (cachedSpeed !== null ? cachedSpeed : searchSpeed);
 
     if (displaySpeed === null) {
         return {
@@ -330,7 +333,7 @@ function formatSourceSpeedText(item) {
         };
     }
 
-    if (item?.__speedTestFailed) {
+    if (item && item.__speedTestFailed) {
         return {
             className: 'error',
             text: '测速失败'
@@ -344,7 +347,7 @@ function formatSourceSpeedText(item) {
         className = 'medium';
     }
 
-    const suffix = item?.__speedSource === 'search' && !cacheEntry?.measurement
+    const suffix = item && item.__speedSource === 'search' && !(cacheEntry && cacheEntry.measurement)
         ? ' 估算'
         : '';
 
@@ -356,8 +359,8 @@ function formatSourceSpeedText(item) {
 
 function sortSearchResultsBySpeed(items) {
     return [...items].sort((left, right) => {
-        const leftGroup = Number.isFinite(left?.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
-        const rightGroup = Number.isFinite(right?.__groupIndex) ? right.__groupIndex : Number.MAX_SAFE_INTEGER;
+        const leftGroup = Number.isFinite(left && left.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
+        const rightGroup = Number.isFinite(right && right.__groupIndex) ? right.__groupIndex : Number.MAX_SAFE_INTEGER;
         if (leftGroup !== rightGroup) {
             return leftGroup - rightGroup;
         }
@@ -368,8 +371,8 @@ function sortSearchResultsBySpeed(items) {
             return leftSpeed - rightSpeed;
         }
 
-        const leftArrival = Number.isFinite(left?.__arrivalIndex) ? left.__arrivalIndex : Number.MAX_SAFE_INTEGER;
-        const rightArrival = Number.isFinite(right?.__arrivalIndex) ? right.__arrivalIndex : Number.MAX_SAFE_INTEGER;
+        const leftArrival = Number.isFinite(left && left.__arrivalIndex) ? left.__arrivalIndex : Number.MAX_SAFE_INTEGER;
+        const rightArrival = Number.isFinite(right && right.__arrivalIndex) ? right.__arrivalIndex : Number.MAX_SAFE_INTEGER;
         if (leftArrival !== rightArrival) {
             return leftArrival - rightArrival;
         }
@@ -475,7 +478,7 @@ async function testSourceConnectionSpeed(sourceKey, vodId, options = {}) {
     } catch (error) {
         return {
             speed: -1,
-            error: error?.name === 'AbortError' ? 'timeout' : 'speed-test-failed',
+            error: error && error.name === 'AbortError' ? 'timeout' : 'speed-test-failed',
             cached: false
         };
     }
@@ -514,7 +517,7 @@ async function searchByAPIAndKeyWord(apiId, query) {
             apiName = API_SITES[apiId].name;
         }
 
-        const authSuffix = window.ProxyAuth?.getAuthPrefix
+        const authSuffix = window.ProxyAuth && window.ProxyAuth.getAuthPrefix
             ? await window.ProxyAuth.getAuthPrefix()
             : null;
 
@@ -523,7 +526,7 @@ async function searchByAPIAndKeyWord(apiId, query) {
                 return PROXY_URL + encodeURIComponent(rawUrl) + authSuffix;
             }
 
-            return window.ProxyAuth?.addAuthToProxyUrl
+            return window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl
                 ? await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(rawUrl))
                 : PROXY_URL + encodeURIComponent(rawUrl);
         }
@@ -555,17 +558,18 @@ async function searchByAPIAndKeyWord(apiId, query) {
             return [];
         }
 
-        if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) {
+        if (!data || !data.list || !Array.isArray(data.list) || data.list.length === 0) {
             return [];
         }
 
-        const customApiUrl = apiId.startsWith('custom_')
-            ? getCustomApiInfo(apiId.replace('custom_', ''))?.url
-            : undefined;
+        const customApiInfo = apiId.startsWith('custom_')
+            ? getCustomApiInfo(apiId.replace('custom_', ''))
+            : null;
+        const customApiUrl = customApiInfo ? customApiInfo.url : undefined;
 
         const cacheEntry = getSourceSpeedCacheEntry(apiId);
-        const speedScore = cacheEntry?.speed ?? searchLatency;
-        const speedSource = cacheEntry?.measurement || 'search';
+        const speedScore = cacheEntry && cacheEntry.speed != null ? cacheEntry.speed : searchLatency;
+        const speedSource = cacheEntry && cacheEntry.measurement ? cacheEntry.measurement : 'search';
 
         const mapItem = (item) => ({
             ...item,
@@ -612,7 +616,7 @@ async function searchByAPIAndKeyWord(apiId, query) {
                             return [];
                         }
 
-                        return pageData?.list ? pageData.list.map(mapItem) : [];
+                        return pageData && pageData.list ? pageData.list.map(mapItem) : [];
                     } catch (error) {
                         return [];
                     }

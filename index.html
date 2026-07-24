@@ -17,9 +17,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet">
 
-    <script src="libs/tailwindcss.min.js"></script>
+    <script>
+        (function () {
+            var supportsModernSyntax = true;
+            try {
+                new Function('var value = {}; return value?.name ?? "";');
+            } catch (error) {
+                supportsModernSyntax = false;
+            }
+
+            if (supportsModernSyntax) {
+                document.write('<script src="libs/tailwindcss.min.js"><\/script>');
+            } else {
+                document.documentElement.className += ' legacy-browser';
+            }
+        })();
+    </script>
     <link rel="stylesheet" href="css/styles.css?v=20260724-tvhub3">
     <link rel="stylesheet" href="css/index.css?v=20260724-tvhub3">
+    <link rel="stylesheet" href="css/safari12.css?v=20260724-ipad1">
 </head>
 
 <body class="page-bg text-white">
@@ -451,6 +467,7 @@
 {"@context":"https://schema.org","@type":"WebSite","name":"FreeDY","url":"https://FreeDY.is-an.org/","description":"免费在线视频搜索与观看平台","potentialAction":{"@type":"SearchAction","target":"https://FreeDY.is-an.org/?s={search_term_string}","query-input":"required name=search_term_string"}}
 </script>
 
+    <script src="js/legacy-compat.js?v=20260724-ipad1"></script>
     <script src="libs/sha256.min.js"></script>
     <script>window._jsSha256 = window.sha256;</script>
     <script src="js/config.js"></script>

@@ -53,7 +53,9 @@ const doubanPageSize = 16;
 function initDouban() {
     const doubanToggle = document.getElementById('doubanToggle');
     if (doubanToggle) {
-        const isEnabled = localStorage.getItem('doubanEnabled') === 'true';
+        const storedDoubanEnabled = localStorage.getItem('doubanEnabled');
+        const isEnabled = storedDoubanEnabled === null || storedDoubanEnabled === 'true';
+        if (storedDoubanEnabled === null) localStorage.setItem('doubanEnabled', 'true');
         doubanToggle.checked = isEnabled;
 
         const toggleBg = doubanToggle.nextElementSibling;
@@ -342,7 +344,7 @@ async function fetchDoubanData(url) {
 
     try {
         // 通过代理访问豆瓣 API
-        const proxiedUrl = await window.ProxyAuth?.addAuthToProxyUrl
+        const proxiedUrl = await window.ProxyAuth && window.ProxyAuth.addAuthToProxyUrl
             ? await window.ProxyAuth.addAuthToProxyUrl(PROXY_URL + encodeURIComponent(url))
             : PROXY_URL + encodeURIComponent(url);
 
@@ -388,7 +390,7 @@ async function renderDoubanCards(data, container) {
         return;
     }
 
-    const authSuffix = window.ProxyAuth?.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : '';
+    const authSuffix = window.ProxyAuth && window.ProxyAuth.getAuthPrefix ? await window.ProxyAuth.getAuthPrefix() : '';
 
     data.subjects.forEach((item, idx) => {
         const safeTitle = (item.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
