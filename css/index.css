@@ -615,7 +615,9 @@
 
 .result-poster {
     position: relative;
-    aspect-ratio: 2 / 3;
+    /* NOTE: Safari 12 不支持 aspect-ratio，用 padding-bottom 实现 2:3 比例 */
+    height: 0;
+    padding-bottom: 150%; /* 2:3 = 3/2 = 150% */
     border-radius: 8px;
     overflow: hidden;
     background: #181820;
@@ -624,6 +626,15 @@
     -webkit-transition: all .3s cubic-bezier(.4, 0, .2, 1);
     transition: all .3s cubic-bezier(.4, 0, .2, 1);
 }
+/* 现代浏览器恢复 aspect-ratio（height:0+padding-bottom 在现代浏览器中仍能工作，此处为明确语义） */
+@supports (aspect-ratio: 2/3) {
+    .result-poster {
+        height: auto;
+        padding-bottom: 0;
+        aspect-ratio: 2 / 3;
+    }
+}
+
 
 .result-card:hover .result-poster {
     -webkit-transform: scale(1.04);
