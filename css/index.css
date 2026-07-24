@@ -2109,9 +2109,18 @@ body.tv-navigation-active .result-card:focus .result-poster {
 
 @media (prefers-reduced-motion: reduce) {
     .hot-source-panel.is-active,
-    .tv-spatial-item,
     .hot-source-tab {
-        animation: none;
-        transition-duration: .01ms;
+        animation: none !important;
+        transition-duration: .01ms !important;
+    }
+
+    .tv-spatial-item {
+        opacity: 1 !important;
+        animation: none !important;
+        transition-duration: .01ms !important;
+    }
+
+    body.tv-navigation-active .tv-spatial-item:focus {
+        transform: none;
     }
 }
