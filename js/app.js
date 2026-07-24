@@ -106,13 +106,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // 设置事件监听器
     setupEventListeners();
 
-    if (typeof initDouban === 'function') {
-        initDouban();
-    }
-    if (typeof initTrending === 'function') {
-        initTrending();
-    }
-
     // 初始检查成人API选中状态
     setTimeout(checkAdultAPIsSelected, 100);
 });
@@ -598,51 +591,12 @@ function removeCustomApi(index) {
     showToast('已移除自定义API: ' + apiName, 'info');
 }
 
-function toggleSettings(e) {
-    const settingsPanel = document.getElementById('settingsPanel');
-    if (!settingsPanel) return;
-
-    if (settingsPanel.classList.contains('show')) {
-        settingsPanel.classList.remove('show');
-    } else {
-        settingsPanel.classList.add('show');
-    }
-
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-}
-
 // 设置事件监听器
 function setupEventListeners() {
     // 回车搜索
     document.getElementById('searchInput').addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             search();
-        }
-    });
-
-    // 点击外部关闭设置面板和历史记录面板
-    document.addEventListener('click', function (e) {
-        // 关闭设置面板
-        const settingsPanel = document.querySelector('#settingsPanel.show');
-        const settingsButton = document.querySelector('#settingsPanel .close-btn');
-
-        if (settingsPanel && settingsButton &&
-            !settingsPanel.contains(e.target) &&
-            !settingsButton.contains(e.target)) {
-            settingsPanel.classList.remove('show');
-        }
-
-        // 关闭历史记录面板
-        const historyPanel = document.querySelector('#historyPanel.show');
-        const historyButton = document.querySelector('#historyPanel .close-btn');
-
-        if (historyPanel && historyButton &&
-            !historyPanel.contains(e.target) &&
-            !historyButton.contains(e.target)) {
-            historyPanel.classList.remove('show');
         }
     });
 
@@ -686,6 +640,7 @@ function resetSearchArea() {
     document.getElementById('searchArea').classList.add('flex-1');
     document.getElementById('searchArea').classList.remove('mb-8');
     document.getElementById('resultsArea').classList.add('hidden');
+    document.body.classList.remove('search-mode');
 
     // 确保页脚正确显示，移除相对定位
     const footer = document.querySelector('.footer');
@@ -765,6 +720,7 @@ async function search() {
         document.getElementById('searchArea').classList.remove('flex-1');
         document.getElementById('searchArea').classList.add('mb-8');
         document.getElementById('resultsArea').classList.remove('hidden');
+        document.body.classList.add('search-mode');
         const doubanArea = document.getElementById('doubanArea');
         if (doubanArea) doubanArea.classList.add('hidden');
         const trendingAreaEl = document.getElementById('trendingArea');
@@ -815,8 +771,11 @@ async function search() {
                     : { className: 'pending', text: '测速中' };
 
                 const div = document.createElement('div');
-                div.className = 'result-card group cursor-pointer';
+                div.className = 'result-card tv-spatial-item group cursor-pointer';
                 div.style.animationDelay = `${idx * 40}ms`;
+                div.tabIndex = 0;
+                div.setAttribute('role', 'button');
+                div.setAttribute('aria-label', `查看 ${item.vod_name || '搜索结果'}`);
                 div.setAttribute('onclick', `showDetails('${safeId}','${safeName}','${sourceCode}')`);
                 if (item.api_url) div.setAttribute('data-api-url', item.api_url.replace(/"/g, '&quot;'));
                 div.innerHTML = `
@@ -1539,5 +1498,192 @@ function saveStringAsFile(content, fileName) {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 }
+
+// Unified responsive controller for settings/history panels.
+(function installResponsivePanelController() {
+    const legacyToggleSettings = window.toggleSettings;
+    const legacyToggleHistory = window.toggleHistory;
+    let lastPanelTrigger = null;
+    let lockedScrollY = 0;
+    let isScrollLocked = false;
+
+    function getPanelTriggers() {
+        return {
+            settingsPanel: document.getElementById('settingsToggle'),
+            historyPanel: document.getElementById('historyToggle')
+        };
+    }
+
+    function getOpenPanel() {
+        return document.querySelector('#settingsPanel.show, #historyPanel.show');
+    }
+
+    function hidePanels() {
+        document.getElementById('settingsPanel')?.classList.remove('show');
+        document.getElementById('historyPanel')?.classList.remove('show');
+    }
+
+    function setScrollLock(shouldLock) {
+        if (shouldLock === isScrollLocked) return;
+
+        if (shouldLock) {
+            lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+            document.documentElement.style.setProperty('--panel-scroll-offset', `-${lockedScrollY}px`);
+            document.body.classList.add('panel-open');
+            isScrollLocked = true;
+            return;
+        }
+
+        document.body.classList.remove('panel-open');
+        document.documentElement.style.removeProperty('--panel-scroll-offset');
+        isScrollLocked = false;
+        window.scrollTo(0, lockedScrollY);
+    }
+
+    function syncPanelChrome() {
+        const openPanel = getOpenPanel();
+        const backdrop = document.getElementById('panelBackdrop');
+        const triggers = getPanelTriggers();
+        const appMain = document.getElementById('appMain');
+        const footer = document.querySelector('.site-footer');
+
+        setScrollLock(Boolean(openPanel));
+
+        if (backdrop) {
+            backdrop.classList.toggle('show', Boolean(openPanel));
+            backdrop.setAttribute('aria-hidden', openPanel ? 'false' : 'true');
+        }
+
+        [appMain, footer].forEach(element => {
+            if (element && 'inert' in element) {
+                element.inert = Boolean(openPanel);
+            }
+        });
+
+        ['settingsPanel', 'historyPanel'].forEach(panelId => {
+            const panel = document.getElementById(panelId);
+            const isOpen = panel === openPanel;
+
+            if (panel) {
+                panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                panel.setAttribute('role', 'dialog');
+                panel.setAttribute('aria-modal', isOpen ? 'true' : 'false');
+                panel.setAttribute('tabindex', '-1');
+            }
+
+            if (triggers[panelId]) {
+                triggers[panelId].setAttribute('aria-controls', panelId);
+                triggers[panelId].setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            }
+        });
+    }
+
+    window.closeAllPanels = function closeAllPanels(restoreFocus = true) {
+        const openPanel = getOpenPanel();
+        const focusTarget = openPanel
+            ? lastPanelTrigger || getPanelTriggers()[openPanel.id]
+            : lastPanelTrigger;
+
+        hidePanels();
+        syncPanelChrome();
+
+        if (restoreFocus && openPanel && focusTarget) {
+            setTimeout(() => focusTarget.focus?.(), 0);
+        }
+
+        lastPanelTrigger = null;
+    };
+
+    function togglePanel(panelId, legacyToggle, event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        const shouldOpen = !panel.classList.contains('show');
+        if (!shouldOpen) {
+            window.closeAllPanels();
+            return;
+        }
+
+        hidePanels();
+        lastPanelTrigger = getPanelTriggers()[panelId] || event?.currentTarget || null;
+
+        if (typeof legacyToggle === 'function') {
+            legacyToggle(event);
+        } else {
+            panel.classList.add('show');
+        }
+
+        syncPanelChrome();
+
+        if (panel.classList.contains('show')) {
+            setTimeout(() => panel.querySelector('.close-btn')?.focus(), 320);
+        } else {
+            lastPanelTrigger = null;
+        }
+    }
+
+    window.toggleSettings = function toggleResponsiveSettings(event) {
+        togglePanel('settingsPanel', legacyToggleSettings, event);
+    };
+
+    window.toggleHistory = function toggleResponsiveHistory(event) {
+        togglePanel('historyPanel', legacyToggleHistory, event);
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        syncPanelChrome();
+
+        ['settingsPanel', 'historyPanel'].forEach(panelId => {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+
+            new MutationObserver(syncPanelChrome).observe(panel, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        });
+
+        document.addEventListener('keydown', function (event) {
+            const openPanel = getOpenPanel();
+            if (!openPanel) return;
+
+            const isBackKey = event.key === 'Escape'
+                || event.key === 'BrowserBack'
+                || event.key === 'GoBack'
+                || event.keyCode === 461
+                || event.keyCode === 10009;
+
+            if (isBackKey) {
+                event.preventDefault();
+                window.closeAllPanels();
+                return;
+            }
+
+            if (event.key !== 'Tab') return;
+
+            const focusable = Array.from(openPanel.querySelectorAll(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+            )).filter(element => element.offsetParent !== null);
+
+            if (focusable.length === 0) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
+    });
+
+    window.addEventListener('pageshow', syncPanelChrome);
+})();
 
 // 移除Node.js的require语句，因为这是在浏览器环境中运行的

@@ -403,6 +403,42 @@ input:checked + .slider:before { transform: translateX(20px); }
     border-radius: 16px !important;
 }
 
+.resource-grid-note {
+    margin: 0 0 1rem;
+    padding: .75rem .85rem;
+    border-radius: 12px;
+    background: rgba(229,9,20,0.08);
+    border: 1px solid rgba(229,9,20,0.16);
+    color: #f2c6c6;
+    font-size: .75rem;
+    line-height: 1.6;
+}
+.resource-recommend-badge {
+    position: absolute;
+    top: .55rem;
+    left: .55rem;
+    z-index: 2;
+    padding: .18rem .5rem;
+    border-radius: 999px;
+    background: rgba(229,9,20,0.88);
+    color: #fff4d0;
+    font-size: .62rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    box-shadow: 0 8px 18px rgba(229,9,20,0.25);
+}
+.resource-region-tag {
+    display: inline-flex;
+    align-items: center;
+    margin-top: .25rem;
+    padding: .12rem .45rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.05);
+    color: #8a8a9a;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 .footer {
     border-top-color: rgba(255,255,255,0.06) !important;

@@ -100,10 +100,9 @@ function updateDoubanVisibility() {
     const isEnabled = localStorage.getItem('doubanEnabled') === 'true';
     const resultsEl = document.getElementById('resultsArea');
     const isSearching = resultsEl && !resultsEl.classList.contains('hidden');
+    doubanArea.dataset.sourceEnabled = isEnabled ? 'true' : 'false';
 
     if (isEnabled && !isSearching) {
-        doubanArea.style.display = '';
-        doubanArea.classList.remove('hidden');
         if (document.getElementById('douban-results').children.length === 0) {
             renderRecommend(doubanCurrentTag, doubanPageSize, doubanPageStart);
         }
@@ -401,8 +400,11 @@ async function renderDoubanCards(data, container) {
         const proxiedCoverUrl = originalCoverUrl ? `${PROXY_URL}${encodeURIComponent(originalCoverUrl)}${authSuffix}` : '';
 
         const card = document.createElement('div');
-        card.className = 'douban-card group cursor-pointer';
+        card.className = 'douban-card tv-spatial-item group cursor-pointer';
         card.style.animationDelay = `${idx * 30}ms`;
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `搜索 ${item.title}`);
         card.onclick = () => fillAndSearchWithDouban(item.title);
 
         card.innerHTML = `

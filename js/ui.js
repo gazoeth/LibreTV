@@ -758,21 +758,6 @@ toggleSettings = function(e) {
     }
 };
 
-// 点击外部关闭历史面板
-document.addEventListener('DOMContentLoaded', function() {
-    document.addEventListener('click', function(e) {
-        const historyPanel = document.getElementById('historyPanel');
-        const historyButton = document.querySelector('button[onclick="toggleHistory(event)"]');
-
-        if (historyPanel && historyButton &&
-            !historyPanel.contains(e.target) &&
-            !historyButton.contains(e.target) &&
-            historyPanel.classList.contains('show')) {
-            historyPanel.classList.remove('show');
-        }
-    });
-});
-
 // 清除本地存储缓存并刷新页面
 function clearLocalStorage() {
     // 确保模态框在页面上只有一个实例

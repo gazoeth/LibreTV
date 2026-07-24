@@ -18,15 +18,17 @@
         rel="stylesheet">
 
     <script src="libs/tailwindcss.min.js"></script>
-    <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
-    <link rel="stylesheet" href="css/index.css?v=20260707-mobile">
+    <link rel="stylesheet" href="css/styles.css?v=20260724-tvhub2">
+    <link rel="stylesheet" href="css/index.css?v=20260724-tvhub2">
 </head>
 
 <body class="page-bg text-white">
 
     <!-- ── 历史记录按钮 ─────────────────────────────────────────── -->
-    <div class="fixed top-4 left-4 z-10">
-        <button onclick="toggleHistory(event)" class="top-corner-button flex items-center" aria-label="观看历史">
+    <div class="fixed top-4 left-4 z-10 app-corner app-corner-left">
+        <button id="historyToggle" type="button" onclick="toggleHistory(event)"
+            class="top-corner-button flex items-center" aria-label="观看历史"
+            aria-controls="historyPanel" aria-expanded="false">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -36,8 +38,10 @@
     </div>
 
     <!-- ── 设置按钮 ──────────────────────────────────────────────── -->
-    <div class="fixed top-4 right-4 z-10">
-        <button onclick="toggleSettings(event)" class="top-corner-button flex items-center" aria-label="打开设置">
+    <div class="fixed top-4 right-4 z-10 app-corner app-corner-right">
+        <button id="settingsToggle" type="button" onclick="toggleSettings(event)"
+            class="top-corner-button flex items-center" aria-label="打开设置"
+            aria-controls="settingsPanel" aria-expanded="false">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -49,6 +53,8 @@
     </div>
 
     <!-- ══════ 历史记录侧边栏 ══════════════════════════════════════ -->
+    <div id="panelBackdrop" class="panel-backdrop" aria-hidden="true" onclick="closeAllPanels()"></div>
+
     <div id="historyPanel" class="history-panel fixed left-0 top-0 h-full bg-panel border-r border-panel z-40"
         aria-label="观看历史" aria-hidden="true">
         <div class="panel-header">
@@ -59,7 +65,8 @@
                 </svg>
                 观看历史
             </h3>
-            <button onclick="toggleHistory()" class="close-btn" style="position:static;margin:0;">
+            <button type="button" onclick="toggleHistory()" class="close-btn" aria-label="关闭观看历史"
+                style="position:static;margin:0;">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -86,7 +93,8 @@
                 </svg>
                 设置
             </h3>
-            <button onclick="toggleSettings()" class="close-btn" style="position:static;margin:0;">
+            <button type="button" onclick="toggleSettings()" class="close-btn" aria-label="关闭设置"
+                style="position:static;margin:0;">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -205,8 +213,8 @@
     </div>
 
     <!-- ══════ 主内容 ═════════════════════════════════════════════ -->
-    <div class="container mx-auto px-4 main-wrap">
-        <div class="main-inner">
+    <div id="appMain" class="container mx-auto px-4 main-wrap app-shell">
+        <div class="main-inner app-content">
 
             <!-- Hero / 搜索区 -->
             <div id="searchArea" class="search-area">
@@ -228,7 +236,8 @@
                     <div class="search-box" id="searchBoxEl">
                         <button onclick="resetToHome()" class="search-side-btn" aria-label="返回首页">首页</button>
                         <input type="text" id="searchInput" class="search-input" placeholder="搜索电影、电视剧、动漫…"
-                            autocomplete="off" aria-label="视频搜索框" oninput="toggleClearButton()">
+                            autocomplete="off" aria-label="视频搜索框" data-tv-default
+                            oninput="toggleClearButton()">
                         <button id="clearSearchInput" class="search-clear-btn" onclick="clearSearchInput()"
                             aria-label="清空搜索框" style="display:none">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,65 +251,99 @@
                 </div>
             </div>
 
-            <!-- 热门推荐双栏区域 -->
+            <!-- 热门推荐中心 -->
             <div id="hotRecommendArea" class="w-full hot-recommend-area">
                 <div class="hot-recommend-wrap">
-
-                    <!-- TMDB 流媒体热门 -->
-                    <div id="trendingArea" class="hot-section" style="display:none">
-                        <div class="hot-section-inner">
-                            <div class="hot-section-header">
-                                <div class="hot-section-title">
-                                    <span class="hot-badge tmdb-badge">TMDB</span>
-                                    <span>流媒体热门</span>
-                                </div>
-                                <div class="hot-section-controls">
-                                    <div id="trendingTabs" class="hot-section-tabs"></div>
-                                    <button id="trending-refresh" class="douban-refresh-button"
-                                        style="margin-left: 0.5rem">
-                                        <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        换一批
-                                    </button>
+                    <section id="hotRecommendHub" class="hot-recommend-hub" aria-labelledby="hotRecommendTitle">
+                        <div class="hot-hub-header">
+                            <div class="hot-hub-heading">
+                                <span class="hot-hub-kicker">DISCOVER</span>
+                                <div>
+                                    <h2 id="hotRecommendTitle" class="hot-hub-title">影视热门中心</h2>
+                                    <p class="hot-hub-subtitle">一个入口浏览全球趋势与豆瓣口碑</p>
                                 </div>
                             </div>
-                            <div id="trendingGrid" class="trending-grid"></div>
-                        </div>
-                    </div>
-
-                    <!-- 豆瓣热门推荐 -->
-                    <div id="doubanArea" class="hot-section" style="display:none">
-                        <div class="hot-section-inner">
-                            <div class="hot-section-header">
-                                <div class="hot-section-title">
-                                    <span class="hot-badge douban-badge">豆瓣</span>
-                                    <span>热门推荐</span>
+                            <div class="hot-hub-actions">
+                                <div id="hotSourceSwitch" class="hot-source-switch" role="tablist"
+                                    aria-label="热门内容来源">
+                                    <button id="hotSourceTmdb" type="button" class="hot-source-tab active"
+                                        role="tab" aria-controls="trendingArea" aria-selected="true"
+                                        data-hot-source="trending">
+                                        <span class="hot-source-mark tmdb">T</span>
+                                        <span>TMDB 流媒体</span>
+                                    </button>
+                                    <button id="hotSourceDouban" type="button" class="hot-source-tab"
+                                        role="tab" aria-controls="doubanArea" aria-selected="false"
+                                        data-hot-source="douban">
+                                        <span class="hot-source-mark douban">豆</span>
+                                        <span>豆瓣热门</span>
+                                    </button>
                                 </div>
-                                <div class="hot-section-controls">
-                                    <div class="douban-toggle">
-                                        <button id="douban-movie-toggle" class="douban-toggle-button active">电影</button>
-                                        <button id="douban-tv-toggle" class="douban-toggle-button">剧集</button>
+                                <span class="hot-remote-hint">方向键移动 · 确认键打开</span>
+                            </div>
+                        </div>
+
+                        <div class="hot-hub-stage">
+                            <!-- TMDB 流媒体热门 -->
+                            <div id="trendingArea" class="hot-source-panel" role="tabpanel"
+                                aria-labelledby="hotSourceTmdb" style="display:none">
+                                <div class="hot-section-inner">
+                                    <div class="hot-section-header hot-source-toolbar">
+                                        <div class="hot-source-caption">
+                                            <span class="hot-badge tmdb-badge">TMDB</span>
+                                            <span>全球实时趋势</span>
+                                        </div>
+                                        <div class="hot-section-controls">
+                                            <div id="trendingTabs" class="hot-section-tabs"></div>
+                                            <button id="trending-refresh" type="button"
+                                                class="douban-refresh-button">
+                                                <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                换一批
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button id="douban-refresh" class="douban-refresh-button">
-                                        <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
-                                            stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        换一批
-                                    </button>
+                                    <div id="trendingGrid" class="trending-grid"></div>
                                 </div>
                             </div>
-                            <div class="douban-tags-container" style="margin-bottom:.75rem">
-                                <div id="douban-tags" class="douban-tags"></div>
-                            </div>
-                            <div id="douban-results" class="douban-grid"></div>
-                        </div>
-                    </div>
 
+                            <!-- 豆瓣热门推荐 -->
+                            <div id="doubanArea" class="hot-source-panel" role="tabpanel"
+                                aria-labelledby="hotSourceDouban" style="display:none">
+                                <div class="hot-section-inner">
+                                    <div class="hot-section-header hot-source-toolbar">
+                                        <div class="hot-source-caption">
+                                            <span class="hot-badge douban-badge">豆瓣</span>
+                                            <span>中文口碑精选</span>
+                                        </div>
+                                        <div class="hot-section-controls">
+                                            <div class="douban-toggle">
+                                                <button id="douban-movie-toggle" type="button"
+                                                    class="douban-toggle-button active">电影</button>
+                                                <button id="douban-tv-toggle" type="button"
+                                                    class="douban-toggle-button">剧集</button>
+                                            </div>
+                                            <button id="douban-refresh" type="button" class="douban-refresh-button">
+                                                <svg style="width:14px;height:14px" fill="none" viewBox="0 0 24 24"
+                                                    stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                换一批
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="douban-tags-container" style="margin-bottom:.75rem">
+                                        <div id="douban-tags" class="douban-tags"></div>
+                                    </div>
+                                    <div id="douban-results" class="douban-grid"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
 
@@ -390,26 +433,6 @@
         </div>
     </div>
 
-    <!-- 版权声明弹窗 -->
-    <div id="disclaimerModal" class="modal-overlay" style="display:none">
-        <div class="modal-box" style="max-width:38rem;overflow-y:auto;max-height:90vh">
-            <h2 style="font-size:1.25rem;font-weight:700;color:white;margin-bottom:1.5rem;text-align:center">使用声明</h2>
-            <div style="color:#a0a0b0;font-size:.875rem;line-height:1.7">
-                <p style="margin-bottom:.75rem">欢迎使用 FreeDY。在开始使用前，请您了解并同意以下条款：</p>
-                <p style="margin-bottom:.75rem"><strong style="color:#e50914">服务性质：</strong>FreeDY
-                    仅提供视频搜索服务，不直接提供、存储或上传任何视频内容。所有搜索结果均来自第三方公开接口。</p>
-                <p style="margin-bottom:.75rem"><strong
-                        style="color:#e50914">用户责任：</strong>用户在使用本站服务时，须遵守相关法律法规，不得利用搜索结果从事侵权行为。</p>
-                <p><strong style="color:#e50914">广告风险提示：</strong>本站所有视频均来自第三方采集站，视频中出现的广告与本站无关，请勿相信或点击视频中的任何广告内容，谨防上当受骗。
-                </p>
-            </div>
-            <div style="margin-top:1.5rem;text-align:center">
-                <button id="acceptDisclaimerBtn" class="btn-primary"
-                    style="padding:.75rem 2.5rem;font-size:.9375rem">我已了解并接受</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast -->
     <div id="toast" class="toast-bar" style="opacity:0;transform:translateX(-50%) translateY(-100%)">
         <p id="toastMessage"></p>
@@ -433,13 +456,13 @@
     <script src="js/config.js"></script>
     <script src="js/proxy-auth.js"></script>
     <script src="js/customer_site.js?v=20260707-routing"></script>
-    <script src="js/ui.js"></script>
+    <script src="js/ui.js?v=20260724-tvhub2"></script>
     <script src="js/api.js"></script>
-    <script src="js/trending.js"></script>
-    <script src="js/douban.js"></script>
+    <script src="js/trending.js?v=20260724-tvhub2"></script>
+    <script src="js/douban.js?v=20260724-tvhub2"></script>
     <script src="js/password.js"></script>
     <script src="js/search.js?v=20260707-routing"></script>
-    <script src="js/app.js?v=20260707-routing"></script>
+    <script src="js/app.js?v=20260724-tvhub2"></script>
     <script src="js/pwa-register.js"></script>
 
     <script>
@@ -450,7 +473,7 @@
         window.__ENV__.GEO_SOURCE = window.__ENV__.GEO_SOURCE || '';
     </script>
 
-    <script src="js/index-page.js"></script>
+    <script src="js/index-page.js?v=20260724-tvhub2"></script>
 </body>
 
 </html>

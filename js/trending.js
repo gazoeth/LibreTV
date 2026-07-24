@@ -85,20 +85,12 @@ function initTrending() {
                 }
             }
             updateTrendingVisibility();
-            updateHotRecommendArea();
         });
     }
 
-    const enabled = localStorage.getItem('trendingEnabled') === 'true';
-    if (!enabled) {
-        area.style.display = 'none';
-        return;
-    }
-
-    area.style.display = '';
     renderTrendingTabs();
     setupTrendingRefreshBtn();
-    loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
+    updateTrendingVisibility();
 }
 
 // ── 设置换一批事件 ────────────────────────────────────────────────────────────
@@ -116,6 +108,11 @@ function setupTrendingRefreshBtn() {
 
 // ── 控制外层容器显隐 ──────────────────────────────────────────────────────────
 function updateHotRecommendArea() {
+    if (typeof window.syncHotRecommendHub === 'function') {
+        window.syncHotRecommendHub();
+        return;
+    }
+
     const hotArea = document.getElementById('hotRecommendArea');
     if (!hotArea) return;
     const showDouban = localStorage.getItem('doubanEnabled') === 'true';
@@ -136,11 +133,13 @@ function renderTrendingTabs() {
     container.innerHTML = '';
     TRENDING_TABS.forEach(tab => {
         const btn = document.createElement('button');
+        btn.type = 'button';
         btn.className = `trending-tab px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${tab.key === trendingCurrentTab
             ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-900/40'
             : 'bg-[#1a1a1a] text-gray-400 border-[#333] hover:text-white hover:border-[#555]'
             }`;
         btn.textContent = tab.label;
+        btn.setAttribute('aria-pressed', tab.key === trendingCurrentTab ? 'true' : 'false');
         btn.onclick = () => switchTrendingTab(tab.key);
         container.appendChild(btn);
     });
@@ -252,8 +251,11 @@ function renderTrendingCards(items) {
         const showRating = item.rating && parseFloat(item.rating) > 0;
 
         const card = document.createElement('div');
-        card.className = 'trending-card group cursor-pointer';
+        card.className = 'trending-card tv-spatial-item group cursor-pointer';
         card.style.animationDelay = `${idx * 35}ms`;
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `搜索 ${item.title}`);
         card.onclick = () => trendingSearch(item.title);
         card.innerHTML = `
             <div class="relative aspect-[2/3] rounded-lg overflow-hidden bg-[#1a1a1a] shadow-lg
@@ -316,9 +318,9 @@ function updateTrendingVisibility() {
     if (!area) return;
     const enabled = localStorage.getItem('trendingEnabled') === 'true';
     const isSearching = resultsArea && !resultsArea.classList.contains('hidden');
+    area.dataset.sourceEnabled = enabled ? 'true' : 'false';
+
     if (enabled && !isSearching) {
-        area.style.display = '';
-        area.classList.remove('hidden');
         renderTrendingTabs();
         loadTrending(trendingCurrentTab, trendingCurrentPage[trendingCurrentTab]);
     } else {

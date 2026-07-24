@@ -769,3 +769,187 @@ body {
         flex-basis: 100%;
     }
 }
+
+/* ── Unified responsive application panels ─────────────────── */
+body {
+    overflow-x: hidden;
+}
+
+body.panel-open {
+    position: fixed;
+    top: var(--panel-scroll-offset, 0);
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.panel-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    background: rgba(3, 3, 8, .68);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+    transition: opacity .25s ease, visibility .25s ease;
+}
+
+.panel-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+body.panel-open .app-corner {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#settingsPanel,
+#historyPanel {
+    top: 1rem !important;
+    bottom: 1rem;
+    height: auto !important;
+    z-index: 50 !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 20px;
+    background: rgba(17,17,24,.96) !important;
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 28px 80px rgba(0,0,0,.58);
+}
+
+#settingsPanel {
+    right: max(1rem, env(safe-area-inset-right)) !important;
+    left: auto !important;
+    width: min(26rem, calc(100vw - 2rem));
+    -webkit-transform: translateX(calc(100% + 3rem)) !important;
+    transform: translateX(calc(100% + 3rem)) !important;
+}
+
+#historyPanel {
+    left: max(1rem, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    width: min(22rem, calc(100vw - 2rem));
+    -webkit-transform: translateX(calc(-100% - 3rem)) !important;
+    transform: translateX(calc(-100% - 3rem)) !important;
+}
+
+#settingsPanel.show,
+#historyPanel.show {
+    -webkit-transform: translate3d(0,0,0) !important;
+    transform: translate3d(0,0,0) !important;
+}
+
+#settingsPanel .panel-header,
+#historyPanel .panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: rgba(17,17,24,.94);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+}
+
+#historyPanel .panel-footer {
+    position: sticky;
+    bottom: 0;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid rgba(255,74,84,.95);
+    outline-offset: 3px;
+}
+
+@media (max-width: 767px) {
+    #settingsPanel,
+    #historyPanel {
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        bottom: 0;
+        width: 100% !important;
+        max-width: none;
+        height: 88vh !important;
+        height: 88dvh !important;
+        border-left: 0 !important;
+        border-right: 0 !important;
+        border-bottom: 0 !important;
+        border-radius: 22px 22px 0 0;
+        -webkit-transform: translateY(calc(100% + 1rem)) !important;
+        transform: translateY(calc(100% + 1rem)) !important;
+        box-shadow: 0 -24px 70px rgba(0,0,0,.62);
+    }
+
+    #settingsPanel.show,
+    #historyPanel.show {
+        -webkit-transform: translateY(0) !important;
+        transform: translateY(0) !important;
+    }
+
+    #settingsPanel .panel-header,
+    #historyPanel .panel-header {
+        padding-top: max(1rem, env(safe-area-inset-top));
+        border-radius: 22px 22px 0 0;
+    }
+
+    .settings-body {
+        height: calc(100% - 61px);
+        padding-bottom: max(2rem, env(safe-area-inset-bottom));
+    }
+
+    .panel-footer {
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+}
+
+@media (min-width: 1600px) {
+    #settingsPanel {
+        width: min(30rem, 28vw);
+    }
+
+    #historyPanel {
+        width: min(25rem, 24vw);
+    }
+
+    .panel-header {
+        padding: 1.5rem 1.75rem 1.15rem;
+    }
+
+    .panel-title {
+        font-size: 1rem;
+    }
+
+    .settings-body {
+        padding: 1.25rem 1.5rem 2rem;
+    }
+
+    .settings-section {
+        padding: 1.15rem;
+    }
+
+    .settings-input,
+    .btn-setting-sm,
+    .btn-danger-ghost,
+    .btn-ghost {
+        min-height: 2.75rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-backdrop,
+    #settingsPanel,
+    #historyPanel {
+        transition-duration: .01ms !important;
+    }
+}
