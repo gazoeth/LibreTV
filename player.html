@@ -11,10 +11,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="libs/tailwindcss.min.js"></script>
+    <script>
+        (function () {
+            var supportsModernSyntax = true;
+            try {
+                new Function('var value = {}; return value?.name ?? "";');
+            } catch (error) {
+                supportsModernSyntax = false;
+            }
+            window.__legacyBrowser = !supportsModernSyntax;
+            if (supportsModernSyntax) {
+                document.write('<script src="libs/tailwindcss.min.js"><\/script>');
+            } else {
+                document.documentElement.className += ' legacy-browser';
+            }
+        })();
+    </script>
     <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
     <link rel="stylesheet" href="css/player.css?v=20260707-routing">
+    <link rel="stylesheet" href="css/safari12.css?v=20260724-player">
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -306,17 +322,27 @@
 <!-- ── Scripts ──────────────────────────────────────────────── -->
 <script src="libs/sha256.min.js"></script>
 <script>window._jsSha256 = window.sha256;</script>
-<script src="libs/hls.min.js" crossorigin="anonymous"></script>
-<script src="libs/artplayer.min.js" crossorigin="anonymous"></script>
-<script src="js/config.js"></script>
-<script src="js/proxy-auth.js"></script>
-<script src="js/customer_site.js?v=20260707-routing"></script>
-<script src="js/password.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/api.js"></script>
-<script src="js/search.js?v=20260707-routing"></script>
-<script src="js/player.js?v=20260707-routing"></script>
-<script src="js/player-recommend.js"></script>
+<script>
+    // NOTE: 旧版 Safari 下跳过 ArtPlayer/HLS.js/现代播放器脚本，改用原生播放器
+    if (!window.__legacyBrowser) {
+        document.write('<script src="libs/hls.min.js" crossorigin="anonymous"><\/script>');
+        document.write('<script src="libs/artplayer.min.js" crossorigin="anonymous"><\/script>');
+        document.write('<script src="js/config.js"><\/script>');
+        document.write('<script src="js/proxy-auth.js"><\/script>');
+        document.write('<script src="js/customer_site.js?v=20260707-routing"><\/script>');
+        document.write('<script src="js/password.js"><\/script>');
+        document.write('<script src="js/ui.js"><\/script>');
+        document.write('<script src="js/api.js"><\/script>');
+        document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
+        document.write('<script src="js/player.js?v=20260724-legacy"><\/script>');
+        document.write('<script src="js/player-recommend.js"><\/script>');
+    } else {
+        document.write('<script src="js/legacy-compat.js"><\/script>');
+        document.write('<script src="js/config.js"><\/script>');
+        document.write('<script src="js/password.js"><\/script>');
+        document.write('<script src="js/player-legacy.js?v=20260724"><\/script>');
+    }
+</script>
 <script>
     window.__ENV__ = window.__ENV__ || {};
     window.__ENV__.PASSWORD = "{{PASSWORD}}";

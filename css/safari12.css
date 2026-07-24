@@ -62,3 +62,152 @@
     .legacy-browser .hot-source-switch { display: -webkit-box; display: -ms-flexbox; display: flex; }
     .legacy-browser .hot-source-tab { -webkit-box-flex: 1; -ms-flex: 1 1 0; flex: 1 1 0; }
 }
+
+/* ========================================================================
+   播放器页面 — Safari 12 / iOS 12 兼容样式
+   ======================================================================== */
+
+/* 播放器页面 Tailwind utility 回退（player.html 使用的额外类） */
+.legacy-browser .flex-1 { -webkit-box-flex: 1; -ms-flex: 1 1 0%; flex: 1 1 0%; }
+.legacy-browser .flex-shrink-0 { -webkit-flex-shrink: 0; -ms-flex-negative: 0; flex-shrink: 0; }
+.legacy-browser .min-w-0 { min-width: 0; }
+.legacy-browser .gap-2 { gap: 0; } /* gap 在旧 WebKit 上不生效，用 margin 代替 */
+.legacy-browser .gap-2 > * + * { margin-left: 0.5rem; }
+.legacy-browser .gap-3 { gap: 0; }
+.legacy-browser .gap-3 > * + * { margin-left: 0.75rem; }
+.legacy-browser .gap-4 { gap: 0; }
+.legacy-browser .gap-4 > * + * { margin-left: 1rem; }
+.legacy-browser .space-y-3 > * + * { margin-top: 0.75rem; }
+.legacy-browser .items-start { -webkit-box-align: start; -ms-flex-align: start; align-items: flex-start; }
+.legacy-browser .justify-between { -webkit-box-pack: justify; -ms-flex-pack: justify; justify-content: space-between; }
+.legacy-browser .justify-end { -webkit-box-pack: end; -ms-flex-pack: end; justify-content: flex-end; }
+.legacy-browser .flex-wrap { -webkit-flex-wrap: wrap; -ms-flex-wrap: wrap; flex-wrap: wrap; }
+.legacy-browser .flex-col { -webkit-box-orient: vertical; -webkit-box-direction: normal; -ms-flex-direction: column; flex-direction: column; }
+.legacy-browser .sticky { position: -webkit-sticky; position: sticky; }
+.legacy-browser .self-start { -ms-flex-item-align: start; align-self: flex-start; }
+.legacy-browser .mr-auto { margin-right: auto; }
+.legacy-browser .mb-0 { margin-bottom: 0; }
+.legacy-browser .mb-1 { margin-bottom: 0.25rem; }
+.legacy-browser .mb-6 { margin-bottom: 1.5rem; }
+.legacy-browser .mt-1 { margin-top: 0.25rem; }
+.legacy-browser .mt-4 { margin-top: 1rem; }
+.legacy-browser .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.legacy-browser .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.legacy-browser .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.legacy-browser .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.legacy-browser .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+.legacy-browser .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.legacy-browser .px-10 { padding-left: 2.5rem; padding-right: 2.5rem; }
+.legacy-browser .p-8 { padding: 2rem; }
+.legacy-browser .rounded-lg { border-radius: 0.5rem; }
+.legacy-browser .rounded-xl { border-radius: 0.75rem; }
+.legacy-browser .rounded-2xl { border-radius: 1rem; }
+.legacy-browser .text-xs { font-size: 0.75rem; }
+.legacy-browser .text-sm { font-size: 0.875rem; }
+.legacy-browser .text-base { font-size: 1rem; }
+.legacy-browser .text-xl { font-size: 1.25rem; }
+.legacy-browser .text-2xl { font-size: 1.5rem; }
+.legacy-browser .font-medium { font-weight: 500; }
+.legacy-browser .font-semibold { font-weight: 600; }
+.legacy-browser .font-bold { font-weight: 700; }
+.legacy-browser .whitespace-nowrap { white-space: nowrap; }
+.legacy-browser .overflow-auto { overflow: auto; }
+.legacy-browser .animate-spin { -webkit-animation: legacy-spin 1s linear infinite; animation: legacy-spin 1s linear infinite; }
+@-webkit-keyframes legacy-spin { from { -webkit-transform: rotate(0deg); } to { -webkit-transform: rotate(360deg); } }
+@keyframes legacy-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* grid 回退 */
+.legacy-browser .grid { display: -ms-grid; display: grid; }
+.legacy-browser .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.legacy-browser .col-span-full { grid-column: 1 / -1; }
+
+/* 原生播放器样式 */
+.legacy-browser .legacy-player-wrapper {
+    width: 100% !important;
+    background: #000 !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.legacy-browser .legacy-video {
+    width: 100% !important;
+    display: block !important;
+    background: #000 !important;
+    /* NOTE: iOS Safari 原生控件在此生效 */
+}
+
+/* 密码验证弹窗：旧 Safari 下 Tailwind .hidden 不生效，手动隐藏 */
+.legacy-browser #passwordModal.hidden {
+    display: none !important;
+}
+
+/* 换源/加载模态框同理 */
+.legacy-browser #modal.hidden,
+.legacy-browser #loading.hidden {
+    display: none !important;
+}
+
+/* iPad 播放器页面布局 */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .legacy-browser main { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .legacy-browser #sideRecommend { display: none !important; }
+}
+
+@media (max-width: 767px) {
+    .legacy-browser .player-header-fixed {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    .legacy-browser #sideRecommend { display: none !important; }
+    .legacy-browser .home-btn-text { display: none; }
+}
+
+/* ── aspect-ratio 回退（Safari 12 不支持该属性）── */
+/* NOTE: 用 padding-bottom 技巧实现 16:9 比例，替代 aspect-ratio: 16/9 */
+.legacy-browser .player-placeholder {
+    height: 0 !important;
+    padding-bottom: 56.25% !important; /* 16:9 = 9/16 = 56.25% */
+    aspect-ratio: unset !important;
+    position: relative !important;
+}
+
+/* 原生视频在旧版播放器容器内撑满父元素 */
+.legacy-browser .legacy-player-wrapper {
+    position: relative !important;
+    height: 0 !important;
+    padding-bottom: 56.25% !important;
+    overflow: hidden !important;
+}
+
+.legacy-browser .legacy-video {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: #000 !important;
+}
+
+/* 旧版浏览器下 inset:0 速记属性回退 */
+.legacy-browser .player-loading-overlay {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+}
+
+/* 旧版加载动画 — 移除 gap，改用 margin */
+.legacy-browser .player-loading-overlay > * + * {
+    margin-top: 1rem;
+}
+
+/* error-container 在旧版下使用 block 而不是 flex（兼容性更好） */
+.legacy-browser .error-container {
+    display: none;
+    padding: 3rem;
+    text-align: center;
+}
+.legacy-browser .error-container[style*="flex"] {
+    display: block !important;
+}
