@@ -582,12 +582,14 @@
 .results-grid {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-gap: 1.25rem;
     gap: 1.25rem;
 }
 
 @media (max-width: 900px) {
     .results-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-gap: 1rem;
         gap: 1rem;
     }
 }
@@ -595,6 +597,7 @@
 @media (max-width: 600px) {
     .results-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-gap: .75rem;
         gap: .75rem;
     }
 }
@@ -602,6 +605,7 @@
 @media (max-width: 400px) {
     .results-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-gap: .5rem;
         gap: .5rem;
     }
 }
@@ -717,6 +721,7 @@
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
+    grid-gap: .35rem;
     gap: .35rem;
     opacity: 1;
     /* 取消悬浮才显示的限制，常驻显示 */
@@ -778,6 +783,7 @@
 .result-speed-indicator {
     display: inline-flex;
     align-items: center;
+    grid-gap: 2px;
     gap: 2px;
     font-size: .62rem;
     font-weight: 700;
@@ -997,6 +1003,7 @@
     display: -webkit-box;
     display: -ms-flexbox;
     display: flex;
+    grid-gap: 1.5rem;
     gap: 1.5rem;
     max-width: 1280px;
     margin: 0 auto;
@@ -1038,6 +1045,7 @@
     -ms-flex-pack: justify;
     justify-content: space-between;
     margin-bottom: 1rem;
+    grid-gap: .75rem;
     gap: .75rem;
 }
 
@@ -1048,6 +1056,7 @@
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
+    grid-gap: .5rem;
     gap: .5rem;
     font-size: .9375rem;
     font-weight: 700;
@@ -1086,6 +1095,7 @@
     display: -webkit-box;
     display: -ms-flexbox;
     display: flex;
+    grid-gap: .375rem;
     gap: .375rem;
     -ms-flex-wrap: wrap;
     flex-wrap: wrap;
@@ -1098,6 +1108,7 @@
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
+    grid-gap: .5rem;
     gap: .5rem;
     -ms-flex-wrap: wrap;
     flex-wrap: wrap;
@@ -1107,6 +1118,7 @@
 .trending-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
+    grid-gap: .625rem;
     gap: .625rem;
 }
 
@@ -1200,6 +1212,7 @@
         -webkit-box-direction: normal;
         -ms-flex-direction: column;
         flex-direction: column;
+        grid-gap: 1rem;
         gap: 1rem;
     }
 
@@ -1216,11 +1229,13 @@
 
     .hot-section-header {
         flex-wrap: wrap;
+        grid-gap: .5rem;
         gap: .5rem;
     }
 
     .trending-grid {
         grid-template-columns: repeat(3, 1fr);
+        grid-gap: .5rem;
         gap: .5rem;
     }
 
@@ -1238,6 +1253,7 @@
 @media (max-width: 480px) {
     .trending-grid {
         grid-template-columns: repeat(3, 1fr);
+        grid-gap: .4rem;
         gap: .4rem;
     }
 
@@ -1306,6 +1322,7 @@
 
     .douban-topbar {
         flex-wrap: wrap;
+        grid-gap: .75rem;
         gap: .75rem;
     }
 
@@ -1325,6 +1342,7 @@
     }
 
     .douban-controls {
+        grid-gap: .375rem;
         gap: .375rem;
     }
 
@@ -1340,6 +1358,7 @@
     .results-header {
         margin-bottom: 1rem;
         align-items: flex-end;
+        grid-gap: .5rem;
         gap: .5rem;
     }
 }
@@ -1378,6 +1397,7 @@
 
     .results-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-gap: .75rem;
         gap: .75rem;
     }
 
@@ -1411,10 +1431,12 @@
     }
 
     .results-grid {
+        grid-gap: .6rem;
         gap: .6rem;
     }
 
     .trending-grid {
+        grid-gap: .35rem;
         gap: .35rem;
     }
 }
@@ -1590,6 +1612,7 @@ body.search-mode .search-wrap {
 
     .results-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-gap: 1.25rem;
         gap: 1.25rem;
     }
 }
@@ -1682,6 +1705,7 @@ body.search-mode .search-wrap {
     }
 
     .hot-recommend-wrap {
+        grid-gap: 2rem;
         gap: 2rem;
     }
 
@@ -1699,6 +1723,7 @@ body.search-mode .search-wrap {
 
     .trending-grid {
         grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-gap: .8rem;
         gap: .8rem;
     }
 
@@ -1709,6 +1734,7 @@ body.search-mode .search-wrap {
 
     .results-grid {
         grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-gap: 1.5rem;
         gap: 1.5rem;
     }
 
@@ -1781,6 +1807,7 @@ body.search-mode .search-wrap {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    grid-gap: 1.5rem;
     gap: 1.5rem;
     padding: 1.35rem 1.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, .07);
@@ -1790,6 +1817,7 @@ body.search-mode .search-wrap {
 .hot-hub-heading {
     display: flex;
     align-items: center;
+    grid-gap: .9rem;
     gap: .9rem;
     min-width: 0;
 }
@@ -1827,6 +1855,7 @@ body.search-mode .search-wrap {
 .hot-hub-actions {
     display: flex;
     align-items: center;
+    grid-gap: 1rem;
     gap: 1rem;
     min-width: 0;
 }
@@ -1834,6 +1863,7 @@ body.search-mode .search-wrap {
 .hot-source-switch {
     display: flex;
     align-items: center;
+    grid-gap: .35rem;
     gap: .35rem;
     padding: .3rem;
     border: 1px solid rgba(255, 255, 255, .08);
@@ -1845,6 +1875,7 @@ body.search-mode .search-wrap {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    grid-gap: .48rem;
     gap: .48rem;
     min-height: 2.6rem;
     padding: .55rem .9rem;
@@ -1933,6 +1964,7 @@ body.search-mode .search-wrap {
 .hot-source-caption {
     display: flex;
     align-items: center;
+    grid-gap: .55rem;
     gap: .55rem;
     color: #d8d8e0;
     font-size: .82rem;
@@ -1941,6 +1973,7 @@ body.search-mode .search-wrap {
 
 .hot-recommend-hub .trending-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-gap: 1rem;
     gap: 1rem;
 }
 
@@ -2002,6 +2035,7 @@ body.tv-navigation-active .result-card:focus .result-poster {
     .hot-hub-header {
         align-items: flex-start;
         flex-direction: column;
+        grid-gap: 1rem;
         gap: 1rem;
     }
 
@@ -2067,6 +2101,7 @@ body.tv-navigation-active .result-card:focus .result-poster {
 
     .hot-recommend-hub .trending-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-gap: .55rem;
         gap: .55rem;
     }
 
@@ -2105,6 +2140,7 @@ body.tv-navigation-active .result-card:focus .result-poster {
 
     .hot-recommend-hub .trending-grid {
         grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-gap: 1.15rem;
         gap: 1.15rem;
     }
 

@@ -206,6 +206,7 @@ body {
 #apiCheckboxes {
     display: flex;
     flex-direction: column;
+    grid-gap: .75rem;
     gap: .75rem;
 }
 .api-group-shell {
@@ -218,6 +219,7 @@ body {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    grid-gap: .75rem;
     gap: .75rem;
     margin-bottom: .65rem;
 }
@@ -258,11 +260,13 @@ body {
 .api-group-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-gap: .45rem;
     gap: .45rem;
 }
 .api-checkbox-item {
     display: flex;
     align-items: center;
+    grid-gap: .42rem;
     gap: .42rem;
     min-width: 0;
     padding: .42rem .48rem;
@@ -715,6 +719,7 @@ body {
 
     .settings-btn-row {
         flex-wrap: wrap;
+        grid-gap: .5rem;
         gap: .5rem;
     }
 
@@ -735,11 +740,13 @@ body {
     .settings-meta {
         flex-direction: column;
         align-items: flex-start;
+        grid-gap: .25rem;
         gap: .25rem;
     }
 
     .toggle-row {
         align-items: flex-start;
+        grid-gap: .75rem;
         gap: .75rem;
     }
 
