@@ -94,11 +94,82 @@ let currentVideoUrl = ''; // 记录当前实际的视频URL
 let resourceSwitchInProgress = false;
 let resourceModalKeydownHandler = null;
 let resourceModalPreviousFocus = null;
+const VISUAL_CLEAN_STORAGE_KEY = 'visualCleanRules.v1';
+const VISUAL_CLEAN_MODES = [
+    { key: 'off', label: '关闭', className: '' },
+    { key: 'bottom-right', label: '右下角遮罩', className: 'clean-mask-bottom-right' },
+    { key: 'bottom-left', label: '左下角遮罩', className: 'clean-mask-bottom-left' },
+    { key: 'top-right', label: '右上角遮罩', className: 'clean-mask-top-right' },
+    { key: 'top-left', label: '左上角遮罩', className: 'clean-mask-top-left' },
+    { key: 'crop-bottom', label: '底部跑马灯', className: 'clean-crop-bottom' },
+    { key: 'crop-top', label: '顶部跑马灯', className: 'clean-crop-top' },
+    { key: 'crop-bottom-right', label: '底部+右下角', className: 'clean-crop-bottom-right' }
+];
+let currentVisualCleanMode = 'off';
 const isWebkit = (typeof window.webkitConvertPointFromNodeToPage === 'function')
 Artplayer.FULLSCREEN_WEB_IN_BODY = true;
 
 function getCurrentSourceCode(params = new URLSearchParams(window.location.search)) {
     return params.get('source_code') || params.get('source') || '';
+}
+
+function readVisualCleanRules() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(VISUAL_CLEAN_STORAGE_KEY) || '{}');
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function getVisualCleanModeForSource(sourceKey = getCurrentSourceCode()) {
+    const savedMode = readVisualCleanRules()[sourceKey] || 'off';
+    return VISUAL_CLEAN_MODES.some(mode => mode.key === savedMode) ? savedMode : 'off';
+}
+
+function saveVisualCleanModeForSource(sourceKey, modeKey) {
+    if (!sourceKey) return;
+    try {
+        const rules = readVisualCleanRules();
+        if (modeKey === 'off') delete rules[sourceKey];
+        else rules[sourceKey] = modeKey;
+        localStorage.setItem(VISUAL_CLEAN_STORAGE_KEY, JSON.stringify(rules));
+    } catch (error) {}
+}
+
+function applyVisualCleanMode(modeKey, options = {}) {
+    const container = document.getElementById('playerContainer');
+    const button = document.getElementById('visualCleanButton');
+    const text = document.getElementById('visualCleanText');
+    if (!container) return;
+
+    const selectedMode = VISUAL_CLEAN_MODES.find(mode => mode.key === modeKey) || VISUAL_CLEAN_MODES[0];
+    VISUAL_CLEAN_MODES.forEach(mode => {
+        if (mode.className) container.classList.remove(mode.className);
+    });
+    if (selectedMode.className) container.classList.add(selectedMode.className);
+    currentVisualCleanMode = selectedMode.key;
+
+    if (text) text.textContent = `画面净化：${selectedMode.label}`;
+    if (button) {
+        button.classList.toggle('is-active', selectedMode.key !== 'off');
+        button.setAttribute('aria-label', `画面净化：${selectedMode.label}`);
+        button.setAttribute('aria-pressed', selectedMode.key !== 'off' ? 'true' : 'false');
+    }
+
+    const sourceKey = getCurrentSourceCode();
+    if (options.persist !== false) saveVisualCleanModeForSource(sourceKey, selectedMode.key);
+    if (options.notify) showToast(`画面净化：${selectedMode.label}`, selectedMode.key === 'off' ? 'info' : 'success');
+}
+
+function cycleVisualCleanMode() {
+    const currentIndex = Math.max(0, VISUAL_CLEAN_MODES.findIndex(mode => mode.key === currentVisualCleanMode));
+    const nextMode = VISUAL_CLEAN_MODES[(currentIndex + 1) % VISUAL_CLEAN_MODES.length];
+    applyVisualCleanMode(nextMode.key, { persist: true, notify: true });
+}
+
+function restoreVisualCleanModeForCurrentSource() {
+    applyVisualCleanMode(getVisualCleanModeForSource(), { persist: false });
 }
 
 // 页面加载
@@ -235,8 +306,9 @@ function initializePageContent() {
         showError('无效的视频链接');
     }
 
-    // 渲染源信息
+    // 渲染源信息并恢复该资源站的画面净化规则
     renderResourceInfoBar();
+    restoreVisualCleanModeForCurrentSource();
 
     // 更新集数信息
     updateEpisodeInfo();
@@ -2247,6 +2319,7 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
         updateButtonStates();
         renderEpisodes();
         renderResourceInfoBar();
+        restoreVisualCleanModeForCurrentSource();
         closeResourceModal();
         showToast(`已切换到 ${sourceName}`, 'success');
     } catch (error) {
@@ -2271,6 +2344,7 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
         updateButtonStates();
         renderEpisodes();
         renderResourceInfoBar();
+        restoreVisualCleanModeForCurrentSource();
         showToast(`切换到 ${sourceName} 失败，已保留原播放源`, 'error');
     } finally {
         window.isSwitchingVideo = false;

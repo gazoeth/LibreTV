@@ -29,7 +29,7 @@
     </script>
     <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
-    <link rel="stylesheet" href="css/player.css?v=20260730-switchsafe1">
+    <link rel="stylesheet" href="css/player.css?v=20260730-cleanscreen1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -102,6 +102,7 @@
                             <div class="player-loading-text" id="loading-title">正在加载视频…</div>
                         </div>
                     </div>
+                    <div id="visualCleanOverlay" class="visual-clean-overlay" aria-hidden="true"></div>
                     <div class="loading-container" id="player-loading" style="display:none">
                         <div class="loading-spinner"></div>
                         <span>正在加载视频…</span>
@@ -153,6 +154,15 @@
                     </div>
                     <!-- 工具按钮组 -->
                     <div class="flex flex-wrap justify-end gap-2">
+                        <button id="visualCleanButton" type="button" onclick="cycleVisualCleanMode()"
+                                class="visual-clean-button flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg"
+                                aria-label="画面净化：关闭" title="切换跑马灯裁切或贴片遮罩">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                                <rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke-width="1.5"/>
+                                <path d="M5 13h10M13 6l2 2-2 2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span id="visualCleanText">画面净化：关闭</span>
+                        </button>
                         <button onclick="toggleEpisodeOrder()"
                                 class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg">
                             <svg class="w-3.5 h-3.5" id="orderIcon" viewBox="0 0 20 20" fill="currentColor">
@@ -334,7 +344,7 @@
         document.write('<script src="js/ui.js"><\/script>');
         document.write('<script src="js/api.js"><\/script>');
         document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
-        document.write('<script src="js/player.js?v=20260730-ad-switch2"><\/script>');
+        document.write('<script src="js/player.js?v=20260730-cleanscreen1"><\/script>');
         document.write('<script src="js/player-recommend.js?v=20260730-tmdbfix1"><\/script>');
     } else {
         document.write('<script src="js/legacy-compat.js"><\/script>');

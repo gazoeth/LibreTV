@@ -251,6 +251,91 @@ body, html {
     transition: transform 0.3s;
 }
 
+/* ── Lightweight visual cleanup ─────────────────────────────── */
+#playerContainer > .relative {
+    overflow: hidden;
+}
+
+.visual-clean-overlay {
+    position: absolute;
+    z-index: 30;
+    display: none;
+    background: #050507;
+    pointer-events: none;
+}
+
+#playerContainer.clean-mask-bottom-right .visual-clean-overlay {
+    display: block;
+    right: 1.2%;
+    bottom: 7.5%;
+    width: 23%;
+    height: 17%;
+    border-radius: 3px;
+}
+
+#playerContainer.clean-mask-bottom-left .visual-clean-overlay {
+    display: block;
+    left: 1.2%;
+    bottom: 7.5%;
+    width: 23%;
+    height: 17%;
+    border-radius: 3px;
+}
+
+#playerContainer.clean-mask-top-right .visual-clean-overlay {
+    display: block;
+    right: 1.2%;
+    top: 5%;
+    width: 21%;
+    height: 15%;
+    border-radius: 3px;
+}
+
+#playerContainer.clean-mask-top-left .visual-clean-overlay {
+    display: block;
+    left: 1.2%;
+    top: 5%;
+    width: 21%;
+    height: 15%;
+    border-radius: 3px;
+}
+
+#playerContainer.clean-crop-bottom #player video,
+#playerContainer.clean-crop-top #player video,
+#playerContainer.clean-crop-bottom-right #player video {
+    transform: scale(1.08) !important;
+    transform-origin: center center !important;
+}
+
+#playerContainer.clean-crop-bottom #player video,
+#playerContainer.clean-crop-bottom-right #player video {
+    object-position: center 43% !important;
+}
+
+#playerContainer.clean-crop-top #player video {
+    object-position: center 57% !important;
+}
+
+#playerContainer.clean-crop-bottom-right .visual-clean-overlay {
+    display: block;
+    right: 1.2%;
+    bottom: 7.5%;
+    width: 22%;
+    height: 16%;
+    border-radius: 3px;
+}
+
+.visual-clean-button.is-active {
+    color: #ffe3a3 !important;
+    border-color: rgba(245,158,11,.48) !important;
+    background: rgba(245,158,11,.12) !important;
+}
+
+.visual-clean-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+}
+
 /* ── Episode navigation buttons ──────────────────────────────── */
 #prevButton, #nextButton {
     background: rgba(255,255,255,0.05) !important;
