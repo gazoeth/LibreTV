@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 window.history.replaceState(
                     { search: keyword },
-                    'YiWuTV - ' + keyword,
+                    'FreeDY - ' + keyword,
                     window.location.href
                 );
             } catch (error) {

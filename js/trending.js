@@ -306,8 +306,8 @@ function trendingSearch(title) {
     input.value = title;
     if (typeof search === 'function') search();
     try {
-        window.history.pushState({ search: title }, `搜索: ${title} - LibreTV`, `/s=${encodeURIComponent(title)}`);
-        document.title = `搜索: ${title} - LibreTV`;
+        window.history.pushState({ search: title }, `搜索: ${title} - FreeDY`, `/s=${encodeURIComponent(title)}`);
+        document.title = `搜索: ${title} - FreeDY`;
     } catch (e) { }
     if (window.innerWidth <= 768) window.scrollTo({ top: 0, behavior: 'smooth' });
 }

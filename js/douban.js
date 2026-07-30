@@ -139,8 +139,8 @@ function fillAndSearch(title) {
         search();
         try {
             const encodedQuery = encodeURIComponent(safeTitle);
-            window.history.pushState({ search: safeTitle }, `搜索: ${safeTitle} - YiWuTV`, `/s=${encodedQuery}`);
-            document.title = `搜索: ${safeTitle} - YiWuTV`;
+            window.history.pushState({ search: safeTitle }, `搜索: ${safeTitle} - FreeDY`, `/s=${encodedQuery}`);
+            document.title = `搜索: ${safeTitle} - FreeDY`;
         } catch (e) {
             console.error('更新浏览器历史失败:', e);
         }
@@ -175,8 +175,8 @@ async function fillAndSearchWithDouban(title) {
         await search();
         try {
             const encodedQuery = encodeURIComponent(safeTitle);
-            window.history.pushState({ search: safeTitle }, `搜索: ${safeTitle} - YiWuTV`, `/s=${encodedQuery}`);
-            document.title = `搜索: ${safeTitle} - YiWuTV`;
+            window.history.pushState({ search: safeTitle }, `搜索: ${safeTitle} - FreeDY`, `/s=${encodedQuery}`);
+            document.title = `搜索: ${safeTitle} - FreeDY`;
         } catch (e) {
             console.error('更新浏览器历史失败:', e);
         }

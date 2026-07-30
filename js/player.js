@@ -225,7 +225,7 @@ function initializePageContent() {
     }
 
     // 设置页面标题
-    document.title = currentVideoTitle + ' - LibreTV播放器';
+    document.title = currentVideoTitle + ' - FreeDY 播放器';
     document.getElementById('videoTitle').textContent = currentVideoTitle;
 
     // 初始化播放器
@@ -524,11 +524,11 @@ function initPlayer(videoUrl) {
                 let sourceElement = video.querySelector('source');
                 if (sourceElement) {
                     // 更新现有source元素的URL
-                    sourceElement.src = videoUrl;
+                    sourceElement.src = url;
                 } else {
                     // 创建新的source元素
                     sourceElement = document.createElement('source');
-                    sourceElement.src = videoUrl;
+                    sourceElement.src = url;
                     video.appendChild(sourceElement);
                 }
                 video.disableRemotePlayback = false;
@@ -785,11 +785,107 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     }
 }
 
-// 保守模式：无法确认广告分片完整起止范围时，原样保留整个 M3U8。
-// #EXT-X-DISCONTINUITY 同时承担时间轴、编码、音轨、密钥和线路切换语义，
-// 单独删除它会导致后续正片分片被播放器丢弃或出现音画不同步。
+const HLS_AD_MARKER_PATTERN = /(?:^|[\/_\-.])(ad|ads|advert|advertise|advertisement|commercial|promo|preroll|midroll|postroll)(?:[\/_\-.]|$)/i;
+const HLS_AD_CLASS_PATTERN = /CLASS=["']?(?:com\.)?(?:apple\.hls\.)?(?:interstitial|ad|ads|advertisement)/i;
+
+function isExplicitHlsAdMarker(line) {
+    const normalized = String(line || '').trim();
+    if (!normalized) return false;
+    return HLS_AD_CLASS_PATTERN.test(normalized)
+        || /^#EXT-X-CUE-OUT(?::|$)/i.test(normalized)
+        || /^#EXT-OATCLS-SCTE35:/i.test(normalized)
+        || /^#EXT-X-ASSET:/i.test(normalized);
+}
+
+function isExplicitHlsAdUri(uri) {
+    if (!uri || uri.startsWith('#')) return false;
+    try {
+        const parsed = new URL(uri, window.location.href);
+        return HLS_AD_MARKER_PATTERN.test(parsed.pathname)
+            || Array.from(parsed.searchParams.keys()).some(key => /^(?:ad|ads|advert|commercial)$/i.test(key));
+    } catch (error) {
+        return HLS_AD_MARKER_PATTERN.test(uri.split('?')[0]);
+    }
+}
+
+function isHlsAdBreakEnd(line) {
+    const normalized = String(line || '').trim();
+    return /^#EXT-X-CUE-IN(?::|$)/i.test(normalized)
+        || (/^#EXT-X-DATERANGE:/i.test(normalized) && /END-DATE=/i.test(normalized));
+}
+
+// 安全分片过滤：仅删除具有明确广告信号的媒体分片。
+// 不按时长猜测，不删除 #EXT-X-DISCONTINUITY、密钥、映射、音轨或播放线路标签。
 function filterAdsFromM3U8(m3u8Content) {
-    return typeof m3u8Content === 'string' ? m3u8Content : '';
+    if (typeof m3u8Content !== 'string' || !m3u8Content.includes('#EXTM3U')) {
+        return typeof m3u8Content === 'string' ? m3u8Content : '';
+    }
+
+    const sourceLines = m3u8Content.split(/\r?\n/);
+    const output = [];
+    let pendingSegmentTags = [];
+    let insideExplicitAdBreak = false;
+    let removedSegments = 0;
+
+    const flushPending = () => {
+        if (pendingSegmentTags.length) {
+            output.push(...pendingSegmentTags);
+            pendingSegmentTags = [];
+        }
+    };
+
+    sourceLines.forEach((line, lineIndex) => {
+        const trimmed = line.trim();
+
+        if (isExplicitHlsAdMarker(trimmed)) {
+            // 只有能找到明确结束标记时才进入广告段，防止残缺 CUE-OUT 误删后续全部正片。
+            const hasMatchingEnd = sourceLines
+                .slice(lineIndex + 1)
+                .some(candidate => isHlsAdBreakEnd(candidate));
+            if (hasMatchingEnd && (/^#EXT-X-CUE-OUT(?::|$)/i.test(trimmed) || /^#EXT-OATCLS-SCTE35:/i.test(trimmed))) {
+                insideExplicitAdBreak = true;
+                pendingSegmentTags = [];
+            } else {
+                output.push(line);
+            }
+            return;
+        }
+
+        if (isHlsAdBreakEnd(trimmed)) {
+            insideExplicitAdBreak = false;
+            pendingSegmentTags = [];
+            return;
+        }
+
+        if (/^#EXTINF:/i.test(trimmed) || /^#EXT-X-BYTERANGE:/i.test(trimmed) || /^#EXT-X-PROGRAM-DATE-TIME:/i.test(trimmed)) {
+            pendingSegmentTags.push(line);
+            return;
+        }
+
+        if (trimmed && !trimmed.startsWith('#')) {
+            const removeSegment = insideExplicitAdBreak || isExplicitHlsAdUri(trimmed);
+            if (removeSegment) {
+                removedSegments++;
+                pendingSegmentTags = [];
+                return;
+            }
+            flushPending();
+            output.push(line);
+            return;
+        }
+
+        // 结构性标签始终保留。仅在广告段内忽略分片级元数据。
+        if (!insideExplicitAdBreak || /^#EXT-X-DISCONTINUITY/i.test(trimmed)) {
+            flushPending();
+            output.push(line);
+        }
+    });
+
+    flushPending();
+    if (removedSegments > 0) {
+        console.info(`HLS 分片广告过滤：移除 ${removedSegments} 个明确广告分片`);
+    }
+    return output.join('\n');
 }
 
 
@@ -1648,16 +1744,26 @@ async function showSwitchResourceModal() {
     modal.style.display = '';
     modal.setAttribute('aria-hidden', 'false');
 
+    const defaultRecommendedSource = window.getDefaultRecommendedSource
+        ? window.getDefaultRecommendedSource()
+        : '';
+    const candidateSourceKeys = Array.from(new Set([
+        defaultRecommendedSource,
+        currentSourceCode,
+        ...selectedAPIs
+    ].filter(Boolean)));
     const orderedSourceKeys = window.getPreferredSourceOrder
-        ? window.getPreferredSourceOrder(selectedAPIs)
-        : [...selectedAPIs];
+        ? window.getPreferredSourceOrder(candidateSourceKeys)
+        : candidateSourceKeys;
     const resourceOptions = orderedSourceKeys.map(curr => {
         if (API_SITES[curr]) {
             return { key: curr, name: API_SITES[curr].name };
         }
+        if (!curr.startsWith('custom_')) return null;
         const idx = parseInt(curr.replace('custom_', ''), 10);
-        return { key: curr, name: customAPIs[idx]?.name || '自定义资源' };
-    });
+        if (!customAPIs[idx]) return null;
+        return { key: curr, name: customAPIs[idx].name || '自定义资源' };
+    }).filter(Boolean);
     const nameMap = Object.fromEntries(resourceOptions.map(option => [option.key, option.name]));
     const availableResults = new Map();
     const speedSnapshot = {};
@@ -1934,20 +2040,32 @@ async function showSwitchResourceModal() {
 
     let foundAny = false;
     await Promise.all(resourceOptions.map(async option => {
-        const queryResult = await searchByAPIAndKeyWord(option.key, currentVideoTitle);
-        if (!queryResult.length) return;
+        try {
+            const queryResult = await searchByAPIAndKeyWord(option.key, currentVideoTitle);
+            if (!Array.isArray(queryResult) || !queryResult.length) return;
 
-        let result = queryResult[0];
-        for (const currentResult of queryResult) {
-            if (currentResult.vod_name === currentVideoTitle) {
-                result = currentResult;
-                break;
-            }
+            let result = queryResult[0];
+            const normalizedTitle = String(currentVideoTitle || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+            let bestScore = -1;
+            queryResult.forEach(currentResult => {
+                const resultTitle = String(currentResult.vod_name || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+                let score = 0;
+                if (resultTitle === normalizedTitle) score = 100;
+                else if (resultTitle.includes(normalizedTitle) || normalizedTitle.includes(resultTitle)) score = 60;
+                if (score > bestScore) {
+                    bestScore = score;
+                    result = currentResult;
+                }
+            });
+
+            foundAny = true;
+            upsertCard(option.key, result, null);
+            testSpeedFast(option.key, result.vod_id)
+                .then(speedResult => upsertCard(option.key, result, speedResult))
+                .catch(() => {});
+        } catch (error) {
+            console.warn(`资源 ${option.key} 搜索失败:`, error.message);
         }
-
-        foundAny = true;
-        upsertCard(option.key, result, null);
-        testSpeedFast(option.key, result.vod_id).then(speedResult => upsertCard(option.key, result, speedResult));
     }));
 
     if (!foundAny) {
@@ -2006,18 +2124,26 @@ function waitForPlayerReady(timeoutMs = 12000) {
 
 async function loadResourceIntoPlayer(videoUrl, restorePosition = 0) {
     window.isSwitchingVideo = true;
+
     if (isWebkit || !art) {
         initPlayer(videoUrl);
+        await waitForPlayerReady();
+    } else if (typeof art.switchUrl === 'function') {
+        // switchUrl 返回 Promise，只有目标地址达到可播放状态才会 resolve。
+        await Promise.race([
+            art.switchUrl(videoUrl),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('目标线路加载超时')), 15000))
+        ]);
     } else {
         art.switch = videoUrl;
+        await waitForPlayerReady();
     }
 
-    await waitForPlayerReady();
     if (restorePosition > 0 && art?.duration > restorePosition + 2) {
         art.currentTime = restorePosition;
     }
     if (art?.play) {
-        art.play().catch(() => {});
+        await art.play().catch(() => {});
     }
 }
 
@@ -2049,7 +2175,7 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
     let targetLoadStarted = false;
     resourceSwitchInProgress = true;
     setResourceCardsSwitching(activeCard, true);
-    showLoading();
+    showLoading(`正在切换到 ${sourceName}...`);
     showToast(`正在切换到 ${sourceName}`, 'warning');
 
     try {
@@ -2112,7 +2238,8 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
             localStorage.setItem('currentPlayingSource', sourceKey);
         } catch (error) {}
 
-        if (snapshot.wasPaused && art?.pause) {
+        // 用户主动选源时优先恢复播放，只有原播放器明确处于暂停状态且已有播放进度才保持暂停。
+        if (snapshot.wasPaused && snapshot.position > 1 && art?.pause) {
             art.pause();
         }
 
