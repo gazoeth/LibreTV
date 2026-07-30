@@ -91,6 +91,9 @@ let shortcutHintTimeout = null; // 用于控制快捷键提示显示时间
 let adFilteringEnabled = true; // 默认开启广告过滤
 let progressSaveInterval = null; // 定期保存进度的计时器
 let currentVideoUrl = ''; // 记录当前实际的视频URL
+let resourceSwitchInProgress = false;
+let resourceModalKeydownHandler = null;
+let resourceModalPreviousFocus = null;
 const isWebkit = (typeof window.webkitConvertPointFromNodeToPage === 'function')
 Artplayer.FULLSCREEN_WEB_IN_BODY = true;
 
@@ -762,48 +765,31 @@ function initPlayer(videoUrl) {
     }, 10000);
 }
 
-// 自定义M3U8 Loader用于过滤广告
+// 自定义 M3U8 Loader。当前采用无损兼容策略，不修改播放清单。
 class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     constructor(config) {
         super(config);
         const load = this.load.bind(this);
         this.load = function (context, config, callbacks) {
-            // 拦截manifest和level请求
             if (context.type === 'manifest' || context.type === 'level') {
                 const onSuccess = callbacks.onSuccess;
                 callbacks.onSuccess = function (response, stats, context) {
-                    // 如果是m3u8文件，处理内容以移除广告分段
                     if (response.data && typeof response.data === 'string') {
-                        // 过滤掉广告段 - 实现更精确的广告过滤逻辑
-                        response.data = filterAdsFromM3U8(response.data, true);
+                        response.data = filterAdsFromM3U8(response.data);
                     }
                     return onSuccess(response, stats, context);
                 };
             }
-            // 执行原始load方法
             load(context, config, callbacks);
         };
     }
 }
 
-// 过滤可疑的广告内容
-function filterAdsFromM3U8(m3u8Content, strictMode = false) {
-    if (!m3u8Content) return '';
-
-    // 按行分割M3U8内容
-    const lines = m3u8Content.split('\n');
-    const filteredLines = [];
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // 只过滤#EXT-X-DISCONTINUITY标识
-        if (!line.includes('#EXT-X-DISCONTINUITY')) {
-            filteredLines.push(line);
-        }
-    }
-
-    return filteredLines.join('\n');
+// 保守模式：无法确认广告分片完整起止范围时，原样保留整个 M3U8。
+// #EXT-X-DISCONTINUITY 同时承担时间轴、编码、音轨、密钥和线路切换语义，
+// 单独删除它会导致后续正片分片被播放器丢弃或出现音画不同步。
+function filterAdsFromM3U8(m3u8Content) {
+    return typeof m3u8Content === 'string' ? m3u8Content : '';
 }
 
 
@@ -1439,53 +1425,88 @@ function closeEmbeddedPlayer() {
     return false;
 }
 
+function escapeResourceText(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getResourceDisplayName(sourceKey) {
+    if (sourceKey && API_SITES[sourceKey]) {
+        return API_SITES[sourceKey].name;
+    }
+
+    if (sourceKey && sourceKey.startsWith('custom_')) {
+        const customIndex = parseInt(sourceKey.replace('custom_', ''), 10);
+        return customAPIs[customIndex]?.name || '自定义资源';
+    }
+
+    return sourceKey || '未知资源';
+}
+
+function closeResourceModal() {
+    const modal = document.getElementById('modal');
+    const modalContent = document.getElementById('modalContent');
+    if (!modal) return;
+
+    modal.classList.add('hidden');
+    modal.style.display = '';
+    modal.setAttribute('aria-hidden', 'true');
+
+    if (resourceModalKeydownHandler) {
+        document.removeEventListener('keydown', resourceModalKeydownHandler, true);
+        resourceModalKeydownHandler = null;
+    }
+
+    if (modalContent && !resourceSwitchInProgress) {
+        modalContent.innerHTML = '';
+    }
+
+    if (resourceModalPreviousFocus && document.contains(resourceModalPreviousFocus)) {
+        resourceModalPreviousFocus.focus({ preventScroll: true });
+    }
+    resourceModalPreviousFocus = null;
+}
+
 function renderResourceInfoBar() {
-    // 获取容器元素
     const container = document.getElementById('resourceInfoBarContainer');
     if (!container) {
         console.error('找不到资源信息卡片容器');
         return;
     }
-    
-    // 获取当前视频 source_code
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentSource = getCurrentSourceCode(urlParams);
-    
-    // 显示临时加载状态
-    container.innerHTML = `
-      <div class="resource-info-bar-left flex">
-        <span>加载中...</span>
-        <span class="resource-info-bar-videos">-</span>
-      </div>
-      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()">
-        <span class="resource-switch-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </span>
-        切换资源
-      </button>
-    `;
 
-    // 查找当前源名称，从 API_SITES 和 custom_api 中查找即可
-    let resourceName = currentSource
-    if (currentSource && API_SITES[currentSource]) {
-        resourceName = API_SITES[currentSource].name;
-    }
-    if (resourceName === currentSource) {
-        const customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]');
-        const customIndex = parseInt(currentSource.replace('custom_', ''), 10);
-        if (customAPIs[customIndex]) {
-            resourceName = customAPIs[customIndex].name || '自定义资源';
-        }
-    }
+    const currentSource = getCurrentSourceCode(new URLSearchParams(window.location.search));
+    const resourceName = getResourceDisplayName(currentSource);
+    const recommendedSource = window.getDefaultRecommendedSource
+        ? window.getDefaultRecommendedSource()
+        : '';
+    const isDefaultRecommended = currentSource && currentSource === recommendedSource;
+    const regionLabel = window.getSourceRegionLabel
+        ? window.getSourceRegionLabel(currentSource)
+        : '普通线路';
+    const cachedSpeed = window.getCachedSourceSpeed
+        ? window.getCachedSourceSpeed(currentSource)
+        : null;
+    const speedLabel = cachedSpeed === null ? '未测速' : `${Math.round(cachedSpeed)}ms`;
 
     container.innerHTML = `
       <div class="resource-info-bar-left flex">
-        <span>${resourceName}</span>
-        <span class="resource-info-bar-videos">${currentEpisodes.length} 个视频</span>
+        <div class="resource-info-primary">
+          <span class="resource-info-name">${escapeResourceText(resourceName)}</span>
+          ${isDefaultRecommended ? '<span class="resource-info-recommended">默认推荐</span>' : ''}
+        </div>
+        <div class="resource-info-meta">
+          <span>${currentEpisodes.length} 集</span>
+          <span>${escapeResourceText(regionLabel)}</span>
+          <span>${escapeResourceText(speedLabel)}</span>
+        </div>
       </div>
-      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()">
-        <span class="resource-switch-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <button type="button" class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()" aria-haspopup="dialog">
+        <span class="resource-switch-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
         切换资源
       </button>
@@ -1616,8 +1637,16 @@ async function showSwitchResourceModal() {
     const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
 
-    modalTitle.innerHTML = `<span class="break-words">${currentVideoTitle}</span>`;
+    if (resourceSwitchInProgress) {
+        showToast('正在切换资源，请稍候', 'warning');
+        return;
+    }
+
+    resourceModalPreviousFocus = document.activeElement;
+    modalTitle.innerHTML = `<span class="break-words">${escapeResourceText(currentVideoTitle)}</span><span class="resource-modal-title-sub">选择可用线路</span>`;
     modal.classList.remove('hidden');
+    modal.style.display = '';
+    modal.setAttribute('aria-hidden', 'false');
 
     const orderedSourceKeys = window.getPreferredSourceOrder
         ? window.getPreferredSourceOrder(selectedAPIs)
@@ -1648,6 +1677,106 @@ async function showSwitchResourceModal() {
         <div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>
     `;
     const grid = document.getElementById('resource-grid');
+    let resourceModalHasFocusedCard = false;
+
+    function getFocusableResourceCards() {
+        return Array.from(grid.querySelectorAll('.resource-source-card:not(:disabled)'));
+    }
+
+    function focusPreferredResourceCard() {
+        if (resourceModalHasFocusedCard || !modal || modal.classList.contains('hidden')) return;
+        const cards = getFocusableResourceCards();
+        if (!cards.length) return;
+
+        const recommendedKey = getRecommendedSourceKeyForGrid();
+        const preferredCard = cards.find(card => card.dataset.sourceKey === recommendedKey) || cards[0];
+        preferredCard.focus({ preventScroll: true });
+        preferredCard.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        resourceModalHasFocusedCard = true;
+    }
+
+    function moveResourceFocus(direction) {
+        const cards = getFocusableResourceCards();
+        if (!cards.length) return;
+
+        const activeCard = document.activeElement?.classList?.contains('resource-source-card')
+            ? document.activeElement
+            : cards[0];
+        const currentRect = activeCard.getBoundingClientRect();
+        const currentCenter = {
+            x: currentRect.left + currentRect.width / 2,
+            y: currentRect.top + currentRect.height / 2
+        };
+
+        let bestCard = null;
+        let bestScore = Infinity;
+        cards.forEach(card => {
+            if (card === activeCard) return;
+            const rect = card.getBoundingClientRect();
+            const center = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+            const dx = center.x - currentCenter.x;
+            const dy = center.y - currentCenter.y;
+            const validDirection = (direction === 'left' && dx < -4)
+                || (direction === 'right' && dx > 4)
+                || (direction === 'up' && dy < -4)
+                || (direction === 'down' && dy > 4);
+            if (!validDirection) return;
+
+            const primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy);
+            const secondary = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx);
+            const score = primary + secondary * 2.5;
+            if (score < bestScore) {
+                bestScore = score;
+                bestCard = card;
+            }
+        });
+
+        if (bestCard) {
+            bestCard.focus({ preventScroll: true });
+            bestCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        }
+    }
+
+    resourceModalKeydownHandler = function (event) {
+        if (modal.classList.contains('hidden')) return;
+
+        const directionMap = {
+            ArrowLeft: 'left',
+            ArrowRight: 'right',
+            ArrowUp: 'up',
+            ArrowDown: 'down'
+        };
+        const direction = directionMap[event.key];
+        if (direction) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            moveResourceFocus(direction);
+            return;
+        }
+
+        const isConfirmKey = event.key === 'Enter' || event.key === ' ' || event.keyCode === 13 || event.keyCode === 23;
+        if (isConfirmKey && document.activeElement?.classList?.contains('resource-source-card')) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            document.activeElement.click();
+            return;
+        }
+
+        const isBackKey = event.key === 'Escape'
+            || event.key === 'BrowserBack'
+            || event.keyCode === 27
+            || event.keyCode === 461
+            || event.keyCode === 10009;
+        if (isBackKey) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (!resourceSwitchInProgress) closeResourceModal();
+        }
+    };
+    document.addEventListener('keydown', resourceModalKeydownHandler, true);
 
     function getOrderedGridKeys() {
         const availableKeys = Array.from(availableResults.keys());
@@ -1690,36 +1819,49 @@ async function showSwitchResourceModal() {
         const sourceRegionLabel = window.getSourceRegionLabel
             ? window.getSourceRegionLabel(sourceKey)
             : '普通线路';
+        const defaultRecommendedSource = window.getDefaultRecommendedSource
+            ? window.getDefaultRecommendedSource()
+            : '';
+        const isDefaultRecommended = sourceKey === defaultRecommendedSource;
         const isRecommended = getRecommendedSourceKeyForGrid() === sourceKey;
-        const speedHtml = nextSpeedResult
-            ? `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75">${formatSpeedDisplay(nextSpeedResult)}</div>`
-            : `<div class="absolute top-1 right-1 speed-badge bg-black bg-opacity-75"><span class="speed-indicator" style="color:#aaa">⏳</span></div>`;
+        const episodeCount = nextSpeedResult?.episodes || result.episodes?.length || 0;
+        const speedText = nextSpeedResult
+            ? formatSpeedDisplay(nextSpeedResult)
+            : '<span class="speed-indicator resource-speed-pending">测速中</span>';
 
         let card = document.getElementById(`rcard-${sourceKey}`);
         if (!card) {
-            card = document.createElement('div');
+            card = document.createElement('button');
+            card.type = 'button';
             card.id = `rcard-${sourceKey}`;
             grid.appendChild(card);
         }
 
-        card.className = `relative group ${isCurrent ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 transition-transform'}`;
-        card.onclick = isCurrent ? null : (() => switchToResource(sourceKey, result.vod_id));
+        card.className = `resource-source-card${isCurrent ? ' current' : ''}${isDefaultRecommended ? ' default-recommended' : ''}`;
+        card.disabled = isCurrent || resourceSwitchInProgress;
+        card.dataset.sourceKey = sourceKey;
+        card.dataset.vodId = result.vod_id;
+        card.setAttribute('aria-label', `${sourceName}，${sourceRegionLabel}${episodeCount ? `，${episodeCount}集` : ''}${isCurrent ? '，当前播放' : ''}${isDefaultRecommended ? '，默认推荐' : ''}`);
+        card.onclick = isCurrent ? null : (() => switchToResource(sourceKey, result.vod_id, card));
         card.innerHTML = `
-            <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
-                <img src="${result.vod_pic}" alt="${result.vod_name}" class="w-full h-full object-cover"
+            <div class="resource-source-poster">
+                <img src="${escapeResourceText(result.vod_pic || _FALLBACK_IMG)}" alt="${escapeResourceText(result.vod_name)}"
                      onerror="this.src='${_FALLBACK_IMG}'">
-                ${isRecommended ? '<div class="resource-recommend-badge">推荐</div>' : ''}
-                ${speedHtml}
+                <div class="resource-source-badges">
+                    ${isDefaultRecommended ? '<span class="resource-recommend-badge default">默认推荐</span>' : (isRecommended ? '<span class="resource-recommend-badge">推荐</span>' : '')}
+                    ${isCurrent ? '<span class="resource-current-badge">当前播放</span>' : ''}
+                </div>
+                <div class="resource-speed-badge">${speedText}</div>
+                <div class="resource-switching-state" aria-hidden="true"><span class="resource-switching-spinner"></span><span>正在切换</span></div>
             </div>
-            <div class="mt-2">
-                <div class="text-xs font-medium text-gray-200 truncate">${result.vod_name}</div>
-                <div class="text-[10px] text-gray-400 truncate">${sourceName}</div>
-                <div class="resource-region-tag">${sourceRegionLabel}</div>
-                <div class="text-[10px] text-gray-500 mt-1">${nextSpeedResult?.episodes ? nextSpeedResult.episodes + '集' : ''}</div>
-            </div>
-            ${isCurrent ? `<div class="absolute inset-0 flex items-center justify-center">
-                <div class="bg-blue-600 bg-opacity-75 rounded-lg px-2 py-0.5 text-xs text-white font-medium">当前播放</div>
-            </div>` : ''}`;
+            <div class="resource-source-copy">
+                <strong title="${escapeResourceText(result.vod_name)}">${escapeResourceText(result.vod_name)}</strong>
+                <span title="${escapeResourceText(sourceName)}">${escapeResourceText(sourceName)}</span>
+                <div class="resource-source-meta">
+                    <span class="resource-region-tag">${escapeResourceText(sourceRegionLabel)}</span>
+                    <span>${episodeCount ? `${episodeCount}集` : '集数待确认'}</span>
+                </div>
+            </div>`;
 
         syncCardOrder();
     }
@@ -1809,71 +1951,207 @@ async function showSwitchResourceModal() {
     }));
 
     if (!foundAny) {
-        modalContent.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa;">未找到匹配资源</div>';
+        modalContent.innerHTML = '<div class="resource-empty-state">未找到匹配资源，请返回后继续使用当前线路。</div>';
+    } else {
+        focusPreferredResourceCard();
     }
 }
 
-// 切换资源的函数（优化：原地换源，无整页跳转）
-async function switchToResource(sourceKey, vodId) {
-    document.getElementById('modal').classList.add('hidden');
+function waitForPlayerReady(timeoutMs = 12000) {
+    return new Promise((resolve, reject) => {
+        const video = art?.video;
+        if (!video) {
+            reject(new Error('播放器尚未就绪'));
+            return;
+        }
+
+        if (video.readyState >= 2 && !video.error) {
+            resolve();
+            return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+            clearTimeout(timer);
+            video.removeEventListener('loadeddata', handleReady);
+            video.removeEventListener('canplay', handleReady);
+            video.removeEventListener('playing', handleReady);
+            video.removeEventListener('error', handleError);
+        };
+        const handleReady = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+        };
+        const handleError = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error('目标线路无法播放'));
+        };
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error('目标线路加载超时'));
+        }, timeoutMs);
+
+        video.addEventListener('loadeddata', handleReady, { once: true });
+        video.addEventListener('canplay', handleReady, { once: true });
+        video.addEventListener('playing', handleReady, { once: true });
+        video.addEventListener('error', handleError, { once: true });
+    });
+}
+
+async function loadResourceIntoPlayer(videoUrl, restorePosition = 0) {
+    window.isSwitchingVideo = true;
+    if (isWebkit || !art) {
+        initPlayer(videoUrl);
+    } else {
+        art.switch = videoUrl;
+    }
+
+    await waitForPlayerReady();
+    if (restorePosition > 0 && art?.duration > restorePosition + 2) {
+        art.currentTime = restorePosition;
+    }
+    if (art?.play) {
+        art.play().catch(() => {});
+    }
+}
+
+function setResourceCardsSwitching(activeCard, isSwitching) {
+    document.querySelectorAll('.resource-source-card').forEach(card => {
+        card.disabled = isSwitching || card.classList.contains('current');
+        card.classList.toggle('is-switching', isSwitching && card === activeCard);
+        card.setAttribute('aria-busy', isSwitching && card === activeCard ? 'true' : 'false');
+    });
+}
+
+// 原地切换资源：目标线路确认可播放后才提交状态，失败时自动恢复旧线路。
+async function switchToResource(sourceKey, vodId, activeCard = null) {
+    if (resourceSwitchInProgress) {
+        showToast('正在切换资源，请勿重复操作', 'warning');
+        return;
+    }
+
+    const sourceName = getResourceDisplayName(sourceKey);
+    const snapshot = {
+        episodes: [...currentEpisodes],
+        episodeIndex: currentEpisodeIndex,
+        videoUrl: currentVideoUrl,
+        pageUrl: window.location.href,
+        position: art?.video?.currentTime || 0,
+        wasPaused: art?.video?.paused ?? false
+    };
+
+    let targetLoadStarted = false;
+    resourceSwitchInProgress = true;
+    setResourceCardsSwitching(activeCard, true);
     showLoading();
+    showToast(`正在切换到 ${sourceName}`, 'warning');
 
     try {
         let apiParams = '';
         if (sourceKey.startsWith('custom_')) {
             const customApi = getCustomApiInfo(sourceKey.replace('custom_', ''));
-            if (!customApi) { showToast('自定义API配置无效', 'error'); return; }
+            if (!customApi) throw new Error('自定义API配置无效');
             apiParams = customApi.detail
                 ? `&customApi=${encodeURIComponent(customApi.url)}&customDetail=${encodeURIComponent(customApi.detail)}&source=custom`
                 : `&customApi=${encodeURIComponent(customApi.url)}&source=custom`;
         } else {
-            apiParams = '&source=' + sourceKey;
+            apiParams = `&source=${encodeURIComponent(sourceKey)}`;
         }
 
-        const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`);
-        const data     = await response.json();
-
-        if (!data.episodes || data.episodes.length === 0) {
-            showToast('未找到播放资源', 'error');
-            return;
+        const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`, {
+            signal: AbortSignal.timeout(10000),
+            cache: 'no-cache'
+        });
+        if (!response.ok) {
+            throw new Error(`详情接口返回 ${response.status}`);
         }
 
-        const targetIndex = currentEpisodeIndex < data.episodes.length ? currentEpisodeIndex : 0;
-        const targetUrl   = data.episodes[targetIndex];
+        const data = await response.json();
+        if (!Array.isArray(data.episodes) || data.episodes.length === 0) {
+            throw new Error('该线路没有可用播放地址');
+        }
 
-        // ── 原地更新状态，不跳转页面 ─────────────────────────────────────
-        currentEpisodes     = data.episodes;
+        const targetIndex = Math.min(snapshot.episodeIndex, data.episodes.length - 1);
+        const targetUrl = data.episodes[targetIndex];
+        if (!targetUrl || typeof targetUrl !== 'string') {
+            throw new Error('目标播放地址无效');
+        }
+
+        targetLoadStarted = true;
+        await loadResourceIntoPlayer(targetUrl, snapshot.position);
+
+        // 目标线路已可播放，此时才原子提交应用状态。
+        currentEpisodes = data.episodes;
         currentEpisodeIndex = targetIndex;
-        currentVideoUrl     = targetUrl;
+        currentVideoUrl = targetUrl;
 
-        // 同步 URL 参数（不刷新）
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.set('id',     vodId);
+        const newUrl = new URL(snapshot.pageUrl);
+        newUrl.searchParams.set('id', vodId);
         newUrl.searchParams.set('source', sourceKey);
-        newUrl.searchParams.set('url',    targetUrl);
-        newUrl.searchParams.set('index',  targetIndex);
-        newUrl.searchParams.delete('position');
+        newUrl.searchParams.set('source_code', sourceKey);
+        newUrl.searchParams.set('url', targetUrl);
+        newUrl.searchParams.set('index', targetIndex);
+        if (snapshot.position > 0) {
+            newUrl.searchParams.set('position', Math.floor(snapshot.position));
+        } else {
+            newUrl.searchParams.delete('position');
+        }
         window.history.replaceState({}, '', newUrl.toString());
 
         try {
-            localStorage.setItem('currentEpisodes',     JSON.stringify(data.episodes));
-            localStorage.setItem('currentEpisodeIndex', targetIndex);
-            localStorage.setItem('currentSourceCode',   sourceKey);
-        } catch (e) {}
+            localStorage.setItem('currentEpisodes', JSON.stringify(data.episodes));
+            localStorage.setItem('currentEpisodeIndex', String(targetIndex));
+            localStorage.setItem('currentSourceCode', sourceKey);
+            localStorage.setItem('currentPlayingId', String(vodId));
+            localStorage.setItem('currentPlayingSource', sourceKey);
+        } catch (error) {}
 
-        // 切换视频流（无整页跳转）
-        if (isWebkit) { initPlayer(targetUrl); } else { art.switch = targetUrl; }
+        if (snapshot.wasPaused && art?.pause) {
+            art.pause();
+        }
 
         updateEpisodeInfo();
         updateButtonStates();
         renderEpisodes();
         renderResourceInfoBar();
-        showToast('已切换到新资源', 'success');
-
+        closeResourceModal();
+        showToast(`已切换到 ${sourceName}`, 'success');
     } catch (error) {
         console.error('切换资源失败:', error);
-        showToast('切换资源失败，请稍后重试', 'error');
+
+        // 若目标流已经替换进播放器，恢复旧流、旧集数、旧 URL 和原播放位置。
+        currentEpisodes = snapshot.episodes;
+        currentEpisodeIndex = snapshot.episodeIndex;
+        currentVideoUrl = snapshot.videoUrl;
+        window.history.replaceState({}, '', snapshot.pageUrl);
+
+        if (targetLoadStarted && snapshot.videoUrl) {
+            try {
+                await loadResourceIntoPlayer(snapshot.videoUrl, snapshot.position);
+                if (snapshot.wasPaused && art?.pause) art.pause();
+            } catch (rollbackError) {
+                console.error('恢复原播放源失败:', rollbackError);
+            }
+        }
+
+        updateEpisodeInfo();
+        updateButtonStates();
+        renderEpisodes();
+        renderResourceInfoBar();
+        showToast(`切换到 ${sourceName} 失败，已保留原播放源`, 'error');
     } finally {
+        window.isSwitchingVideo = false;
+        resourceSwitchInProgress = false;
+        setResourceCardsSwitching(null, false);
         hideLoading();
+        if (!document.getElementById('modal')?.classList.contains('hidden')) {
+            activeCard?.focus({ preventScroll: true });
+        }
     }
 }

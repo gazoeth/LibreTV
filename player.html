@@ -29,7 +29,7 @@
     </script>
     <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
-    <link rel="stylesheet" href="css/player.css?v=20260707-routing">
+    <link rel="stylesheet" href="css/player.css?v=20260730-switchsafe1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -295,12 +295,12 @@
 
 <!-- 换源模态框 -->
 <div id="modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[10000]"
-     style="backdrop-filter:blur(6px)">
-    <div class="bg-[#16161f] p-8 rounded-2xl w-11/12 max-w-4xl border border-[rgba(255,255,255,0.08)] max-h-[90vh] flex flex-col shadow-2xl">
+     style="backdrop-filter:blur(6px)" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="resource-modal-panel bg-[#16161f] p-8 rounded-2xl w-11/12 max-w-4xl border border-[rgba(255,255,255,0.08)] max-h-[90vh] flex flex-col shadow-2xl">
         <div class="flex justify-between items-center mb-6 flex-none">
-            <h2 id="modalTitle" class="text-xl font-bold text-white break-words pr-4 max-w-[80%]"></h2>
-            <button onclick="closeModal()"
-                    class="text-[#5a5a6e] hover:text-white text-2xl transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgba(255,255,255,0.06)]">
+            <h2 id="modalTitle" class="resource-modal-title text-xl font-bold text-white break-words pr-4 max-w-[80%]"></h2>
+            <button type="button" onclick="closeResourceModal()" aria-label="关闭资源选择"
+                    class="resource-modal-close text-[#5a5a6e] hover:text-white text-2xl transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgba(255,255,255,0.06)]">
                 &times;
             </button>
         </div>
@@ -334,7 +334,7 @@
         document.write('<script src="js/ui.js"><\/script>');
         document.write('<script src="js/api.js"><\/script>');
         document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
-        document.write('<script src="js/player.js?v=20260724-legacy"><\/script>');
+        document.write('<script src="js/player.js?v=20260730-switchsafe1"><\/script>');
         document.write('<script src="js/player-recommend.js"><\/script>');
     } else {
         document.write('<script src="js/legacy-compat.js"><\/script>');

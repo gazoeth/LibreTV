@@ -172,11 +172,51 @@ body, html {
 }
 
 .resource-info-bar-left {
-    align-items: center;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .32rem;
     font-size: 0.9rem;
     font-weight: 600;
     color: #f1f1f1;
     flex: 1;
+    min-width: 0;
+}
+
+.resource-info-primary,
+.resource-info-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+
+.resource-info-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: min(40vw, 28rem);
+}
+
+.resource-info-recommended {
+    padding: .12rem .45rem;
+    border-radius: 999px;
+    color: #ffe7a1;
+    background: rgba(245, 158, 11, .14);
+    border: 1px solid rgba(245, 158, 11, .38);
+    font-size: .66rem;
+    line-height: 1.3;
+}
+
+.resource-info-meta {
+    color: #8a8a9a;
+    font-size: .72rem;
+    font-weight: 400;
+}
+
+.resource-info-meta span + span::before {
+    content: "·";
+    margin-right: .45rem;
+    color: #4f4f60;
 }
 
 .resource-info-bar-videos {
@@ -430,13 +470,208 @@ input:checked + .slider:before { transform: translateX(20px); }
 .resource-region-tag {
     display: inline-flex;
     align-items: center;
-    margin-top: .25rem;
     padding: .12rem .45rem;
     border-radius: 999px;
     background: rgba(255,255,255,0.05);
-    color: #8a8a9a;
+    color: #a0a0b0;
     font-size: 10px;
     line-height: 1.4;
+}
+
+.resource-modal-title {
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+
+.resource-modal-title-sub {
+    color: #8a8a9a;
+    font-size: .72rem;
+    font-weight: 500;
+}
+
+#resource-grid {
+    align-items: stretch;
+}
+
+.resource-source-card {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    padding: .55rem;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+    color: #f5f5f7;
+    text-align: left;
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.resource-source-card:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,.22);
+    background: rgba(255,255,255,.065);
+}
+
+.resource-source-card:focus-visible {
+    outline: none;
+    transform: translateY(-3px) scale(1.015);
+    border-color: #fff;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 7px #e50914, 0 16px 34px rgba(0,0,0,.42);
+    z-index: 5;
+}
+
+.resource-source-card.current {
+    border-color: rgba(59,130,246,.72);
+    background: rgba(59,130,246,.1);
+}
+
+.resource-source-card.default-recommended {
+    border-color: rgba(245,158,11,.62);
+    box-shadow: inset 0 0 0 1px rgba(245,158,11,.16);
+}
+
+.resource-source-card:disabled {
+    cursor: not-allowed;
+}
+
+.resource-source-card.current:disabled {
+    opacity: .7;
+}
+
+.resource-source-poster {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #22222c;
+}
+
+.resource-source-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.resource-source-badges {
+    position: absolute;
+    top: .45rem;
+    left: .45rem;
+    right: .45rem;
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: .3rem;
+    z-index: 2;
+}
+
+.resource-source-badges .resource-recommend-badge {
+    position: static;
+}
+
+.resource-recommend-badge.default {
+    background: rgba(245,158,11,.92);
+    color: #241500;
+    box-shadow: 0 8px 18px rgba(245,158,11,.25);
+}
+
+.resource-current-badge {
+    padding: .18rem .5rem;
+    border-radius: 999px;
+    background: rgba(37,99,235,.92);
+    color: #fff;
+    font-size: .62rem;
+    font-weight: 700;
+}
+
+.resource-speed-badge {
+    position: absolute;
+    right: .45rem;
+    bottom: .45rem;
+    padding: .3rem .42rem;
+    border-radius: 7px;
+    background: rgba(0,0,0,.78);
+    backdrop-filter: blur(5px);
+    z-index: 2;
+}
+
+.resource-speed-pending {
+    color: #d0d0da;
+}
+
+.resource-source-copy {
+    display: flex;
+    flex-direction: column;
+    gap: .22rem;
+    padding: .55rem .08rem .05rem;
+    min-width: 0;
+}
+
+.resource-source-copy strong,
+.resource-source-copy > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.resource-source-copy strong {
+    font-size: .78rem;
+}
+
+.resource-source-copy > span,
+.resource-source-meta {
+    color: #8a8a9a;
+    font-size: .66rem;
+}
+
+.resource-source-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .35rem;
+    margin-top: .15rem;
+}
+
+.resource-switching-state {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: .55rem;
+    background: rgba(7,7,11,.78);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    z-index: 4;
+}
+
+.resource-source-card.is-switching .resource-switching-state {
+    display: flex;
+}
+
+.resource-switching-spinner {
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 3px solid rgba(255,255,255,.2);
+    border-top-color: #e50914;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+
+.resource-empty-state {
+    padding: 3rem 1rem;
+    color: #aaa;
+    text-align: center;
+}
+
+.resource-modal-close:focus-visible,
+.resource-switch-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
 }
 
 /* ── Footer ──────────────────────────────────────────────────── */
@@ -502,10 +737,25 @@ input:checked + .slider:before { transform: translateX(20px); }
         min-width: 0;
     }
 
+    .resource-info-name {
+        max-width: 78vw;
+    }
+
     .resource-info-bar-videos {
         display: block;
         margin-left: 0;
         margin-top: .2rem;
+    }
+
+    .resource-modal-panel {
+        width: calc(100% - 1rem) !important;
+        padding: 1rem !important;
+        max-height: 94vh !important;
+    }
+
+    #resource-grid {
+        gap: .75rem !important;
+        padding: .5rem !important;
     }
 
     .resource-switch-btn {
