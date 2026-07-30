@@ -6,6 +6,23 @@ const PR_TMDB_BASE = 'https://api.themoviedb.org/3';
 const PR_TMDB_IMG  = 'https://image.tmdb.org/t/p/w300';
 const PR_PER_PAGE  = 12;
 const PR_CACHE_TTL = 60 * 60 * 1000; // 1小时
+const PR_CACHE_KEY = 'playerTmdbRecommendCache';
+
+// 网络不可用、代理未配置或 TMDB 暂时失败时，至少保持推荐栏可用。
+const PR_FALLBACK_ITEMS = [
+    { title: '哪吒之魔童闹海', year: '2025', poster: '', rating: '8.5', type: 'movie' },
+    { title: '疯狂动物城2', year: '2025', poster: '', rating: '8.1', type: 'movie' },
+    { title: '鬼灭之刃：无限城篇', year: '2025', poster: '', rating: '8.2', type: 'movie' },
+    { title: '藏海传', year: '2025', poster: '', rating: '7.6', type: 'tv' },
+    { title: '折腰', year: '2025', poster: '', rating: '7.5', type: 'tv' },
+    { title: '生命树', year: '2026', poster: '', rating: '', type: 'tv' },
+    { title: '阿凡达3', year: '2025', poster: '', rating: '7.0', type: 'movie' },
+    { title: '罚罪2', year: '2025', poster: '', rating: '7.8', type: 'tv' },
+    { title: '挽救计划', year: '2026', poster: '', rating: '8.6', type: 'movie' },
+    { title: '骄阳似我', year: '2026', poster: '', rating: '', type: 'tv' },
+    { title: '玩具总动员5', year: '2026', poster: '', rating: '7.4', type: 'movie' },
+    { title: '太平年', year: '2026', poster: '', rating: '', type: 'tv' },
+];
 
 let _prPool    = [];
 let _prOffset  = 0;
@@ -34,10 +51,75 @@ async function _prProxyUrl(rawUrl) {
         + encodeURIComponent(rawUrl) + authSuffix;
 }
 
-// ── 加载数据：电影 + 剧集并发，走代理 ───────────────────────────────────────
+function _prFetchWithTimeout(url, timeoutMs) {
+    if (window.fetchWithLegacyTimeout) {
+        return window.fetchWithLegacyTimeout(url, {
+            headers: { Accept: 'application/json' },
+        }, timeoutMs);
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+}
+
+async function _prFetchTmdb(rawUrl) {
+    let directError = null;
+    try {
+        const directResponse = await _prFetchWithTimeout(rawUrl, 6000);
+        if (directResponse.ok) return directResponse.json();
+        directError = new Error(`TMDB HTTP ${directResponse.status}`);
+    } catch (error) {
+        directError = error;
+    }
+
+    try {
+        const proxyUrl = await _prProxyUrl(rawUrl);
+        const proxyResponse = await _prFetchWithTimeout(proxyUrl, 8000);
+        if (!proxyResponse.ok) throw new Error(`代理 HTTP ${proxyResponse.status}`);
+        return proxyResponse.json();
+    } catch (proxyError) {
+        throw new Error(`${directError?.message || 'TMDB直连失败'}；${proxyError.message}`);
+    }
+}
+
+function _prReadCache(allowExpired = false) {
+    try {
+        const cached = JSON.parse(localStorage.getItem(PR_CACHE_KEY) || 'null');
+        if (!cached || !Array.isArray(cached.items) || !cached.items.length) return null;
+        if (!allowExpired && Date.now() - cached.ts >= PR_CACHE_TTL) return null;
+        return cached;
+    } catch (error) {
+        return null;
+    }
+}
+
+function _prSaveCache(items) {
+    try {
+        localStorage.setItem(PR_CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
+    } catch (error) {}
+}
+
+function _prUseItems(items, timestamp = Date.now()) {
+    _prPool = items;
+    _prOffset = 0;
+    _prCacheTs = timestamp;
+    renderSideCards(_prPool.slice(0, PR_PER_PAGE));
+}
+
+// ── 加载数据：直连 TMDB 优先，代理备用，缓存与本地数据兜底 ──────────────────
 async function loadSideRecommend() {
     if (_prPool.length > 0 && (Date.now() - _prCacheTs) < PR_CACHE_TTL) {
         renderSideCards(_prPool.slice(0, PR_PER_PAGE));
+        return;
+    }
+
+    const freshCache = _prReadCache(false);
+    if (freshCache) {
+        _prUseItems(freshCache.items, freshCache.ts);
         return;
     }
 
@@ -45,24 +127,15 @@ async function loadSideRecommend() {
         const dateFilter = 'primary_release_date.gte=2025-01-01&primary_release_date.lte=2026-12-31';
         const tvFilter   = 'first_air_date.gte=2025-01-01&first_air_date.lte=2026-12-31';
         const common     = `api_key=${PR_TMDB_KEY}&language=zh-CN&sort_by=popularity.desc`;
-
         const movieUrl = `${PR_TMDB_BASE}/discover/movie?${common}&${dateFilter}&page=1`;
         const tvUrl    = `${PR_TMDB_BASE}/discover/tv?${common}&${tvFilter}&page=1`;
 
-        const [movieProxied, tvProxied] = await Promise.all([
-            _prProxyUrl(movieUrl),
-            _prProxyUrl(tvUrl),
+        const [movieResult, tvResult] = await Promise.allSettled([
+            _prFetchTmdb(movieUrl),
+            _prFetchTmdb(tvUrl),
         ]);
-
-        const [movieRes, tvRes] = await Promise.all([
-            fetch(movieProxied, { signal: AbortSignal.timeout(10000) }),
-            fetch(tvProxied,    { signal: AbortSignal.timeout(10000) }),
-        ]);
-
-        const [movieData, tvData] = await Promise.all([
-            movieRes.ok ? movieRes.json() : { results: [] },
-            tvRes.ok    ? tvRes.json()    : { results: [] },
-        ]);
+        const movieData = movieResult.status === 'fulfilled' ? movieResult.value : { results: [] };
+        const tvData = tvResult.status === 'fulfilled' ? tvResult.value : { results: [] };
 
         const toItem = (item, type) => ({
             title:  item.title || item.name || '未知',
@@ -71,26 +144,29 @@ async function loadSideRecommend() {
             rating: item.vote_average ? parseFloat(item.vote_average).toFixed(1) : '',
             type,
         });
-
-        // 电影剧集交错混排
-        const movies = (movieData.results || []).map(i => toItem(i, 'movie'));
-        const tvs    = (tvData.results    || []).map(i => toItem(i, 'tv'));
+        const movies = Array.isArray(movieData.results) ? movieData.results.map(i => toItem(i, 'movie')) : [];
+        const tvs = Array.isArray(tvData.results) ? tvData.results.map(i => toItem(i, 'tv')) : [];
         const merged = [];
         const maxLen = Math.max(movies.length, tvs.length);
         for (let i = 0; i < maxLen; i++) {
             if (movies[i]) merged.push(movies[i]);
-            if (tvs[i])    merged.push(tvs[i]);
+            if (tvs[i]) merged.push(tvs[i]);
         }
 
-        _prPool    = merged;
-        _prOffset  = 0;
-        _prCacheTs = Date.now();
+        if (!merged.length) {
+            const errors = [movieResult, tvResult]
+                .filter(result => result.status === 'rejected')
+                .map(result => result.reason?.message)
+                .filter(Boolean);
+            throw new Error(errors.join('；') || 'TMDB 未返回推荐数据');
+        }
 
-        renderSideCards(_prPool.slice(0, PR_PER_PAGE));
-    } catch (e) {
-        console.warn('侧栏推荐加载失败:', e.message);
-        document.getElementById('sideRecommendList').innerHTML =
-            '<p class="text-xs text-gray-600 text-center py-4">暂时无法加载推荐</p>';
+        _prSaveCache(merged);
+        _prUseItems(merged);
+    } catch (error) {
+        console.warn('侧栏推荐加载失败，使用缓存或本地推荐:', error.message);
+        const expiredCache = _prReadCache(true);
+        _prUseItems(expiredCache?.items?.length ? expiredCache.items : PR_FALLBACK_ITEMS, expiredCache?.ts || 0);
     }
 }
 
