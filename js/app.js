@@ -112,22 +112,59 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function createBuiltInAPICheckbox(apiKey, checked, labelClassName = 'text-gray-400') {
     const api = API_SITES[apiKey];
+    const recommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+    const isRecommended = recommendedSource === apiKey;
     const checkbox = document.createElement('div');
-    checkbox.className = 'api-checkbox-item';
+    checkbox.className = `api-checkbox-item${isRecommended ? ' is-default-recommended' : ''}`;
     checkbox.innerHTML = `
         <input type="checkbox" id="api_${apiKey}" 
                class="form-checkbox h-3 w-3 text-blue-600 bg-[#222] border border-[#333]" 
                ${checked ? 'checked' : ''} 
                data-api="${apiKey}">
         <label for="api_${apiKey}" class="text-xs ${labelClassName} truncate">${api.name}</label>
+        <button type="button" class="api-recommend-button${isRecommended ? ' active' : ''}" data-recommend-source="${apiKey}" aria-pressed="${isRecommended ? 'true' : 'false'}" title="${isRecommended ? '取消默认推荐' : '设为默认推荐'}">${isRecommended ? '已推荐' : '推荐'}</button>
     `;
 
     checkbox.querySelector('input').addEventListener('change', function () {
         updateSelectedAPIs();
         checkAdultAPIsSelected();
     });
+    checkbox.querySelector('[data-recommend-source]').addEventListener('click', function () {
+        setRecommendedSource(apiKey);
+    });
 
     return checkbox;
+}
+
+function getSourceDisplayName(sourceKey) {
+    if (!sourceKey) return '';
+    if (sourceKey.startsWith('custom_')) {
+        const customIndex = parseInt(sourceKey.replace('custom_', ''), 10);
+        return customAPIs[customIndex] ? customAPIs[customIndex].name : '';
+    }
+    return API_SITES[sourceKey] ? API_SITES[sourceKey].name : '';
+}
+
+function setRecommendedSource(sourceKey) {
+    const currentSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+    const nextSource = currentSource === sourceKey ? '' : sourceKey;
+    if (window.setDefaultRecommendedSource) {
+        window.setDefaultRecommendedSource(nextSource);
+    }
+
+    if (nextSource && !selectedAPIs.includes(nextSource)) {
+        selectedAPIs.unshift(nextSource);
+        localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+    }
+
+    selectedAPIs = window.getPreferredSourceOrder
+        ? window.getPreferredSourceOrder(selectedAPIs)
+        : selectedAPIs;
+    localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
+    initAPICheckboxes();
+    renderCustomAPIsList();
+    updateSelectedApiCount();
+    showToast(nextSource ? `已将 ${getSourceDisplayName(nextSource)} 设为默认推荐，搜索时优先展示` : '已取消默认推荐数据源', 'success');
 }
 
 function getNormalSourceGroups() {
@@ -141,6 +178,13 @@ function getNormalSourceGroups() {
 function updateSourceRecommendationStatus() {
     const statusEl = document.getElementById('siteStatus');
     if (!statusEl || !window.getUserPlaybackRegion) {
+        return;
+    }
+
+    const manualRecommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+    const manualRecommendedName = getSourceDisplayName(manualRecommendedSource);
+    if (manualRecommendedName) {
+        statusEl.innerHTML = `<span class="text-amber-300">默认推荐：${manualRecommendedName}</span>`;
         return;
     }
 
@@ -176,10 +220,12 @@ function initAPICheckboxes() {
         const groupMeta = groupConfig[groupKey];
         const groupSection = document.createElement('section');
         groupSection.className = 'api-group-shell';
-        const isRecommendedGroup = regionInfo && (
+        const manualRecommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+        const hasManualRecommendedSource = apiKeys.includes(manualRecommendedSource);
+        const isRecommendedGroup = hasManualRecommendedSource || (regionInfo && (
             (regionInfo.region === 'overseas' && groupKey === 'overseas')
             || (regionInfo.region === 'mainland' && groupKey === 'mainland')
-        );
+        ));
 
         groupSection.innerHTML = `
             <div class="api-group-head">
@@ -187,7 +233,7 @@ function initAPICheckboxes() {
                     <div class="api-group-title">${groupMeta.title}</div>
                     <div class="api-group-desc">${groupMeta.description}</div>
                 </div>
-                <span class="api-group-badge ${isRecommendedGroup ? '' : 'secondary'}">${isRecommendedGroup ? '当前优先' : `${apiKeys.length}条`}</span>
+                <span class="api-group-badge ${isRecommendedGroup ? '' : 'secondary'}">${hasManualRecommendedSource ? '含默认推荐' : (isRecommendedGroup ? '当前优先' : `${apiKeys.length}条`)}</span>
             </div>
             <div class="api-group-grid"></div>
         `;
@@ -202,9 +248,13 @@ function initAPICheckboxes() {
 
     const note = document.createElement('div');
     note.className = 'api-group-note';
-    note.textContent = regionInfo && regionInfo.detection === 'ip'
-        ? `已根据 ${regionInfo.label} 自动优先推荐更快线路，测速结果会继续刷新顺序。`
-        : '未读取到 IP 归属地，当前先按浏览器时区推荐线路，测速结果会继续刷新顺序。';
+    const manualRecommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+    const manualRecommendedName = getSourceDisplayName(manualRecommendedSource);
+    note.textContent = manualRecommendedName
+        ? `默认推荐：${manualRecommendedName}。聚合搜索会优先请求，并将该源结果排在最前。`
+        : (regionInfo && regionInfo.detection === 'ip'
+            ? `已根据 ${regionInfo.label} 自动优先推荐更快线路，测速结果会继续刷新顺序。`
+            : '未读取到 IP 归属地，当前先按浏览器时区推荐线路，测速结果会继续刷新顺序。');
     container.appendChild(note);
 
     updateSourceRecommendationStatus();
@@ -243,13 +293,16 @@ function addAdultAPI() {
             const checked = selectedAPIs.includes(apiKey);
 
             const checkbox = document.createElement('div');
-            checkbox.className = 'flex items-center';
+            const recommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+            const isRecommended = recommendedSource === apiKey;
+            checkbox.className = `api-checkbox-item${isRecommended ? ' is-default-recommended' : ''}`;
             checkbox.innerHTML = `
                 <input type="checkbox" id="api_${apiKey}" 
                        class="form-checkbox h-3 w-3 text-blue-600 bg-[#222] border border-[#333] api-adult" 
                        ${checked ? 'checked' : ''} 
                        data-api="${apiKey}">
                 <label for="api_${apiKey}" class="ml-1 text-xs text-pink-400 truncate">${api.name}</label>
+                <button type="button" class="api-recommend-button${isRecommended ? ' active' : ''}" data-recommend-source="${apiKey}" aria-pressed="${isRecommended ? 'true' : 'false'}">${isRecommended ? '已推荐' : '推荐'}</button>
             `;
             adultdiv.appendChild(checkbox);
 
@@ -257,6 +310,9 @@ function addAdultAPI() {
             checkbox.querySelector('input').addEventListener('change', function () {
                 updateSelectedAPIs();
                 checkAdultAPIsSelected();
+            });
+            checkbox.querySelector('[data-recommend-source]').addEventListener('click', function () {
+                setRecommendedSource(apiKey);
             });
         });
         container.appendChild(adultdiv);
@@ -326,8 +382,11 @@ function renderCustomAPIsList() {
 
     container.innerHTML = '';
     customAPIs.forEach((api, index) => {
+        const sourceKey = 'custom_' + index;
+        const recommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+        const isRecommended = recommendedSource === sourceKey;
         const apiItem = document.createElement('div');
-        apiItem.className = 'flex items-center justify-between p-1 mb-1 bg-[#222] rounded';
+        apiItem.className = `custom-api-item flex items-center justify-between p-1 mb-1 bg-[#222] rounded${isRecommended ? ' is-default-recommended' : ''}`;
         const textColorClass = api.isAdult ? 'text-pink-400' : 'text-white';
         const adultTag = api.isAdult ? '<span class="text-xs text-pink-400 mr-1">(18+)</span>' : '';
         // 新增 detail 地址显示
@@ -346,7 +405,8 @@ function renderCustomAPIsList() {
                     ${detailLine}
                 </div>
             </div>
-            <div class="flex items-center">
+            <div class="flex items-center custom-api-actions">
+                <button type="button" class="api-recommend-button${isRecommended ? ' active' : ''}" onclick="setRecommendedSource('${sourceKey}')" aria-pressed="${isRecommended ? 'true' : 'false'}">${isRecommended ? '已推荐' : '推荐'}</button>
                 <button class="text-blue-500 hover:text-blue-700 text-xs px-1" onclick="editCustomApi(${index})">✎</button>
                 <button class="text-red-500 hover:text-red-700 text-xs px-1" onclick="removeCustomApi(${index})">✕</button>
             </div>
@@ -457,11 +517,22 @@ function updateSelectedAPIs() {
     // 合并内置和自定义API
     selectedAPIs = [...orderedBuiltInApis, ...customApiIndices];
 
+    const recommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
+    const recommendationWasRemoved = recommendedSource && !selectedAPIs.includes(recommendedSource);
+    if (recommendationWasRemoved && window.setDefaultRecommendedSource) {
+        window.setDefaultRecommendedSource('');
+    }
+
     // 保存到localStorage
     localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
 
     // 更新显示选中的API数量
     updateSelectedApiCount();
+    updateSourceRecommendationStatus();
+    if (recommendationWasRemoved) {
+        initAPICheckboxes();
+        renderCustomAPIsList();
+    }
 }
 
 // 更新选中的API数量显示
@@ -557,6 +628,8 @@ function removeCustomApi(index) {
     if (index < 0 || index >= customAPIs.length) return;
 
     const apiName = customAPIs[index].name;
+    const removedSourceKey = 'custom_' + index;
+    const recommendedSource = window.getDefaultRecommendedSource ? window.getDefaultRecommendedSource() : '';
 
     // 从列表中移除API
     customAPIs.splice(index, 1);
@@ -579,8 +652,20 @@ function removeCustomApi(index) {
 
     localStorage.setItem('selectedAPIs', JSON.stringify(selectedAPIs));
 
+    if (window.setDefaultRecommendedSource && recommendedSource) {
+        if (recommendedSource === removedSourceKey) {
+            window.setDefaultRecommendedSource('');
+        } else if (recommendedSource.startsWith('custom_')) {
+            const recommendedIndex = parseInt(recommendedSource.replace('custom_', ''), 10);
+            if (recommendedIndex > index) {
+                window.setDefaultRecommendedSource('custom_' + (recommendedIndex - 1));
+            }
+        }
+    }
+
     // 重新渲染自定义API列表
     renderCustomAPIsList();
+    updateSourceRecommendationStatus();
 
     // 更新选中的API数量
     updateSelectedApiCount();
@@ -736,11 +821,60 @@ async function search() {
         let totalCount = 0;
         let hasAnyResult = false;
         let arrivalCounter = 0;
+        let activeQualityFilter = 'all';
+        let activeResultSort = 'quality';
         const resultBuckets = new Map();
+        const qualityFilterModes = [
+            { key: 'all', label: '全部质量', accepts: () => true },
+            { key: 'high', label: '1080P及以上', accepts: item => (item.__qualityRank || 0) >= 3 },
+            { key: 'uhd', label: '仅4K', accepts: item => item.__qualityKey === 'uhd' },
+            { key: 'known', label: '排除未知', accepts: item => (item.__qualityRank || 0) > 0 }
+        ];
+        const resultSortModes = [
+            { key: 'quality', label: '清晰度优先' },
+            { key: 'speed', label: '线路速度优先' },
+            { key: 'source', label: '资源站顺序' }
+        ];
+        const qualityFilterButton = document.getElementById('qualityFilterButton');
+        const qualitySortButton = document.getElementById('qualitySortButton');
+        const qualityFilterText = document.getElementById('qualityFilterText');
+        const qualitySortText = document.getElementById('qualitySortText');
+        const qualityFilterSummary = document.getElementById('qualityFilterSummary');
+        const searchResultsTotal = document.getElementById('searchResultsTotal');
         const orderedSelectedAPIs = window.getPreferredSourceOrder
             ? window.getPreferredSourceOrder(selectedAPIs)
             : [...selectedAPIs];
         const sourceRankMap = new Map(orderedSelectedAPIs.map((apiId, index) => [apiId, index]));
+
+        function updateResultControls(visibleCount, allCount) {
+            const activeFilter = qualityFilterModes.find(mode => mode.key === activeQualityFilter) || qualityFilterModes[0];
+            const activeSort = resultSortModes.find(mode => mode.key === activeResultSort) || resultSortModes[0];
+            if (qualityFilterText) qualityFilterText.textContent = activeFilter.label;
+            if (qualitySortText) qualitySortText.textContent = activeSort.label;
+            if (searchResultsTotal) searchResultsTotal.textContent = visibleCount < allCount ? ` / 原始 ${allCount}` : '';
+            if (qualityFilterSummary) {
+                qualityFilterSummary.textContent = `当前显示 ${visibleCount} 条；质量依据资源站标题与备注推断，线路速度为实测/缓存值`;
+            }
+        }
+
+        function cycleControl(items, currentKey) {
+            const currentIndex = items.findIndex(item => item.key === currentKey);
+            return items[(currentIndex + 1) % items.length].key;
+        }
+
+        if (qualityFilterButton) {
+            qualityFilterButton.onclick = function () {
+                activeQualityFilter = cycleControl(qualityFilterModes, activeQualityFilter);
+                renderSortedResults();
+            };
+        }
+        if (qualitySortButton) {
+            qualitySortButton.onclick = function () {
+                activeResultSort = cycleControl(resultSortModes, activeResultSort);
+                renderSortedResults();
+            };
+        }
+        updateResultControls(0, 0);
 
         // 流式渲染：每个 API 返回结果立刻追加到页面
         function appendResults(results) {
@@ -769,6 +903,8 @@ async function search() {
                 const speedInfo = window.formatSourceSpeedText
                     ? window.formatSourceSpeedText(item)
                     : { className: 'pending', text: '测速中' };
+                const qualityLabel = item.__qualityLabel || '质量未知';
+                const qualityClass = item.__qualityKey || 'unknown';
 
                 const div = document.createElement('div');
                 div.className = 'result-card tv-spatial-item group cursor-pointer';
@@ -802,6 +938,7 @@ async function search() {
                             ${sourceInfo ? `<span class="result-source-tag">${sourceInfo}</span>` : ''}
                             ${item.vod_year ? `<span class="result-year-tag">${item.vod_year}</span>` : ''}
                         </div>
+                        <div class="result-quality-badge ${qualityClass}">${qualityLabel}</div>
                         <div class="result-speed-badge">
                             <span class="result-speed-indicator ${speedInfo.className}">${speedInfo.text}</span>
                         </div>
@@ -825,12 +962,18 @@ async function search() {
             const mergedResults = [];
             resultBuckets.forEach(items => mergedResults.push(...items));
 
-            const sortedResults = sortSearchResultsBySpeed(mergedResults);
+            const activeFilter = qualityFilterModes.find(mode => mode.key === activeQualityFilter) || qualityFilterModes[0];
+            const filteredResults = mergedResults.filter(activeFilter.accepts);
+            const sortedResults = window.sortSearchResults
+                ? window.sortSearchResults(filteredResults, activeResultSort)
+                : sortSearchResultsBySpeed(filteredResults);
             resultsDiv.innerHTML = '';
             totalCount = 0;
+            updateResultControls(sortedResults.length, mergedResults.length);
 
             if (sortedResults.length === 0) {
                 if (searchResultsCount) searchResultsCount.textContent = '0';
+                resultsDiv.innerHTML = '<div class="results-empty-filter">当前质量条件下没有结果，请切换“视频质量”继续查看。</div>';
                 return;
             }
 
@@ -856,8 +999,12 @@ async function search() {
                         ? item.__sourceSpeedScore
                         : (item.__searchResponseTime != null ? item.__searchResponseTime : Number.POSITIVE_INFINITY));
 
+                const qualityItem = window.enrichSearchResultQuality
+                    ? window.enrichSearchResultQuality(item)
+                    : { ...item, __qualityKey: 'unknown', __qualityRank: 0, __qualityLabel: '质量未知' };
+
                 return {
-                    ...item,
+                    ...qualityItem,
                     __groupIndex: sourceRankMap.has(sourceCode)
                         ? sourceRankMap.get(sourceCode)
                         : (Number.isFinite(sourceIndex) ? sourceIndex : selectedAPIs.indexOf(sourceCode)),
@@ -917,6 +1064,11 @@ async function search() {
                 searchByAPIAndKeyWord(apiId, query).then(results => collectResults(results, apiId, sourceIndex))
             )
         );
+
+        if (hasAnyResult && qualityFilterButton && typeof focusTvElement === 'function') {
+            document.body.classList.add('tv-navigation-active');
+            focusTvElement(qualityFilterButton);
+        }
 
         // 全部完成后若无结果
         if (!hasAnyResult) {
@@ -1450,6 +1602,7 @@ async function exportConfig() {
     const settingsToExport = [
         'selectedAPIs',
         'customAPIs',
+        'defaultRecommendedSource',
         'yellowFilterEnabled',
         'adFilteringEnabled',
         'doubanEnabled',

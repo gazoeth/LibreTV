@@ -1,5 +1,27 @@
 const SOURCE_SPEED_CACHE_KEY = 'sourceSpeedCache.v1';
 const SOURCE_SPEED_CACHE_TTL = 24 * 60 * 60 * 1000;
+const DEFAULT_RECOMMENDED_SOURCE_KEY = 'defaultRecommendedSource';
+
+function getDefaultRecommendedSource() {
+    try {
+        return localStorage.getItem(DEFAULT_RECOMMENDED_SOURCE_KEY) || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+function setDefaultRecommendedSource(sourceKey) {
+    try {
+        if (sourceKey) {
+            localStorage.setItem(DEFAULT_RECOMMENDED_SOURCE_KEY, sourceKey);
+        } else {
+            localStorage.removeItem(DEFAULT_RECOMMENDED_SOURCE_KEY);
+        }
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
 
 function getNowMs() {
     return Date.now();
@@ -265,8 +287,17 @@ function getPreferredSourceOrder(sourceKeys, options = {}) {
     const playbackRegion = options.playbackRegion || getUserPlaybackRegion().region;
     const speedMap = options.speedMap || null;
     const allowSpeedSort = options.allowSpeedSort !== false;
+    const recommendedSource = options.recommendedSource === undefined
+        ? getDefaultRecommendedSource()
+        : options.recommendedSource;
 
     return uniqueSourceKeys.sort((left, right) => {
+        const leftIsRecommended = left === recommendedSource;
+        const rightIsRecommended = right === recommendedSource;
+        if (leftIsRecommended !== rightIsRecommended) {
+            return leftIsRecommended ? -1 : 1;
+        }
+
         const leftPriority = getSourcePriority(left, playbackRegion);
         const rightPriority = getSourcePriority(right, playbackRegion);
         if (leftPriority !== rightPriority) {
@@ -357,28 +388,72 @@ function formatSourceSpeedText(item) {
     };
 }
 
-function sortSearchResultsBySpeed(items) {
+const SEARCH_QUALITY_LEVELS = [
+    { key: 'uhd', rank: 4, label: '4K', pattern: /(?:^|[^0-9])(2160p?|4k|uhd)(?:[^0-9]|$)|蓝光原盘|杜比视界|dolby\s*vision/i },
+    { key: 'fhd', rank: 3, label: '1080P', pattern: /(?:^|[^0-9])(1080p?|full\s*hd|fhd)(?:[^0-9]|$)|蓝光|超清/i },
+    { key: 'hd', rank: 2, label: '720P', pattern: /(?:^|[^0-9])(720p?|hd)(?:[^0-9]|$)|高清/i },
+    { key: 'sd', rank: 1, label: '标清', pattern: /(?:^|[^0-9])(480p?|360p?|sd|dvd|vcd|cam|ts|tc)(?:[^0-9]|$)|标清|枪版/i }
+];
+
+function inferSearchResultQuality(item) {
+    const text = [
+        item && item.vod_remarks,
+        item && item.vod_name,
+        item && item.type_name,
+        item && item.vod_play_note,
+        item && item.vod_play_from
+    ].filter(Boolean).join(' ');
+    const matched = SEARCH_QUALITY_LEVELS.find(level => level.pattern.test(text));
+
+    return matched || {
+        key: 'unknown',
+        rank: 0,
+        label: '质量未知'
+    };
+}
+
+function enrichSearchResultQuality(item) {
+    const quality = inferSearchResultQuality(item);
+    return {
+        ...item,
+        __qualityKey: quality.key,
+        __qualityRank: quality.rank,
+        __qualityLabel: quality.label
+    };
+}
+
+function sortSearchResults(items, sortMode = 'quality') {
+    const recommendedSource = getDefaultRecommendedSource();
     return [...items].sort((left, right) => {
-        const leftGroup = Number.isFinite(left && left.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
-        const rightGroup = Number.isFinite(right && right.__groupIndex) ? right.__groupIndex : Number.MAX_SAFE_INTEGER;
-        if (leftGroup !== rightGroup) {
-            return leftGroup - rightGroup;
+        const leftIsRecommended = left && left.source_code === recommendedSource;
+        const rightIsRecommended = right && right.source_code === recommendedSource;
+        if (leftIsRecommended !== rightIsRecommended) {
+            return leftIsRecommended ? -1 : 1;
         }
 
-        const leftSpeed = getItemSourceSpeedScore(left);
-        const rightSpeed = getItemSourceSpeedScore(right);
-        if (leftSpeed !== rightSpeed) {
-            return leftSpeed - rightSpeed;
+        if (sortMode === 'quality') {
+            const qualityDifference = (right.__qualityRank || 0) - (left.__qualityRank || 0);
+            if (qualityDifference !== 0) return qualityDifference;
         }
+
+        if (sortMode === 'speed' || sortMode === 'quality') {
+            const leftSpeed = getItemSourceSpeedScore(left);
+            const rightSpeed = getItemSourceSpeedScore(right);
+            if (leftSpeed !== rightSpeed) return leftSpeed - rightSpeed;
+        }
+
+        const leftGroup = Number.isFinite(left && left.__groupIndex) ? left.__groupIndex : Number.MAX_SAFE_INTEGER;
+        const rightGroup = Number.isFinite(right && right.__groupIndex) ? right.__groupIndex : Number.MAX_SAFE_INTEGER;
+        if (leftGroup !== rightGroup) return leftGroup - rightGroup;
 
         const leftArrival = Number.isFinite(left && left.__arrivalIndex) ? left.__arrivalIndex : Number.MAX_SAFE_INTEGER;
         const rightArrival = Number.isFinite(right && right.__arrivalIndex) ? right.__arrivalIndex : Number.MAX_SAFE_INTEGER;
-        if (leftArrival !== rightArrival) {
-            return leftArrival - rightArrival;
-        }
-
-        return 0;
+        return leftArrival - rightArrival;
     });
+}
+
+function sortSearchResultsBySpeed(items) {
+    return sortSearchResults(items, 'speed');
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
@@ -484,11 +559,16 @@ async function testSourceConnectionSpeed(sourceKey, vodId, options = {}) {
     }
 }
 
+window.getDefaultRecommendedSource = getDefaultRecommendedSource;
+window.setDefaultRecommendedSource = setDefaultRecommendedSource;
 window.getSourceSpeedCacheEntry = getSourceSpeedCacheEntry;
 window.getCachedSourceSpeed = getCachedSourceSpeed;
 window.updateSourceSpeedCache = updateSourceSpeedCache;
 window.getItemSourceSpeedScore = getItemSourceSpeedScore;
 window.formatSourceSpeedText = formatSourceSpeedText;
+window.inferSearchResultQuality = inferSearchResultQuality;
+window.enrichSearchResultQuality = enrichSearchResultQuality;
+window.sortSearchResults = sortSearchResults;
 window.sortSearchResultsBySpeed = sortSearchResultsBySpeed;
 window.testSourceConnectionSpeed = testSourceConnectionSpeed;
 window.getUserPlaybackRegion = getUserPlaybackRegion;

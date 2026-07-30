@@ -258,6 +258,22 @@ function initTvRemoteNavigation() {
             || event.keyCode === 13
             || event.keyCode === 32;
 
+        var isBackKey = event.key === 'Escape'
+            || event.key === 'BrowserBack'
+            || event.keyCode === 27
+            || event.keyCode === 461
+            || event.keyCode === 10009;
+
+        if (isBackKey) {
+            var resultsArea = document.getElementById('resultsArea');
+            var hasOpenOverlay = getTvNavigationScope() !== document;
+            if (resultsArea && !resultsArea.classList.contains('hidden') && !hasOpenOverlay) {
+                event.preventDefault();
+                if (typeof resetToHome === 'function') resetToHome();
+            }
+            return;
+        }
+
         if (!isConfirmKey) return;
 
         var activeElement = document.activeElement;

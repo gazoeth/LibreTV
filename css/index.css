@@ -578,6 +578,81 @@
     font-weight: 600;
 }
 
+.results-total {
+    color: #686879;
+}
+
+.results-remote-hint {
+    color: #77778a;
+    font-size: .72rem;
+    white-space: nowrap;
+}
+
+.results-toolbar {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: 1.35rem;
+    padding: .85rem;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 14px;
+    background: rgba(21, 21, 29, .92);
+}
+
+.results-filter-button {
+    min-width: 10.5rem;
+    min-height: 3.4rem;
+    padding: .6rem .85rem;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 10px;
+    background: #22222c;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.results-filter-button:hover,
+.results-filter-button:focus {
+    border-color: rgba(229, 9, 20, .75);
+    background: #2a2228;
+}
+
+.results-filter-kicker,
+.results-filter-value {
+    display: block;
+}
+
+.results-filter-kicker {
+    margin-bottom: .18rem;
+    color: #858596;
+    font-size: .65rem;
+}
+
+.results-filter-value {
+    color: #f4f4f7;
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.results-filter-summary {
+    flex: 1 1 16rem;
+    display: flex;
+    align-items: center;
+    min-height: 3.4rem;
+    padding: .55rem .75rem;
+    color: #858596;
+    font-size: .7rem;
+    line-height: 1.5;
+}
+
+.results-empty-filter {
+    grid-column: 1 / -1;
+    padding: 4rem 1rem;
+    color: #9292a3;
+    text-align: center;
+}
+
 /* 搜索结果海报卡片网格 */
 .results-grid {
     display: grid;
@@ -767,9 +842,44 @@
     z-index: 2;
 }
 
-.result-speed-badge {
+.result-quality-badge {
     position: absolute;
     top: .4rem;
+    right: .4rem;
+    z-index: 3;
+    padding: .22rem .46rem;
+    border-radius: 999px;
+    background: rgba(17, 17, 24, .86);
+    color: #c4c4ce;
+    font-size: .62rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .28);
+}
+
+.result-quality-badge.uhd {
+    background: rgba(229, 9, 20, .9);
+    color: #fff;
+}
+
+.result-quality-badge.fhd {
+    background: rgba(37, 99, 235, .9);
+    color: #fff;
+}
+
+.result-quality-badge.hd {
+    background: rgba(5, 150, 105, .9);
+    color: #fff;
+}
+
+.result-quality-badge.sd {
+    background: rgba(180, 83, 9, .9);
+    color: #fff;
+}
+
+.result-speed-badge {
+    position: absolute;
+    top: 2rem;
     right: .4rem;
     z-index: 2;
     padding: .2rem .42rem;
@@ -2028,7 +2138,51 @@ body.tv-navigation-active .trending-card:focus > div:first-child,
 body.tv-navigation-active .douban-card:focus > div:first-child,
 body.tv-navigation-active .result-card:focus .result-poster {
     transform: scale(1.04);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, .48);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .48), 0 0 0 4px #fff, 0 0 0 8px #e50914;
+}
+
+body.tv-navigation-active .result-card:focus .result-poster-overlay {
+    opacity: 1;
+}
+
+body.tv-navigation-active .result-card:focus .result-card-name {
+    color: #fff;
+}
+
+@media (max-width: 700px) {
+    .results-header {
+        align-items: flex-start;
+    }
+
+    .results-remote-hint {
+        display: none;
+    }
+
+    .results-filter-button {
+        flex: 1 1 calc(50% - .75rem);
+        min-width: 8rem;
+    }
+
+    .results-filter-summary {
+        flex-basis: 100%;
+        min-height: auto;
+        padding: .2rem .15rem;
+    }
+}
+
+@media (min-width: 1200px) and (min-height: 650px) {
+    .results-inner {
+        max-width: 1180px;
+    }
+
+    .results-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 1.35rem;
+    }
+
+    .result-card-name {
+        font-size: .9rem;
+    }
 }
 
 @media (max-width: 900px) {

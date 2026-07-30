@@ -33,8 +33,8 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="css/styles.css?v=20260724-fix1">
-    <link rel="stylesheet" href="css/index.css?v=20260724-fix1">
+    <link rel="stylesheet" href="css/styles.css?v=20260730-recommend1">
+    <link rel="stylesheet" href="css/index.css?v=20260730-tvsearch1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
 </head>
 
@@ -367,12 +367,31 @@
             <div id="resultsArea" class="w-full hidden">
                 <div class="results-inner">
                     <div class="results-header">
-                        <h2 class="results-label">搜索结果</h2>
-                        <div class="results-count">
-                            共 <span id="searchResultsCount" class="results-count-num">0</span> 个结果
+                        <div>
+                            <h2 class="results-label">搜索结果</h2>
+                            <div class="results-count">
+                                共 <span id="searchResultsCount" class="results-count-num">0</span> 个结果
+                                <span id="searchResultsTotal" class="results-total"></span>
+                            </div>
                         </div>
+                        <div class="results-remote-hint">方向键选择 · 确认键切换</div>
                     </div>
-                    <div id="results" class="results-grid"></div>
+                    <div class="results-toolbar" role="toolbar" aria-label="搜索结果筛选与排序">
+                        <button id="qualityFilterButton" type="button" class="results-filter-button tv-spatial-item" data-tv-default>
+                            <span class="results-filter-kicker">视频质量</span>
+                            <span id="qualityFilterText" class="results-filter-value">全部质量</span>
+                        </button>
+                        <button id="qualitySortButton" type="button" class="results-filter-button tv-spatial-item">
+                            <span class="results-filter-kicker">排序方式</span>
+                            <span id="qualitySortText" class="results-filter-value">清晰度优先</span>
+                        </button>
+                        <button type="button" class="results-filter-button results-back-button tv-spatial-item" onclick="resetToHome()">
+                            <span class="results-filter-kicker">返回</span>
+                            <span class="results-filter-value">回到首页</span>
+                        </button>
+                        <div id="qualityFilterSummary" class="results-filter-summary" aria-live="polite">质量依据资源站标题与备注推断</div>
+                    </div>
+                    <div id="results" class="results-grid" aria-live="polite"></div>
                 </div>
             </div>
 
@@ -478,8 +497,8 @@
     <script src="js/trending.js?v=20260724-tvhub3"></script>
     <script src="js/douban.js?v=20260724-tvhub3"></script>
     <script src="js/password.js"></script>
-    <script src="js/search.js?v=20260707-routing"></script>
-    <script src="js/app.js?v=20260724-tvhub3"></script>
+    <script src="js/search.js?v=20260730-recommend1"></script>
+    <script src="js/app.js?v=20260730-recommend1"></script>
     <script src="js/pwa-register.js"></script>
 
     <script>
@@ -490,7 +509,7 @@
         window.__ENV__.GEO_SOURCE = window.__ENV__.GEO_SOURCE || '';
     </script>
 
-    <script src="js/index-page.js?v=20260724-tvhub3"></script>
+    <script src="js/index-page.js?v=20260730-tvsearch1"></script>
 </body>
 
 </html>

@@ -278,6 +278,36 @@ body {
     flex: 1;
     min-width: 0;
 }
+.api-checkbox-item.is-default-recommended,
+.custom-api-item.is-default-recommended {
+    border-color: rgba(245, 158, 11, .62);
+    background: rgba(245, 158, 11, .1);
+    box-shadow: inset 3px 0 0 #f59e0b;
+}
+.api-recommend-button {
+    flex: 0 0 auto;
+    min-height: 1.7rem;
+    padding: .22rem .42rem;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    background: rgba(255, 255, 255, .05);
+    color: #8d8d9d;
+    font-size: .62rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.api-recommend-button:hover,
+.api-recommend-button:focus,
+.api-recommend-button.active {
+    border-color: rgba(245, 158, 11, .72);
+    background: rgba(245, 158, 11, .18);
+    color: #fbbf24;
+}
+.custom-api-actions {
+    grid-gap: .2rem;
+    gap: .2rem;
+    margin-left: .35rem;
+}
 .api-group-note {
     padding: .62rem .72rem;
     border-radius: 12px;
