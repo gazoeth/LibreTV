@@ -1288,6 +1288,13 @@ const HLS_SOURCE_FILTER_PROFILES = {
     // 360资源在多个真实样例中固定插入同一目录的 4 分片、约 17.57 秒广告块。
     zy360: {
         explicitAdPathPatterns: [/\/20260726\/1AS9nSvi\/hls\//i]
+    },
+    // 原系统对红牛资源的有效兼容方式：只移除时间轴断点标记，不删除断点前后的任何媒体分片。
+    hongniu2: {
+        stripDiscontinuityMarkers: true
+    },
+    hongniu3: {
+        stripDiscontinuityMarkers: true
     }
 };
 
@@ -1411,14 +1418,24 @@ function isHlsAdBreakEnd(line) {
 }
 
 // 安全分片过滤：仅删除具有明确广告信号的媒体分片。
-// 不按时长猜测，不删除 #EXT-X-DISCONTINUITY、密钥、映射、音轨或播放线路标签。
+// 默认不按时长猜测，也不删除结构标签；红牛 profile 仅兼容性移除 DISCONTINUITY 标记，绝不删除相邻分片。
 function filterAdsFromM3U8(m3u8Content, options = {}) {
     if (typeof m3u8Content !== 'string' || !m3u8Content.includes('#EXTM3U')) {
         return typeof m3u8Content === 'string' ? m3u8Content : '';
     }
 
     const sourceKey = options.sourceKey || getCurrentSourceCode();
-    const sourceLines = removeRepeatedForeignDiscontinuityBlocks(m3u8Content.split(/\r?\n/), sourceKey);
+    const profile = getHlsSourceFilterProfile(sourceKey);
+    let removedDiscontinuityMarkers = 0;
+    let sourceLines = m3u8Content.split(/\r?\n/);
+    if (profile?.stripDiscontinuityMarkers) {
+        sourceLines = sourceLines.filter(line => {
+            const isDiscontinuity = /^\s*#EXT-X-DISCONTINUITY\s*$/i.test(line);
+            if (isDiscontinuity) removedDiscontinuityMarkers++;
+            return !isDiscontinuity;
+        });
+    }
+    sourceLines = removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey);
     const output = [];
     let pendingSegmentTags = [];
     let insideExplicitAdBreak = false;
@@ -1481,6 +1498,9 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
     flushPending();
     if (removedSegments > 0) {
         console.info(`HLS 分片广告过滤：移除 ${removedSegments} 个明确广告分片`);
+    }
+    if (removedDiscontinuityMarkers > 0) {
+        console.info(`HLS ${sourceKey} 兼容过滤：移除 ${removedDiscontinuityMarkers} 个时间轴断点标记，媒体分片保持不变`);
     }
     return output.join('\n');
 }
