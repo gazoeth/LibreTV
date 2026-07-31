@@ -336,6 +336,147 @@ body, html {
     box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
 }
 
+.visual-clean-confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10020;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(5,5,9,.86);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+}
+
+.visual-clean-confirm-modal.hidden {
+    display: none;
+}
+
+.visual-clean-confirm-panel {
+    width: min(92vw, 34rem);
+    padding: 1.5rem;
+    border: 1px solid rgba(245,158,11,.30);
+    border-radius: 16px;
+    background: #16161f;
+    box-shadow: 0 24px 70px rgba(0,0,0,.55);
+}
+
+.visual-clean-confirm-badge {
+    display: inline-flex;
+    margin-bottom: .75rem;
+    padding: .25rem .55rem;
+    border-radius: 999px;
+    color: #ffe4a0;
+    background: rgba(245,158,11,.12);
+    border: 1px solid rgba(245,158,11,.3);
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.visual-clean-confirm-panel h2 {
+    margin: 0 0 .65rem;
+    color: #f5f5f7;
+    font-size: 1.25rem;
+    line-height: 1.35;
+}
+
+.visual-clean-confirm-panel p {
+    margin: 0;
+    color: #b5b5c2;
+    font-size: .9rem;
+    line-height: 1.75;
+}
+
+.visual-clean-confirm-panel .visual-clean-confirm-note {
+    margin-top: .7rem;
+    color: #717181;
+    font-size: .75rem;
+}
+
+.visual-clean-confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-top: 1.25rem;
+}
+
+.visual-clean-confirm-action {
+    min-height: 42px;
+    padding: .65rem 1rem;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 10px;
+    color: #d8d8df;
+    background: rgba(255,255,255,.06);
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 700;
+}
+
+.visual-clean-confirm-action.primary {
+    color: #fff;
+    border-color: #e50914;
+    background: #e50914;
+}
+
+.visual-clean-confirm-action.danger {
+    color: #d0a5a5;
+}
+
+.visual-clean-confirm-action:focus,
+.visual-clean-confirm-action:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+}
+
+.visual-clean-editor-panel {
+    width: min(94vw, 42rem);
+}
+
+.visual-clean-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+    margin-top: 1.15rem;
+}
+
+.visual-clean-option {
+    min-height: 46px;
+    padding: .7rem .8rem;
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 10px;
+    color: #c8c8d2;
+    background: rgba(255,255,255,.045);
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.visual-clean-option.is-selected {
+    color: #fff4d0;
+    border-color: rgba(245,158,11,.72);
+    background: rgba(245,158,11,.16);
+}
+
+.visual-clean-option:focus,
+.visual-clean-option:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+}
+
+@media (max-width: 640px) {
+    .visual-clean-confirm-actions {
+        flex-direction: column;
+    }
+    .visual-clean-confirm-action {
+        width: 100%;
+    }
+    .visual-clean-options {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* ── Episode navigation buttons ──────────────────────────────── */
 #prevButton, #nextButton {
     background: rgba(255,255,255,0.05) !important;

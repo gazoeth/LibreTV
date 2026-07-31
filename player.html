@@ -29,7 +29,7 @@
     </script>
     <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
-    <link rel="stylesheet" href="css/player.css?v=20260730-cleanscreen1">
+    <link rel="stylesheet" href="css/player.css?v=20260731-adclean3">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -154,9 +154,9 @@
                     </div>
                     <!-- 工具按钮组 -->
                     <div class="flex flex-wrap justify-end gap-2">
-                        <button id="visualCleanButton" type="button" onclick="cycleVisualCleanMode()"
+                        <button id="visualCleanButton" type="button" onclick="openVisualCleanEditor()"
                                 class="visual-clean-button flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg"
-                                aria-label="画面净化：关闭" title="切换跑马灯裁切或贴片遮罩">
+                                aria-label="打开画面净化设置" title="预览并选择跑马灯裁切或贴片遮罩">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
                                 <rect x="2.5" y="3.5" width="15" height="13" rx="2" stroke-width="1.5"/>
                                 <path d="M5 13h10M13 6l2 2-2 2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -320,6 +320,35 @@
     </div>
 </div>
 
+<!-- 画面净化设置：用户主动打开、实时预览，保存后按资源站记忆 -->
+<div id="visualCleanEditorModal" class="visual-clean-confirm-modal hidden" role="dialog" aria-modal="true"
+     aria-labelledby="visualCleanEditorTitle" aria-describedby="visualCleanEditorDescription" aria-hidden="true">
+    <div class="visual-clean-confirm-panel visual-clean-editor-panel">
+        <div class="visual-clean-confirm-badge">实时预览</div>
+        <h2 id="visualCleanEditorTitle">画面净化设置</h2>
+        <p id="visualCleanEditorDescription">选择后会立即预览；只有点击“保存到此资源站”才会记忆。黑色遮罩适合角落贴片，裁切适合顶部或底部跑马灯。</p>
+        <div class="visual-clean-options" role="radiogroup" aria-label="画面净化方案">
+            <button type="button" class="visual-clean-option" data-mode="off" role="radio" aria-checked="true" onclick="selectVisualCleanPreview('off', this)">关闭</button>
+            <button type="button" class="visual-clean-option" data-mode="bottom-right" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('bottom-right', this)">右下角遮罩</button>
+            <button type="button" class="visual-clean-option" data-mode="bottom-left" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('bottom-left', this)">左下角遮罩</button>
+            <button type="button" class="visual-clean-option" data-mode="top-right" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('top-right', this)">右上角遮罩</button>
+            <button type="button" class="visual-clean-option" data-mode="top-left" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('top-left', this)">左上角遮罩</button>
+            <button type="button" class="visual-clean-option" data-mode="crop-bottom" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('crop-bottom', this)">底部跑马灯</button>
+            <button type="button" class="visual-clean-option" data-mode="crop-top" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('crop-top', this)">顶部跑马灯</button>
+            <button type="button" class="visual-clean-option" data-mode="crop-bottom-right" role="radio" aria-checked="false" onclick="selectVisualCleanPreview('crop-bottom-right', this)">底部 + 右下角</button>
+        </div>
+        <p class="visual-clean-confirm-note">该功能只改变本机显示，不修改视频流、不上传画面，也不增加服务器转码负担。</p>
+        <div class="visual-clean-confirm-actions">
+            <button type="button" class="visual-clean-confirm-action primary" onclick="saveVisualCleanEditor()">保存到此资源站</button>
+            <button type="button" class="visual-clean-confirm-action" onclick="resetVisualCleanEditor()">恢复关闭</button>
+            <button type="button" class="visual-clean-confirm-action" onclick="closeVisualCleanEditor()">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 保留兼容容器；自动检测默认关闭，不会主动弹出 -->
+<div id="visualCleanConfirmModal" class="visual-clean-confirm-modal hidden" aria-hidden="true"></div>
+
 <!-- Loading -->
 <div id="loading" class="fixed inset-0 bg-black/75 hidden items-center justify-center z-[10001]"
      style="backdrop-filter:blur(4px)">
@@ -344,7 +373,7 @@
         document.write('<script src="js/ui.js"><\/script>');
         document.write('<script src="js/api.js"><\/script>');
         document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
-        document.write('<script src="js/player.js?v=20260730-cleanscreen1"><\/script>');
+        document.write('<script src="js/player.js?v=20260731-adclean3"><\/script>');
         document.write('<script src="js/player-recommend.js?v=20260730-tmdbfix1"><\/script>');
     } else {
         document.write('<script src="js/legacy-compat.js"><\/script>');

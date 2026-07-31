@@ -95,6 +95,10 @@ let resourceSwitchInProgress = false;
 let resourceModalKeydownHandler = null;
 let resourceModalPreviousFocus = null;
 const VISUAL_CLEAN_STORAGE_KEY = 'visualCleanRules.v1';
+const VISUAL_CLEAN_AUTO_DISABLED_KEY = 'visualCleanAutoDisabledSources.v1';
+const VISUAL_CLEAN_AUTO_SAMPLE_DELAYS = [8000, 20000, 45000];
+const VISUAL_CLEAN_AUTO_WIDTH = 256;
+const VISUAL_CLEAN_AUTO_MIN_CONFIDENCE = 0.74;
 const VISUAL_CLEAN_MODES = [
     { key: 'off', label: '关闭', className: '' },
     { key: 'bottom-right', label: '右下角遮罩', className: 'clean-mask-bottom-right' },
@@ -106,6 +110,12 @@ const VISUAL_CLEAN_MODES = [
     { key: 'crop-bottom-right', label: '底部+右下角', className: 'clean-crop-bottom-right' }
 ];
 let currentVisualCleanMode = 'off';
+let visualCleanDetectionSession = null;
+let visualCleanDetectionAttemptKey = '';
+let visualCleanConfirmKeydownHandler = null;
+let visualCleanConfirmPreviousFocus = null;
+let visualCleanEditorOriginalMode = 'off';
+let visualCleanEditorPreviewMode = 'off';
 const isWebkit = (typeof window.webkitConvertPointFromNodeToPage === 'function')
 Artplayer.FULLSCREEN_WEB_IN_BODY = true;
 
@@ -163,13 +173,379 @@ function applyVisualCleanMode(modeKey, options = {}) {
 }
 
 function cycleVisualCleanMode() {
-    const currentIndex = Math.max(0, VISUAL_CLEAN_MODES.findIndex(mode => mode.key === currentVisualCleanMode));
-    const nextMode = VISUAL_CLEAN_MODES[(currentIndex + 1) % VISUAL_CLEAN_MODES.length];
-    applyVisualCleanMode(nextMode.key, { persist: true, notify: true });
+    openVisualCleanEditor();
+}
+
+function selectVisualCleanPreview(modeKey, button = null) {
+    if (!VISUAL_CLEAN_MODES.some(mode => mode.key === modeKey)) return;
+    visualCleanEditorPreviewMode = modeKey;
+    applyVisualCleanMode(modeKey, { persist: false });
+    document.querySelectorAll('.visual-clean-option').forEach(option => {
+        const isSelected = option.dataset.mode === modeKey;
+        option.classList.toggle('is-selected', isSelected);
+        option.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+    });
+    button?.focus({ preventScroll: true });
+}
+
+function closeVisualCleanEditor(options = {}) {
+    const modal = document.getElementById('visualCleanEditorModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (!options.keepPreview) {
+        applyVisualCleanMode(visualCleanEditorOriginalMode, { persist: false });
+    }
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    closeVisualCleanConfirm();
+}
+
+function openVisualCleanEditor() {
+    const modal = document.getElementById('visualCleanEditorModal');
+    if (!modal) return;
+    visualCleanEditorOriginalMode = currentVisualCleanMode;
+    visualCleanEditorPreviewMode = currentVisualCleanMode;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    selectVisualCleanPreview(currentVisualCleanMode);
+    const selected = modal.querySelector(`.visual-clean-option[data-mode="${currentVisualCleanMode}"]`)
+        || modal.querySelector('.visual-clean-option');
+    requestAnimationFrame(() => selected?.focus({ preventScroll: true }));
+}
+
+function saveVisualCleanEditor() {
+    applyVisualCleanMode(visualCleanEditorPreviewMode, { persist: true, notify: true });
+    closeVisualCleanEditor({ keepPreview: true });
+}
+
+function resetVisualCleanEditor() {
+    selectVisualCleanPreview('off');
 }
 
 function restoreVisualCleanModeForCurrentSource() {
     applyVisualCleanMode(getVisualCleanModeForSource(), { persist: false });
+}
+
+function readVisualCleanAutoDisabledSources() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(VISUAL_CLEAN_AUTO_DISABLED_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function isVisualCleanAutoDisabledForSource(sourceKey) {
+    return Boolean(sourceKey) && readVisualCleanAutoDisabledSources().includes(sourceKey);
+}
+
+function disableVisualCleanAutoForSource(sourceKey) {
+    if (!sourceKey) return;
+    try {
+        const sources = new Set(readVisualCleanAutoDisabledSources());
+        sources.add(sourceKey);
+        localStorage.setItem(VISUAL_CLEAN_AUTO_DISABLED_KEY, JSON.stringify(Array.from(sources)));
+    } catch (error) {}
+}
+
+function hasVisualCleanRuleForSource(sourceKey) {
+    if (!sourceKey) return false;
+    return Object.prototype.hasOwnProperty.call(readVisualCleanRules(), sourceKey);
+}
+
+function isLowPerformanceVisualCleanDevice() {
+    const cores = Number(navigator.hardwareConcurrency || 0);
+    const memory = Number(navigator.deviceMemory || 0);
+    const saveData = Boolean(navigator.connection && navigator.connection.saveData);
+    return saveData || (cores > 0 && cores <= 2) || (memory > 0 && memory <= 1);
+}
+
+function canStartVisualCleanDetection(video, sourceKey) {
+    if (!video || !sourceKey || window.__legacyBrowser) return false;
+    if (resourceSwitchInProgress || visualCleanDetectionSession) return false;
+    if (hasVisualCleanRuleForSource(sourceKey) || isVisualCleanAutoDisabledForSource(sourceKey)) return false;
+    if (isLowPerformanceVisualCleanDevice()) return false;
+    if (!document.createElement('canvas').getContext) return false;
+    return video.readyState >= 2 && video.videoWidth >= 240 && video.videoHeight >= 135;
+}
+
+function stopVisualCleanDetection() {
+    const session = visualCleanDetectionSession;
+    if (!session) return;
+    session.cancelled = true;
+    session.timers.forEach(timer => clearTimeout(timer));
+    session.timers = [];
+    if (session.canvas) {
+        session.canvas.width = 1;
+        session.canvas.height = 1;
+    }
+    visualCleanDetectionSession = null;
+}
+
+function getVisualCleanRegionPixels(frame, region) {
+    const { width, height, data } = frame;
+    const startX = Math.max(0, Math.floor(width * region.x));
+    const startY = Math.max(0, Math.floor(height * region.y));
+    const endX = Math.min(width, Math.ceil(width * (region.x + region.w)));
+    const endY = Math.min(height, Math.ceil(height * (region.y + region.h)));
+    const regionWidth = Math.max(1, endX - startX);
+    const regionHeight = Math.max(1, endY - startY);
+    const pixels = new Uint8Array(regionWidth * regionHeight);
+    let outputIndex = 0;
+
+    for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+            const index = (y * width + x) * 4;
+            pixels[outputIndex++] = Math.round(data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114);
+        }
+    }
+    return { pixels, width: regionWidth, height: regionHeight };
+}
+
+function measureVisualCleanRegion(frame, region) {
+    const sample = getVisualCleanRegionPixels(frame, region);
+    let edgeCount = 0;
+    let contrastCount = 0;
+    let occupiedRows = 0;
+
+    for (let y = 0; y < sample.height; y++) {
+        let rowEdges = 0;
+        for (let x = 0; x < sample.width; x++) {
+            const index = y * sample.width + x;
+            const value = sample.pixels[index];
+            if (value < 42 || value > 214) contrastCount++;
+            if (x > 0 && Math.abs(value - sample.pixels[index - 1]) > 34) {
+                edgeCount++;
+                rowEdges++;
+            }
+        }
+        if (rowEdges >= Math.max(2, sample.width * 0.08)) occupiedRows++;
+    }
+
+    const pixelCount = Math.max(1, sample.pixels.length);
+    return {
+        sample,
+        edgeDensity: edgeCount / pixelCount,
+        contrastRatio: contrastCount / pixelCount,
+        rowOccupancy: occupiedRows / sample.height
+    };
+}
+
+function measureVisualCleanFrameDifference(firstSample, secondSample) {
+    if (!firstSample || !secondSample || firstSample.pixels.length !== secondSample.pixels.length) return 1;
+    let difference = 0;
+    for (let index = 0; index < firstSample.pixels.length; index += 2) {
+        difference += Math.abs(firstSample.pixels[index] - secondSample.pixels[index]);
+    }
+    return difference / (Math.ceil(firstSample.pixels.length / 2) * 255);
+}
+
+function clampVisualCleanScore(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+function analyzeVisualCleanFrames(frames) {
+    if (!Array.isArray(frames) || frames.length < 3) return null;
+    const regions = {
+        'top-left': { x: 0, y: 0.02, w: 0.28, h: 0.22, kind: 'corner' },
+        'top-right': { x: 0.72, y: 0.02, w: 0.28, h: 0.22, kind: 'corner' },
+        'bottom-left': { x: 0, y: 0.76, w: 0.28, h: 0.22, kind: 'corner' },
+        'bottom-right': { x: 0.72, y: 0.76, w: 0.28, h: 0.22, kind: 'corner' },
+        'crop-top': { x: 0.06, y: 0, w: 0.88, h: 0.15, kind: 'strip' },
+        'crop-bottom': { x: 0.06, y: 0.84, w: 0.88, h: 0.16, kind: 'strip' }
+    };
+    const candidates = [];
+
+    Object.entries(regions).forEach(([mode, region]) => {
+        const measurements = frames.map(frame => measureVisualCleanRegion(frame, region));
+        const averageEdge = measurements.reduce((sum, item) => sum + item.edgeDensity, 0) / measurements.length;
+        const averageContrast = measurements.reduce((sum, item) => sum + item.contrastRatio, 0) / measurements.length;
+        const averageRows = measurements.reduce((sum, item) => sum + item.rowOccupancy, 0) / measurements.length;
+        const differences = measurements.slice(1).map((item, index) =>
+            measureVisualCleanFrameDifference(measurements[index].sample, item.sample)
+        );
+        const averageDifference = differences.reduce((sum, value) => sum + value, 0) / Math.max(1, differences.length);
+
+        let confidence;
+        if (region.kind === 'corner') {
+            const detailScore = clampVisualCleanScore((averageEdge - 0.035) / 0.14);
+            const stabilityScore = clampVisualCleanScore((0.17 - averageDifference) / 0.15);
+            const contrastScore = clampVisualCleanScore((averageContrast - 0.18) / 0.42);
+            confidence = detailScore * 0.42 + stabilityScore * 0.43 + contrastScore * 0.15;
+        } else {
+            const detailScore = clampVisualCleanScore((averageEdge - 0.045) / 0.12);
+            const rowScore = clampVisualCleanScore((averageRows - 0.22) / 0.55);
+            const motionScore = clampVisualCleanScore(1 - Math.abs(averageDifference - 0.12) / 0.12);
+            confidence = detailScore * 0.38 + rowScore * 0.32 + motionScore * 0.30;
+        }
+
+        candidates.push({ mode, confidence, averageDifference, averageEdge });
+    });
+
+    candidates.sort((first, second) => second.confidence - first.confidence);
+    const best = candidates[0];
+    const bottomStrip = candidates.find(item => item.mode === 'crop-bottom');
+    const bottomRight = candidates.find(item => item.mode === 'bottom-right');
+    if (bottomStrip && bottomRight
+        && bottomStrip.confidence >= VISUAL_CLEAN_AUTO_MIN_CONFIDENCE
+        && bottomRight.confidence >= VISUAL_CLEAN_AUTO_MIN_CONFIDENCE) {
+        return {
+            mode: 'crop-bottom-right',
+            confidence: Math.min(0.98, (bottomStrip.confidence + bottomRight.confidence) / 2),
+            reason: '检测到底部横条和右下角固定贴片'
+        };
+    }
+
+    if (!best || best.confidence < VISUAL_CLEAN_AUTO_MIN_CONFIDENCE) return null;
+    const modeConfig = VISUAL_CLEAN_MODES.find(mode => mode.key === best.mode);
+    return {
+        mode: best.mode,
+        confidence: best.confidence,
+        reason: best.mode.startsWith('crop-')
+            ? `检测到${modeConfig?.label || '持续横条'}`
+            : `检测到${modeConfig?.label || '固定贴片'}`
+    };
+}
+
+function closeVisualCleanConfirm() {
+    const modal = document.getElementById('visualCleanConfirmModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    if (visualCleanConfirmKeydownHandler) {
+        document.removeEventListener('keydown', visualCleanConfirmKeydownHandler, true);
+        visualCleanConfirmKeydownHandler = null;
+    }
+    if (visualCleanConfirmPreviousFocus && document.contains(visualCleanConfirmPreviousFocus)) {
+        visualCleanConfirmPreviousFocus.focus({ preventScroll: true });
+    }
+    visualCleanConfirmPreviousFocus = null;
+}
+
+function showVisualCleanConfirm(result, sourceKey) {
+    const modal = document.getElementById('visualCleanConfirmModal');
+    const description = document.getElementById('visualCleanConfirmDescription');
+    if (!modal || !description || !result || sourceKey !== getCurrentSourceCode()) return;
+    if (hasVisualCleanRuleForSource(sourceKey) || resourceSwitchInProgress) return;
+
+    const modeConfig = VISUAL_CLEAN_MODES.find(mode => mode.key === result.mode);
+    const sourceName = getResourceDisplayName(sourceKey);
+    const confidence = Math.round(result.confidence * 100);
+    description.textContent = `${result.reason}，建议使用“${modeConfig?.label || '画面净化'}”（置信度 ${confidence}%）。仅在你确认后应用，并保存到 ${sourceName}。`;
+    visualCleanConfirmPreviousFocus = document.activeElement;
+    modal.dataset.mode = result.mode;
+    modal.dataset.sourceKey = sourceKey;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+
+    const buttons = Array.from(modal.querySelectorAll('.visual-clean-confirm-action'));
+    const applyButton = document.getElementById('visualCleanConfirmApply');
+    requestAnimationFrame(() => applyButton?.focus({ preventScroll: true }));
+
+    visualCleanConfirmKeydownHandler = function (event) {
+        if (modal.classList.contains('hidden')) return;
+        const isBackKey = event.key === 'Escape' || event.key === 'BrowserBack'
+            || event.keyCode === 27 || event.keyCode === 461 || event.keyCode === 10009;
+        if (isBackKey) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeVisualCleanConfirm();
+            return;
+        }
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const activeIndex = Math.max(0, buttons.indexOf(document.activeElement));
+            const step = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1;
+            buttons[(activeIndex + step + buttons.length) % buttons.length]?.focus({ preventScroll: true });
+            return;
+        }
+        const isConfirmKey = event.key === 'Enter' || event.key === ' ' || event.keyCode === 13 || event.keyCode === 23;
+        if (isConfirmKey && buttons.includes(document.activeElement)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            document.activeElement.click();
+        }
+    };
+    document.addEventListener('keydown', visualCleanConfirmKeydownHandler, true);
+}
+
+function handleVisualCleanConfirm(action) {
+    const modal = document.getElementById('visualCleanConfirmModal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    const sourceKey = modal.dataset.sourceKey || '';
+    const mode = modal.dataset.mode || '';
+    closeVisualCleanConfirm();
+
+    if (!sourceKey || sourceKey !== getCurrentSourceCode()) return;
+    if (action === 'apply') {
+        applyVisualCleanMode(mode, { persist: true, notify: true });
+    } else if (action === 'disable') {
+        disableVisualCleanAutoForSource(sourceKey);
+        showToast(`已关闭 ${getResourceDisplayName(sourceKey)} 的自动画面识别`, 'info');
+    }
+}
+
+function captureVisualCleanFrame(session) {
+    if (!session || session.cancelled || session !== visualCleanDetectionSession) return null;
+    const video = session.video;
+    if (!video || video.paused || video.ended || video.readyState < 2 || resourceSwitchInProgress) return null;
+    if (session.sourceKey !== getCurrentSourceCode()) return null;
+
+    const width = VISUAL_CLEAN_AUTO_WIDTH;
+    const height = Math.max(90, Math.round(width * video.videoHeight / video.videoWidth));
+    session.canvas.width = width;
+    session.canvas.height = height;
+    session.context.drawImage(video, 0, 0, width, height);
+    const imageData = session.context.getImageData(0, 0, width, height);
+    return { width, height, data: imageData.data };
+}
+
+function startVisualCleanDetection() {
+    const video = art?.video;
+    const sourceKey = getCurrentSourceCode();
+    const attemptKey = `${sourceKey}|${currentVideoUrl}`;
+    if (visualCleanDetectionAttemptKey === attemptKey) return;
+    if (!canStartVisualCleanDetection(video, sourceKey)) return;
+    visualCleanDetectionAttemptKey = attemptKey;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+
+    const session = {
+        sourceKey,
+        video,
+        canvas,
+        context,
+        frames: [],
+        timers: [],
+        cancelled: false
+    };
+    visualCleanDetectionSession = session;
+
+    VISUAL_CLEAN_AUTO_SAMPLE_DELAYS.forEach((delay, sampleIndex) => {
+        const timer = setTimeout(() => {
+            if (session.cancelled || session !== visualCleanDetectionSession) return;
+            try {
+                const frame = captureVisualCleanFrame(session);
+                if (frame) session.frames.push(frame);
+            } catch (error) {
+                // 第三方视频没有 CORS 响应头时 Canvas 会被污染；静默退出，不影响播放。
+                stopVisualCleanDetection();
+                return;
+            }
+
+            if (sampleIndex === VISUAL_CLEAN_AUTO_SAMPLE_DELAYS.length - 1) {
+                const frames = session.frames.slice();
+                stopVisualCleanDetection();
+                const result = analyzeVisualCleanFrames(frames);
+                if (result && sourceKey === getCurrentSourceCode() && !hasVisualCleanRuleForSource(sourceKey)) {
+                    showVisualCleanConfirm(result, sourceKey);
+                }
+            }
+        }, delay);
+        session.timers.push(timer);
+    });
 }
 
 // 页面加载
@@ -330,13 +706,16 @@ function initializePageContent() {
     // 添加键盘快捷键事件监听
     document.addEventListener('keydown', handleKeyboardShortcuts);
 
-    // 添加页面离开事件监听，保存播放位置
+    // 添加页面离开事件监听，保存播放位置并释放自动识别资源
     window.addEventListener('beforeunload', saveCurrentProgress);
+    window.addEventListener('pagehide', stopVisualCleanDetection, { once: true });
 
-    // 新增：页面隐藏（切后台/切标签）时也保存
+    // 页面隐藏时保存，并停止尚未完成的抽样；回到前台不会持续重启分析。
     document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
             saveCurrentProgress();
+            stopVisualCleanDetection();
+            closeVisualCleanConfirm();
         }
     });
 
@@ -362,6 +741,34 @@ function initializePageContent() {
 
 // 处理键盘快捷键
 function handleKeyboardShortcuts(e) {
+    const visualEditor = document.getElementById('visualCleanEditorModal');
+    if (visualEditor && !visualEditor.classList.contains('hidden')) {
+        const focusables = Array.from(visualEditor.querySelectorAll('button'));
+        const isBackKey = e.key === 'Escape' || e.key === 'BrowserBack'
+            || e.keyCode === 27 || e.keyCode === 461 || e.keyCode === 10009;
+        if (isBackKey) {
+            e.preventDefault();
+            closeVisualCleanEditor();
+            return;
+        }
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+            e.preventDefault();
+            const activeIndex = Math.max(0, focusables.indexOf(document.activeElement));
+            const columns = window.innerWidth <= 640 ? 1 : 2;
+            const step = e.key === 'ArrowLeft' ? -1
+                : e.key === 'ArrowRight' ? 1
+                    : e.key === 'ArrowUp' ? -columns : columns;
+            focusables[(activeIndex + step + focusables.length) % focusables.length]?.focus({ preventScroll: true });
+            return;
+        }
+        const isConfirmKey = e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 23;
+        if (isConfirmKey && focusables.includes(document.activeElement)) {
+            e.preventDefault();
+            document.activeElement.click();
+        }
+        return;
+    }
+
     // 忽略输入框中的按键事件
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -482,6 +889,9 @@ function initPlayer(videoUrl) {
     }
 
     // 销毁旧实例
+    stopVisualCleanDetection();
+    closeVisualCleanConfirm();
+    visualCleanDetectionAttemptKey = '';
     if (art) {
         art.destroy();
         art = null;
@@ -811,12 +1221,14 @@ function initPlayer(videoUrl) {
     // 添加双击全屏支持
     art.on('video:playing', () => {
         // 绑定双击事件到视频容器
-        if (art.video) {
+        if (art.video && !art.video.dataset.freeDyDoubleClickBound) {
+            art.video.dataset.freeDyDoubleClickBound = 'true';
             art.video.addEventListener('dblclick', () => {
                 art.fullscreen = !art.fullscreen;
                 art.play();
             });
         }
+        // 画面净化不再自动抽样弹窗；用户可通过工具栏主动选择遮罩或裁切模式。
     });
 
     // 10秒后如果仍在加载，但不立即显示错误
@@ -837,7 +1249,7 @@ function initPlayer(videoUrl) {
     }, 10000);
 }
 
-// 自定义 M3U8 Loader。当前采用无损兼容策略，不修改播放清单。
+// 自定义 M3U8 Loader：只在媒体播放清单阶段执行广告过滤，主清单和线路信息保持原样。
 class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     constructor(config) {
         super(config);
@@ -847,7 +1259,9 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
                 const onSuccess = callbacks.onSuccess;
                 callbacks.onSuccess = function (response, stats, context) {
                     if (response.data && typeof response.data === 'string') {
-                        response.data = filterAdsFromM3U8(response.data);
+                        response.data = filterAdsFromM3U8(response.data, {
+                            sourceKey: getCurrentSourceCode()
+                        });
                     }
                     return onSuccess(response, stats, context);
                 };
@@ -859,6 +1273,111 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
 
 const HLS_AD_MARKER_PATTERN = /(?:^|[\/_\-.])(ad|ads|advert|advertise|advertisement|commercial|promo|preroll|midroll|postroll)(?:[\/_\-.]|$)/i;
 const HLS_AD_CLASS_PATTERN = /CLASS=["']?(?:com\.)?(?:apple\.hls\.)?(?:interstitial|ad|ads|advertisement)/i;
+const HLS_SOURCE_FILTER_PROFILES = {
+    // ikun 会在正片中插入一段来自不同目录的短片段块，前后用 DISCONTINUITY 分隔，且该块在同一清单中会重复出现。
+    // 只删除满足“异目录 + 重复出现 + 短块 + 位于时间轴边界之间”的块，不按单个短时长猜广告。
+    ikun: {
+        removeRepeatedForeignDiscontinuityBlocks: true,
+        maxSegments: 8,
+        maxDuration: 30
+    },
+    // 暴风资源在多个真实样例中固定使用 /video/adjump/time/ 存放 9 个、约 26 秒的插播分片。
+    bfzy: {
+        explicitAdPathPatterns: [/\/video\/adjump\/time\//i]
+    },
+    // 360资源在多个真实样例中固定插入同一目录的 4 分片、约 17.57 秒广告块。
+    zy360: {
+        explicitAdPathPatterns: [/\/20260726\/1AS9nSvi\/hls\//i]
+    }
+};
+
+function getHlsSourceFilterProfile(sourceKey) {
+    return HLS_SOURCE_FILTER_PROFILES[String(sourceKey || '').toLowerCase()] || null;
+}
+
+function getHlsSegmentDirectory(uri) {
+    if (!uri || uri.startsWith('#')) return '';
+    try {
+        const parsed = new URL(uri, window.location.href);
+        const pathname = parsed.pathname.replace(/\/+/g, '/');
+        return pathname.slice(0, pathname.lastIndexOf('/'));
+    } catch (error) {
+        const pathname = String(uri).split('?')[0].replace(/\/+/g, '/');
+        return pathname.slice(0, pathname.lastIndexOf('/'));
+    }
+}
+
+function removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey) {
+    const profile = getHlsSourceFilterProfile(sourceKey);
+    if (!profile || !profile.removeRepeatedForeignDiscontinuityBlocks) return sourceLines;
+
+    const discontinuityIndexes = [];
+    sourceLines.forEach((line, index) => {
+        if (/^\s*#EXT-X-DISCONTINUITY\s*$/i.test(line)) discontinuityIndexes.push(index);
+    });
+    if (discontinuityIndexes.length < 2) return sourceLines;
+
+    const blocks = [];
+    for (let index = 0; index < discontinuityIndexes.length - 1; index++) {
+        const start = discontinuityIndexes[index];
+        const end = discontinuityIndexes[index + 1];
+        const segments = [];
+        for (let lineIndex = start + 1; lineIndex < end; lineIndex++) {
+            const trimmed = sourceLines[lineIndex].trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+            const previous = sourceLines[lineIndex - 1]?.trim() || '';
+            if (/^#EXTINF:/i.test(previous)) {
+                segments.push({
+                    uri: trimmed,
+                    uriIndex: lineIndex,
+                    duration: Number((previous.match(/^#EXTINF:([0-9.]+)/i) || [])[1] || 0)
+                });
+            }
+        }
+        if (!segments.length) continue;
+        const directories = new Map();
+        segments.forEach(segment => {
+            const directory = getHlsSegmentDirectory(segment.uri);
+            directories.set(directory, (directories.get(directory) || 0) + 1);
+        });
+        const [directory, count] = Array.from(directories.entries()).sort((a, b) => b[1] - a[1])[0] || [];
+        const duration = segments.reduce((sum, segment) => sum + segment.duration, 0);
+        blocks.push({ start, end, segments, directory, count, duration });
+    }
+
+    const directoryBlockCounts = new Map();
+    const directorySegmentCounts = new Map();
+    sourceLines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+        const directory = getHlsSegmentDirectory(trimmed);
+        if (directory) directorySegmentCounts.set(directory, (directorySegmentCounts.get(directory) || 0) + 1);
+    });
+    blocks.forEach(block => {
+        if (block.count === block.segments.length && block.directory) {
+            directoryBlockCounts.set(block.directory, (directoryBlockCounts.get(block.directory) || 0) + 1);
+        }
+    });
+    const mainDirectory = Array.from(directorySegmentCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+    const removeRanges = [];
+    blocks.forEach(block => {
+        const isShort = block.segments.length <= profile.maxSegments && block.duration <= profile.maxDuration;
+        const isSingleDirectory = block.count === block.segments.length && Boolean(block.directory);
+        const isRepeated = isSingleDirectory && (directoryBlockCounts.get(block.directory) || 0) >= 2;
+        const isForeignDirectory = Boolean(mainDirectory) && block.directory !== mainDirectory;
+        if (!isShort || !isRepeated || !isForeignDirectory) return;
+        removeRanges.push([block.start, block.end]);
+    });
+
+    if (!removeRanges.length) return sourceLines;
+    const removedLines = new Set();
+    removeRanges.forEach(([start, end]) => {
+        for (let index = start; index < end; index++) removedLines.add(index);
+    });
+    console.info(`HLS ${sourceKey} 适配过滤：移除 ${removeRanges.length} 个重复异目录插播块`);
+    return sourceLines.filter((_, index) => !removedLines.has(index));
+}
 
 function isExplicitHlsAdMarker(line) {
     const normalized = String(line || '').trim();
@@ -869,14 +1388,19 @@ function isExplicitHlsAdMarker(line) {
         || /^#EXT-X-ASSET:/i.test(normalized);
 }
 
-function isExplicitHlsAdUri(uri) {
+function isExplicitHlsAdUri(uri, sourceKey) {
     if (!uri || uri.startsWith('#')) return false;
+    const profile = getHlsSourceFilterProfile(sourceKey);
+    const profilePatterns = Array.isArray(profile?.explicitAdPathPatterns) ? profile.explicitAdPathPatterns : [];
     try {
         const parsed = new URL(uri, window.location.href);
         return HLS_AD_MARKER_PATTERN.test(parsed.pathname)
+            || profilePatterns.some(pattern => pattern.test(parsed.pathname))
             || Array.from(parsed.searchParams.keys()).some(key => /^(?:ad|ads|advert|commercial)$/i.test(key));
     } catch (error) {
-        return HLS_AD_MARKER_PATTERN.test(uri.split('?')[0]);
+        const pathname = uri.split('?')[0];
+        return HLS_AD_MARKER_PATTERN.test(pathname)
+            || profilePatterns.some(pattern => pattern.test(pathname));
     }
 }
 
@@ -888,12 +1412,13 @@ function isHlsAdBreakEnd(line) {
 
 // 安全分片过滤：仅删除具有明确广告信号的媒体分片。
 // 不按时长猜测，不删除 #EXT-X-DISCONTINUITY、密钥、映射、音轨或播放线路标签。
-function filterAdsFromM3U8(m3u8Content) {
+function filterAdsFromM3U8(m3u8Content, options = {}) {
     if (typeof m3u8Content !== 'string' || !m3u8Content.includes('#EXTM3U')) {
         return typeof m3u8Content === 'string' ? m3u8Content : '';
     }
 
-    const sourceLines = m3u8Content.split(/\r?\n/);
+    const sourceKey = options.sourceKey || getCurrentSourceCode();
+    const sourceLines = removeRepeatedForeignDiscontinuityBlocks(m3u8Content.split(/\r?\n/), sourceKey);
     const output = [];
     let pendingSegmentTags = [];
     let insideExplicitAdBreak = false;
@@ -935,7 +1460,7 @@ function filterAdsFromM3U8(m3u8Content) {
         }
 
         if (trimmed && !trimmed.startsWith('#')) {
-            const removeSegment = insideExplicitAdBreak || isExplicitHlsAdUri(trimmed);
+            const removeSegment = insideExplicitAdBreak || isExplicitHlsAdUri(trimmed, sourceKey);
             if (removeSegment) {
                 removedSegments++;
                 pendingSegmentTags = [];
@@ -2245,6 +2770,8 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
     };
 
     let targetLoadStarted = false;
+    stopVisualCleanDetection();
+    closeVisualCleanConfirm();
     resourceSwitchInProgress = true;
     setResourceCardsSwitching(activeCard, true);
     showLoading(`正在切换到 ${sourceName}...`);
