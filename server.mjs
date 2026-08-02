@@ -127,6 +127,7 @@ app.get('/s=:keyword', async (req, res) => {
   try {
     const filePath = path.join(__dirname, 'index.html');
     const content = await renderPage(filePath, config.password, getClientGeo(req.headers));
+    res.setHeader('X-Robots-Tag', 'noindex, follow');
     res.send(content);
   } catch (error) {
     console.error('搜索页面渲染错误:', error);

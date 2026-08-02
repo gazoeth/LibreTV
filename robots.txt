@@ -1,2 +1,29 @@
+# FreeDY crawler policy
+# Public pages may be indexed and referenced by search and answer engines.
+
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /proxy/
+Disallow: /api/
+Disallow: /.netlify/
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+# Generative engines can use the concise site description at /llms.txt.
+Sitemap: https://freedy.xx.kg/sitemap.xml

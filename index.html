@@ -4,10 +4,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FreeDY - 免费在线视频搜索与观看平台</title>
-    <meta name="description" content="FreeDY是一个免费的在线视频搜索平台，无广告、安全，提供来自多个视频源的内容搜索与观看服务，无需注册即可使用。">
-    <meta name="keywords" content="在线视频,免费视频,视频搜索,电影,电视剧,FreeDY">
+    <title>FreeDY - 免费在线视频搜索与多源影视发现平台</title>
+    <meta name="description" content="FreeDY 是无需注册的在线视频搜索与影视发现工具，聚合多个第三方公开数据源，支持电影、电视剧和动漫检索、清晰度筛选、热门推荐与多线路选择。">
+    <meta name="keywords" content="在线视频搜索,免费视频搜索,影视搜索,电影搜索,电视剧搜索,动漫搜索,FreeDY">
     <meta name="author" content="FreeDY Team">
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+    <meta name="googlebot" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+    <link rel="canonical" href="https://freedy.xx.kg/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:site_name" content="FreeDY">
+    <meta property="og:title" content="FreeDY - 免费在线视频搜索与多源影视发现平台">
+    <meta property="og:description" content="无需注册的在线视频搜索与影视发现工具，支持多源聚合、清晰度筛选、热门推荐与多线路选择。">
+    <meta property="og:url" content="https://freedy.xx.kg/">
+    <meta property="og:image" content="https://freedy.xx.kg/image/logo.png">
+    <meta property="og:image:alt" content="FreeDY 标志">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="FreeDY - 免费在线视频搜索与多源影视发现平台">
+    <meta name="twitter:description" content="无需注册的在线视频搜索与影视发现工具，支持多源聚合与清晰度筛选。">
+    <meta name="twitter:image" content="https://freedy.xx.kg/image/logo.png">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://freedy.xx.kg/#organization",
+          "name": "FreeDY",
+          "url": "https://freedy.xx.kg/",
+          "logo": "https://freedy.xx.kg/image/logo.png",
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "url": "https://freedy.xx.kg/about.html#contact",
+            "availableLanguage": "zh-CN"
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://freedy.xx.kg/#website",
+          "url": "https://freedy.xx.kg/",
+          "name": "FreeDY",
+          "description": "在线视频搜索与多源影视发现平台",
+          "publisher": { "@id": "https://freedy.xx.kg/#organization" },
+          "inLanguage": "zh-CN",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://freedy.xx.kg/s={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://freedy.xx.kg/#application",
+          "name": "FreeDY",
+          "url": "https://freedy.xx.kg/",
+          "applicationCategory": "MultimediaApplication",
+          "operatingSystem": "Web",
+          "isAccessibleForFree": true,
+          "description": "聚合第三方公开数据源的影视搜索工具，支持质量筛选、热门发现和多线路选择。",
+          "publisher": { "@id": "https://freedy.xx.kg/#organization" }
+        }
+      ]
+    }
+    </script>
 
     <link rel="icon" href="image/logo.png">
     <link rel="apple-touch-icon" href="image/logo-black.png">
@@ -362,6 +427,28 @@
                     </section>
                 </div>
             </div>
+
+            <!-- 面向搜索引擎与首次访问者的静态产品说明 -->
+            <section id="aboutFreeDY" class="w-full mt-8 mb-4" aria-labelledby="aboutFreeDYTitle">
+                <div class="hot-recommend-hub" style="padding:1.25rem 1.5rem">
+                    <span class="hot-hub-kicker">ABOUT FREEDY</span>
+                    <h2 id="aboutFreeDYTitle" class="hot-hub-title" style="margin-top:.4rem">多源影视搜索，更快找到可用线路</h2>
+                    <p class="hot-hub-subtitle" style="margin-top:.75rem;max-width:60rem;line-height:1.75">
+                        FreeDY 是一个无需注册的在线视频搜索与影视发现工具。输入电影、电视剧或动漫名称后，
+                        系统会聚合多个第三方公开数据源，并提供清晰度识别、来源排序、地区适配和多线路选择。
+                        本站不存储、不上传也不分发视频文件，搜索结果及播放资源由第三方接口提供。
+                    </p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.75rem;margin-top:1rem">
+                        <div class="results-filter-summary" style="display:block">多源聚合：一次检索对比多个公开来源</div>
+                        <div class="results-filter-summary" style="display:block">质量筛选：识别 4K、1080P、720P 等标记</div>
+                        <div class="results-filter-summary" style="display:block">设备友好：兼容手机、电脑与电视遥控操作</div>
+                    </div>
+                    <p class="hot-hub-subtitle" style="margin-top:1rem">
+                        了解服务边界、隐私说明、版权沟通与联系方式，请访问
+                        <a href="about.html" style="color:#f1b2b5;text-decoration:underline">关于 FreeDY</a>。
+                    </p>
+                </div>
+            </section>
 
             <!-- 搜索结果 -->
             <div id="resultsArea" class="w-full hidden">

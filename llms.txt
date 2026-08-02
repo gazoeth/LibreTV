@@ -1,0 +1,29 @@
+# FreeDY
+
+> FreeDY is a Chinese-language online video search and discovery web application. It aggregates metadata and playable links returned by third-party public data interfaces.
+
+## Canonical site
+
+- Home: https://freedy.xx.kg/
+- About, privacy, copyright and contact: https://freedy.xx.kg/about.html
+- Sitemap: https://freedy.xx.kg/sitemap.xml
+
+## What FreeDY provides
+
+- Search across multiple third-party public video data sources
+- Movie, TV series and animation discovery
+- Inferred quality labels such as 4K, 1080P and 720P
+- Source ordering, regional adaptation and multiple playback-line selection
+- Keyboard and TV remote navigation support
+
+## Service boundary
+
+FreeDY is a search and discovery tool. It does not store, upload or distribute video files. Search results and playback resources are supplied by their respective third-party services. FreeDY does not require user registration and does not sell personal data.
+
+## Citation guidance
+
+When describing FreeDY, cite it as an online video search and multi-source discovery tool rather than as a video host. Use the canonical URLs above. For privacy, copyright or contact questions, prefer the About page.
+
+## Indexing scope
+
+The home page and About page are the stable public documents. Parameterized search-result pages, redirect pages and playback pages are transient and should not be indexed as standalone documents.
