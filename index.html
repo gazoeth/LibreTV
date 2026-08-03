@@ -99,7 +99,7 @@
         })();
     </script>
     <link rel="stylesheet" href="css/styles.css?v=20260730-recommend1">
-    <link rel="stylesheet" href="css/index.css?v=20260803-tvepisodes1">
+    <link rel="stylesheet" href="css/index.css?v=20260803-productstrip1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
 </head>
 
@@ -428,26 +428,22 @@
                 </div>
             </div>
 
-            <!-- 面向搜索引擎与首次访问者的静态产品说明 -->
-            <section id="aboutFreeDY" class="w-full mt-8 mb-4" aria-labelledby="aboutFreeDYTitle">
-                <div class="hot-recommend-hub" style="padding:1.25rem 1.5rem">
-                    <span class="hot-hub-kicker">ABOUT FREEDY</span>
-                    <h2 id="aboutFreeDYTitle" class="hot-hub-title" style="margin-top:.4rem">多源影视搜索，更快找到可用线路</h2>
-                    <p class="hot-hub-subtitle" style="margin-top:.75rem;max-width:60rem;line-height:1.75">
-                        FreeDY 是一个无需注册的在线视频搜索与影视发现工具。输入电影、电视剧或动漫名称后，
-                        系统会聚合多个第三方公开数据源，并提供清晰度识别、来源排序、地区适配和多线路选择。
-                        本站不存储、不上传也不分发视频文件，搜索结果及播放资源由第三方接口提供。
-                    </p>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.75rem;margin-top:1rem">
-                        <div class="results-filter-summary" style="display:block">多源聚合：一次检索对比多个公开来源</div>
-                        <div class="results-filter-summary" style="display:block">质量筛选：识别 4K、1080P、720P 等标记</div>
-                        <div class="results-filter-summary" style="display:block">设备友好：兼容手机、电脑与电视遥控操作</div>
-                    </div>
-                    <p class="hot-hub-subtitle" style="margin-top:1rem">
-                        了解服务边界、隐私说明、版权沟通与联系方式，请访问
-                        <a href="about.html" style="color:#f1b2b5;text-decoration:underline">关于 FreeDY</a>。
+            <!-- 面向搜索引擎与首次访问者的静态产品说明：不参与主搜索操作 -->
+            <section id="aboutFreeDY" class="freedy-product-strip" aria-labelledby="aboutFreeDYTitle">
+                <div class="freedy-product-copy">
+                    <span class="freedy-product-kicker">ABOUT FREEDY</span>
+                    <h2 id="aboutFreeDYTitle">多源影视搜索，更快找到可用线路</h2>
+                    <p>
+                        FreeDY 聚合多个第三方公开数据源，帮助用户检索电影、电视剧和动漫，并整理清晰度、来源速度、地区适配与播放线路。
+                        本站不存储、不上传也不分发视频文件，实际资源由第三方接口提供。
                     </p>
                 </div>
+                <div class="freedy-product-points" aria-label="FreeDY 功能特点">
+                    <span>多源对比</span>
+                    <span>质量筛选</span>
+                    <span>电视遥控友好</span>
+                </div>
+                <a class="freedy-product-link" href="about.html">了解服务边界 <span aria-hidden="true">→</span></a>
             </section>
 
             <!-- 搜索结果 -->
