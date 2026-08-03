@@ -99,7 +99,7 @@
         })();
     </script>
     <link rel="stylesheet" href="css/styles.css?v=20260730-recommend1">
-    <link rel="stylesheet" href="css/index.css?v=20260730-tvsearch1">
+    <link rel="stylesheet" href="css/index.css?v=20260803-tvepisodes1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
 </head>
 
@@ -517,13 +517,22 @@
     <!-- ══════ Modals — 全部用 style="display:none" 代替 hidden class ══════ -->
 
     <!-- 详情模态框 -->
-    <div id="modal" class="modal-overlay" style="display:none">
-        <div class="modal-box">
-            <div class="modal-head">
-                <h2 id="modalTitle" class="modal-title-text"></h2>
-                <button onclick="closeModal()" class="modal-close">&times;</button>
+    <div id="modal" class="modal-overlay episode-picker-overlay" style="display:none" role="dialog"
+        aria-modal="true" aria-hidden="true" aria-labelledby="modalTitle">
+        <div class="modal-box episode-picker-shell">
+            <div class="modal-head episode-picker-head">
+                <div class="episode-picker-heading">
+                    <span class="episode-picker-kicker">选择要播放的集数</span>
+                    <h2 id="modalTitle" class="modal-title-text"></h2>
+                    <p id="episodePickerStatus" class="episode-picker-status" aria-live="polite">正在获取播放列表…</p>
+                </div>
+                <div class="episode-picker-head-actions">
+                    <span class="episode-picker-remote-hint">方向键选择 · 确认键播放 · 返回键退出</span>
+                    <button type="button" onclick="closeModal()" class="modal-close episode-picker-close"
+                        aria-label="关闭选集" data-tv-close>&times;</button>
+                </div>
             </div>
-            <div id="modalContent" class="modal-content-area">
+            <div id="modalContent" class="modal-content-area episode-picker-content">
                 <div class="results-grid"></div>
             </div>
         </div>
@@ -579,13 +588,13 @@
     <script src="js/config.js?v=20260730-freedy1"></script>
     <script src="js/proxy-auth.js"></script>
     <script src="js/customer_site.js?v=20260707-routing"></script>
-    <script src="js/ui.js?v=20260724-tvhub3"></script>
+    <script src="js/ui.js?v=20260803-tvepisodes1"></script>
     <script src="js/api.js"></script>
     <script src="js/trending.js?v=20260730-freedy1"></script>
     <script src="js/douban.js?v=20260730-freedy1"></script>
     <script src="js/password.js"></script>
     <script src="js/search.js?v=20260730-recommend1"></script>
-    <script src="js/app.js?v=20260730-freedy1"></script>
+    <script src="js/app.js?v=20260803-tvepisodes1"></script>
     <script src="js/pwa-register.js"></script>
 
     <script>
@@ -596,7 +605,7 @@
         window.__ENV__.GEO_SOURCE = window.__ENV__.GEO_SOURCE || '';
     </script>
 
-    <script src="js/index-page.js?v=20260730-freedy1"></script>
+    <script src="js/index-page.js?v=20260803-tvepisodes1"></script>
 </body>
 
 </html>

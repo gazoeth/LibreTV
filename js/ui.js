@@ -135,10 +135,24 @@ function updateSiteStatus(isAvailable) {
 }
 
 function closeModal() {
-    // NOTE: 使用 style.display 控制，与 HTML 中 style="display:none" 保持一致
-    document.getElementById('modal').style.display = 'none';
-    // 清除 iframe 内容
+    const modal = document.getElementById('modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('episode-picker-open');
     document.getElementById('modalContent').innerHTML = '';
+
+    if (typeof episodePickerPreviousFocus !== 'undefined'
+        && episodePickerPreviousFocus
+        && document.contains(episodePickerPreviousFocus)) {
+        requestAnimationFrame(() => {
+            try {
+                episodePickerPreviousFocus.focus({ preventScroll: true });
+            } catch (error) {
+                episodePickerPreviousFocus.focus();
+            }
+        });
+    }
 }
 
 // 获取搜索历史的增强版本 - 支持新旧格式

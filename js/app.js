@@ -72,6 +72,10 @@ let currentEpisodes = [];
 let currentVideoTitle = '';
 // 全局变量用于倒序状态
 let episodesReversed = false;
+// 电视端选集界面状态
+let currentEpisodeSourceCode = '';
+let currentEpisodeVodId = '';
+let episodePickerPreviousFocus = null;
 
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function () {
@@ -1155,16 +1159,22 @@ async function showDetails(id, vod_name, sourceCode) {
     const modalContent = document.getElementById('modalContent');
 
     currentVideoTitle = vod_name || '未知视频';
+    currentEpisodeSourceCode = sourceCode || '';
+    currentEpisodeVodId = id || '';
+    episodePickerPreviousFocus = document.activeElement;
     modalTitle.innerHTML = `<span class="break-words">${vod_name || '未知视频'}</span>`;
+    updateEpisodePickerStatus('正在获取播放列表…');
     modalContent.innerHTML = `
-        <div class="animate-pulse space-y-3 p-2">
-            <div class="h-4 bg-gray-700 rounded w-3/4"></div>
-            <div class="h-4 bg-gray-700 rounded w-1/2"></div>
-            <div class="grid grid-cols-4 gap-2 mt-4">
-                ${Array(8).fill('<div class="h-8 bg-gray-700 rounded"></div>').join('')}
+        <div class="episode-picker-loading" aria-label="正在加载集数">
+            <div class="episode-picker-loading-bar"></div>
+            <div class="episode-picker-loading-bar short"></div>
+            <div class="episode-picker-skeleton-grid">
+                ${Array(12).fill('<div class="episode-picker-skeleton-button"></div>').join('')}
             </div>
         </div>`;
     modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('episode-picker-open');
     showLoading();
 
     try {
@@ -1222,40 +1232,68 @@ async function showDetails(id, vod_name, sourceCode) {
 
             currentEpisodes = data.episodes;
             currentEpisodeIndex = 0;
+            updateEpisodePickerStatus(`共 ${data.episodes.length} 集 · 当前焦点：第 1 集`);
 
             modalContent.innerHTML = `
-                ${detailInfoHtml}
-                <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
-                    <div class="flex items-center gap-2">
-                        <button onclick="toggleEpisodeOrder('${sourceCode}', '${id}')" 
-                                class="px-3 py-1.5 bg-[#333] hover:bg-[#444] border border-[#444] rounded text-sm transition-colors flex items-center gap-1">
-                            <svg class="w-4 h-4 transform ${episodesReversed ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                            </svg>
-                            <span>${episodesReversed ? '正序排列' : '倒序排列'}</span>
-                        </button>
-                        <span class="text-gray-400 text-sm">共 ${data.episodes.length} 集</span>
-                    </div>
-                    <button onclick="copyLinks()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
-                        复制链接
-                    </button>
-                </div>
-                <div id="episodesGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                    ${renderEpisodes(vod_name, sourceCode, id)}
+                <div class="episode-picker-layout">
+                    <aside class="episode-picker-summary">
+                        ${detailInfoHtml || '<p class="episode-picker-empty-summary">该资源暂未提供更多简介。</p>'}
+                    </aside>
+                    <section class="episode-picker-main" aria-labelledby="episodeSectionTitle">
+                        <div class="episode-picker-toolbar">
+                            <div>
+                                <span class="episode-picker-section-kicker">PLAYLIST</span>
+                                <h3 id="episodeSectionTitle" class="episode-picker-section-title">选择集数</h3>
+                            </div>
+                            <div class="episode-picker-toolbar-actions">
+                                <button id="episodeOrderButton" type="button" onclick="toggleEpisodeOrder('${sourceCode}', '${id}')"
+                                    class="episode-picker-tool-button" aria-label="切换集数排序">
+                                    <svg class="episode-order-icon ${episodesReversed ? 'is-reversed' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                    </svg>
+                                    <span>${episodesReversed ? '切换为正序' : '切换为倒序'}</span>
+                                </button>
+                                <button id="copyEpisodeLinksButton" type="button" onclick="copyLinks()" class="episode-picker-tool-button secondary">
+                                    复制链接
+                                </button>
+                            </div>
+                        </div>
+                        <div id="episodesViewport" class="episode-picker-viewport">
+                            <div id="episodesGrid" class="episode-picker-grid" role="grid" aria-label="${vod_name || '视频'}集数列表">
+                                ${renderEpisodes(vod_name, sourceCode, id)}
+                            </div>
+                        </div>
+                    </section>
                 </div>
             `;
+            requestAnimationFrame(() => focusEpisodePickerDefault());
         } else {
+            updateEpisodePickerStatus('未找到可播放集数');
             modalContent.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="text-red-400 mb-2">❌ 未找到播放资源</div>
-                    <div class="text-gray-500 text-sm">该视频可能暂时无法播放，请尝试其他视频</div>
+                <div class="episode-picker-error">
+                    <strong>未找到播放资源</strong>
+                    <span>该资源可能暂时不可用，请返回搜索结果选择其他资源站。</span>
+                    <button type="button" onclick="closeModal()" class="episode-picker-tool-button" data-tv-default>返回搜索结果</button>
                 </div>
             `;
+            requestAnimationFrame(() => modalContent.querySelector('[data-tv-default]')?.focus());
         }
 
         // modal 已在请求前打开，此处无需再次 remove('hidden')
     } catch (error) {
         console.error('获取详情错误:', error);
+        updateEpisodePickerStatus('加载失败，请返回后重试');
+        modalContent.innerHTML = `
+            <div class="episode-picker-error">
+                <strong>播放列表加载失败</strong>
+                <span>请检查网络状态，或返回搜索结果选择其他资源站。</span>
+                <div class="episode-picker-error-actions">
+                    <button type="button" onclick="showDetails('${String(id).replace(/'/g, "\\'")}','${String(vod_name || '').replace(/'/g, "\\'")}','${String(sourceCode || '').replace(/'/g, "\\'")}')"
+                        class="episode-picker-tool-button" data-tv-default>重新加载</button>
+                    <button type="button" onclick="closeModal()" class="episode-picker-tool-button secondary">返回搜索结果</button>
+                </div>
+            </div>`;
+        requestAnimationFrame(() => modalContent.querySelector('[data-tv-default]')?.focus());
         showToast('获取详情失败，请稍后重试', 'error');
     } finally {
         hideLoading();
@@ -1393,16 +1431,63 @@ function handlePlayerError() {
     showToast('视频播放加载失败，请尝试其他视频源', 'error');
 }
 
+function updateEpisodePickerStatus(message) {
+    const status = document.getElementById('episodePickerStatus');
+    if (status) status.textContent = message || '';
+}
+
+function focusEpisodePickerDefault(preferredIndex) {
+    const grid = document.getElementById('episodesGrid');
+    if (!grid) return;
+    const buttons = Array.from(grid.querySelectorAll('.episode-btn'));
+    if (buttons.length === 0) return;
+
+    let target = Number.isInteger(preferredIndex)
+        ? document.getElementById(`episode-${preferredIndex}`)
+        : null;
+    if (!target) target = document.getElementById(`episode-${currentEpisodeIndex}`) || buttons[0];
+
+    target.setAttribute('data-tv-default', 'true');
+    try {
+        target.focus({ preventScroll: true });
+    } catch (error) {
+        target.focus();
+    }
+    target.scrollIntoView({ block: 'center', inline: 'center' });
+    updateEpisodePickerStatus(`共 ${currentEpisodes.length} 集 · 当前焦点：第 ${target.dataset.episodeNumber} 集`);
+}
+
+function handleEpisodeFocus(button) {
+    if (!button) return;
+    document.querySelectorAll('#episodesGrid .episode-btn[data-tv-default]').forEach(item => {
+        item.removeAttribute('data-tv-default');
+    });
+    button.setAttribute('data-tv-default', 'true');
+    const episodeNumber = Number(button.dataset.episodeNumber || 1);
+    updateEpisodePickerStatus(`共 ${currentEpisodes.length} 集 · 当前焦点：第 ${episodeNumber} 集`);
+}
+
 // 辅助函数用于渲染剧集按钮（使用当前的排序状态）
 function renderEpisodes(vodName, sourceCode, vodId) {
     const episodes = episodesReversed ? [...currentEpisodes].reverse() : currentEpisodes;
+    const safeVodName = String(vodName || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeSourceCode = String(sourceCode || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const safeVodId = String(vodId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
     return episodes.map((episode, index) => {
-        // 根据倒序状态计算真实的剧集索引
         const realIndex = episodesReversed ? currentEpisodes.length - 1 - index : index;
+        const safeEpisode = String(episode || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const isDefault = realIndex === currentEpisodeIndex;
         return `
-            <button id="episode-${realIndex}" onclick="playVideo('${episode}','${vodName.replace(/"/g, '&quot;')}', '${sourceCode}', ${realIndex}, '${vodId}')" 
-                    class="px-4 py-2 bg-[#222] hover:bg-[#333] border border-[#333] rounded-lg transition-colors text-center episode-btn">
-                ${realIndex + 1}
+            <button id="episode-${realIndex}" type="button" role="gridcell"
+                    data-episode-index="${realIndex}" data-episode-number="${realIndex + 1}"
+                    ${isDefault ? 'data-tv-default="true"' : ''}
+                    onfocus="handleEpisodeFocus(this)"
+                    onclick="playVideo('${safeEpisode}','${safeVodName}','${safeSourceCode}',${realIndex},'${safeVodId}')"
+                    class="episode-btn" aria-label="播放第 ${realIndex + 1} 集">
+                <span class="episode-btn-prefix">第</span>
+                <strong>${realIndex + 1}</strong>
+                <span class="episode-btn-suffix">集</span>
             </button>
         `;
     }).join('');
@@ -1421,22 +1506,25 @@ function copyLinks() {
 
 // 切换排序状态的函数
 function toggleEpisodeOrder(sourceCode, vodId) {
+    const focusedEpisode = document.activeElement?.classList.contains('episode-btn')
+        ? Number(document.activeElement.dataset.episodeIndex)
+        : currentEpisodeIndex;
     episodesReversed = !episodesReversed;
-    // 重新渲染剧集区域，使用 currentVideoTitle 作为视频标题
+
     const episodesGrid = document.getElementById('episodesGrid');
     if (episodesGrid) {
         episodesGrid.innerHTML = renderEpisodes(currentVideoTitle, sourceCode, vodId);
     }
 
-    // 更新按钮文本和箭头方向
-    const toggleBtn = document.querySelector(`button[onclick="toggleEpisodeOrder('${sourceCode}', '${vodId}')"]`);
+    const toggleBtn = document.getElementById('episodeOrderButton');
     if (toggleBtn) {
-        toggleBtn.querySelector('span').textContent = episodesReversed ? '正序排列' : '倒序排列';
+        const label = toggleBtn.querySelector('span');
+        if (label) label.textContent = episodesReversed ? '切换为正序' : '切换为倒序';
         const arrowIcon = toggleBtn.querySelector('svg');
-        if (arrowIcon) {
-            arrowIcon.style.transform = episodesReversed ? 'rotate(180deg)' : 'rotate(0deg)';
-        }
+        if (arrowIcon) arrowIcon.classList.toggle('is-reversed', episodesReversed);
     }
+
+    requestAnimationFrame(() => focusEpisodePickerDefault(focusedEpisode));
 }
 
 // 从URL导入配置

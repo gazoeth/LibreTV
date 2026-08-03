@@ -111,7 +111,7 @@ function isTvNavigable(element) {
 }
 
 function getTvNavigationScope() {
-    return document.querySelector('#settingsPanel.show, #historyPanel.show, .modal-overlay[style*="flex"]')
+    return document.querySelector('#settingsPanel.show, #historyPanel.show, .modal-overlay[aria-hidden="false"], .modal-overlay[style*="flex"]')
         || document;
 }
 
@@ -255,19 +255,34 @@ function initTvRemoteNavigation() {
 
         var isConfirmKey = event.key === 'Enter'
             || event.key === ' '
+            || event.key === 'Select'
             || event.keyCode === 13
-            || event.keyCode === 32;
+            || event.keyCode === 23
+            || event.keyCode === 32
+            || event.keyCode === 66;
 
         var isBackKey = event.key === 'Escape'
             || event.key === 'BrowserBack'
+            || event.key === 'GoBack'
             || event.keyCode === 27
             || event.keyCode === 461
             || event.keyCode === 10009;
 
         if (isBackKey) {
+            var scope = getTvNavigationScope();
             var resultsArea = document.getElementById('resultsArea');
-            var hasOpenOverlay = getTvNavigationScope() !== document;
-            if (resultsArea && !resultsArea.classList.contains('hidden') && !hasOpenOverlay) {
+            var hasOpenOverlay = scope !== document;
+            if (hasOpenOverlay) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (scope.id === 'modal' && typeof closeModal === 'function') {
+                    closeModal();
+                } else if (typeof window.closeAllPanels === 'function') {
+                    window.closeAllPanels();
+                }
+                return;
+            }
+            if (resultsArea && !resultsArea.classList.contains('hidden')) {
                 event.preventDefault();
                 if (typeof resetToHome === 'function') resetToHome();
             }
