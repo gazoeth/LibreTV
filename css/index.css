@@ -1747,6 +1747,62 @@ body.episode-picker-open {
 }
 
 /* Mobile adaptation refinements */
+/* ── TV compact result flow ─────────────────────────────────── */
+@media (min-width: 1200px) and (pointer: coarse) {
+    .results-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-gap: .85rem;
+        gap: .85rem;
+    }
+
+    .result-poster {
+        aspect-ratio: 5 / 7;
+    }
+
+    .result-card-title {
+        min-height: 2.35rem;
+        padding-top: .3rem;
+    }
+
+    .result-card-name,
+    .result-card-remarks {
+        font-size: .72rem;
+    }
+
+    .result-card:focus {
+        outline: none;
+        position: relative;
+        z-index: 4;
+    }
+
+    .result-card:focus .result-poster {
+        transform: scale(1.035);
+        box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914, 0 10px 26px rgba(0, 0, 0, .55);
+    }
+
+    .result-card:focus .result-poster-overlay {
+        opacity: 1;
+    }
+}
+
+@media (min-width: 1600px) and (pointer: coarse) {
+    .results-grid {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1200px) and (pointer: fine) {
+    .results-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .result-poster {
+        aspect-ratio: 5 / 7;
+    }
+}
+
 @media (max-width: 767px) {
     .main-wrap {
         padding-top: 4rem;

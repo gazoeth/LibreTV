@@ -900,6 +900,77 @@ input:checked + .slider:before { transform: translateX(20px); }
     box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
 }
 
+/* ── TV remote playback navigation ─────────────────────────── */
+.player-tv-navigation-active .player-container:focus-within {
+    border-color: rgba(229, 9, 20, .42);
+    box-shadow: 0 0 0 1px rgba(229, 9, 20, .18);
+}
+
+.player-tv-navigation-active #goBack:focus,
+.player-tv-navigation-active #prevButton:focus,
+.player-tv-navigation-active #nextButton:focus,
+.player-tv-navigation-active #switchResourceBtn:focus,
+.player-tv-navigation-active #visualCleanButton:focus,
+.player-tv-navigation-active #episodeOrderButton:focus,
+.player-tv-navigation-active #autoplayControl:focus,
+.player-tv-navigation-active #episodesList button:focus {
+    outline: none !important;
+    border-color: #fff !important;
+    color: #fff !important;
+    background: #e50914 !important;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914 !important;
+    position: relative;
+    z-index: 5;
+}
+
+.player-tv-navigation-active #episodesList button:focus {
+    transform: scale(1.04);
+}
+
+@media (min-width: 1200px) and (pointer: coarse) {
+    body {
+        padding-top: 64px;
+    }
+
+    .player-header-fixed {
+        height: 64px;
+    }
+
+    main > div {
+        max-width: 1680px !important;
+        gap: 1.5rem !important;
+    }
+
+    .player-container {
+        border-radius: 10px;
+    }
+
+    #episodesList {
+        grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+        gap: .7rem !important;
+    }
+
+    #episodesList button {
+        min-height: 3.25rem;
+        padding: .55rem .45rem;
+        font-size: .95rem;
+    }
+
+    #prevButton,
+    #nextButton,
+    #switchResourceBtn,
+    #visualCleanButton,
+    .player-container .flex-wrap button {
+        min-height: 3rem;
+        padding: .65rem .9rem !important;
+    }
+
+    .episode-grid {
+        max-height: 28vh;
+        padding: .7rem;
+    }
+}
+
 /* ── Footer ──────────────────────────────────────────────────── */
 .footer {
     border-top-color: rgba(255,255,255,0.06) !important;

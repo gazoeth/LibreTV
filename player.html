@@ -32,7 +32,7 @@
     </script>
     <script src="js/version-check.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=20260707-routing">
-    <link rel="stylesheet" href="css/player.css?v=20260731-adclean3">
+    <link rel="stylesheet" href="css/player.css?v=20260804-tvflow1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -150,8 +150,8 @@
                     <!-- 自动连播 -->
                     <div class="flex items-center gap-2 mr-auto">
                         <span class="text-sm text-[#8a8a9a]">自动连播</span>
-                        <label class="switch">
-                            <input type="checkbox" id="autoplayToggle">
+                        <label class="switch" id="autoplayControl" tabindex="0" role="checkbox" aria-label="自动连播">
+                            <input type="checkbox" id="autoplayToggle" tabindex="-1">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -166,7 +166,7 @@
                             </svg>
                             <span id="visualCleanText">画面净化：关闭</span>
                         </button>
-                        <button onclick="toggleEpisodeOrder()"
+                        <button id="episodeOrderButton" type="button" onclick="toggleEpisodeOrder()"
                                 class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg">
                             <svg class="w-3.5 h-3.5" id="orderIcon" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/>
@@ -376,7 +376,7 @@
         document.write('<script src="js/ui.js"><\/script>');
         document.write('<script src="js/api.js"><\/script>');
         document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
-        document.write('<script src="js/player.js?v=20260731-hongniu1"><\/script>');
+        document.write('<script src="js/player.js?v=20260804-tvflow1"><\/script>');
         document.write('<script src="js/player-recommend.js?v=20260730-tmdbfix1"><\/script>');
     } else {
         document.write('<script src="js/legacy-compat.js"><\/script>');

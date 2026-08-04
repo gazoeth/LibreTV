@@ -92,6 +92,8 @@ let adFilteringEnabled = true; // 默认开启广告过滤
 let progressSaveInterval = null; // 定期保存进度的计时器
 let currentVideoUrl = ''; // 记录当前实际的视频URL
 let resourceSwitchInProgress = false;
+let playerTvNavigationMode = false;
+let playerTvPreviousFocus = null;
 let resourceModalKeydownHandler = null;
 let resourceModalPreviousFocus = null;
 const VISUAL_CLEAN_STORAGE_KEY = 'visualCleanRules.v1';
@@ -739,8 +741,100 @@ function initializePageContent() {
     }, 200);
 }
 
+function getPlayerTvControls() {
+    return Array.from(document.querySelectorAll(
+        '#goBack, #prevButton, #nextButton, #switchResourceBtn, #visualCleanButton, #episodeOrderButton, #episodesList button, #autoplayControl'
+    )).filter(element => {
+        if (element.disabled || element.closest('.hidden, [aria-hidden="true"]')) return false;
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    });
+}
+
+function focusPlayerTvDefault() {
+    const target = document.querySelector('#episodesList button.episode-active, #episodesList button, #goBack');
+    if (!target) return;
+    playerTvPreviousFocus = target;
+    target.focus({ preventScroll: false });
+}
+
+function handlePlayerTvNavigation(event) {
+    const directionMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+    const direction = directionMap[event.key];
+    const active = document.activeElement;
+    const isConfirm = event.key === 'Enter' || event.key === 'Select' || event.keyCode === 13 || event.keyCode === 23;
+    const isBack = event.key === 'Escape' || event.key === 'BrowserBack' || event.key === 'GoBack'
+        || event.keyCode === 27 || event.keyCode === 461 || event.keyCode === 10009;
+
+    if (isBack) {
+        if (playerTvNavigationMode) {
+            event.preventDefault();
+            playerTvNavigationMode = false;
+            document.body.classList.remove('player-tv-navigation-active');
+            if (playerTvPreviousFocus && document.contains(playerTvPreviousFocus)) playerTvPreviousFocus.focus();
+            else focusPlayerTvDefault();
+            return true;
+        }
+        return false;
+    }
+
+    if (direction && !playerTvNavigationMode) {
+        playerTvNavigationMode = true;
+        document.body.classList.add('player-tv-navigation-active');
+        playerTvPreviousFocus = active;
+        focusPlayerTvDefault();
+        event.preventDefault();
+        return true;
+    }
+
+    if (isConfirm && playerTvNavigationMode && active && active.matches('button, a, input[type="checkbox"], #autoplayControl')) {
+        event.preventDefault();
+        if (active.id === 'autoplayControl') {
+            const toggle = document.getElementById('autoplayToggle');
+            if (toggle) {
+                toggle.checked = !toggle.checked;
+                toggle.dispatchEvent(new Event('change', { bubbles: true }));
+                active.setAttribute('aria-checked', toggle.checked ? 'true' : 'false');
+            }
+        } else {
+            active.click();
+        }
+        return true;
+    }
+
+    if (!direction || !playerTvNavigationMode) return false;
+    const controls = getPlayerTvControls();
+    if (!controls.length) return false;
+    const origin = active && active.getBoundingClientRect ? active.getBoundingClientRect() : null;
+    if (!origin) return false;
+    const center = { x: origin.left + origin.width / 2, y: origin.top + origin.height / 2 };
+    let target = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    controls.forEach(candidate => {
+        if (candidate === active) return;
+        const rect = candidate.getBoundingClientRect();
+        const dx = rect.left + rect.width / 2 - center.x;
+        const dy = rect.top + rect.height / 2 - center.y;
+        const primary = direction === 'left' ? -dx : direction === 'right' ? dx : direction === 'up' ? -dy : dy;
+        if (primary <= 2) return;
+        const secondary = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx);
+        const score = primary + secondary * 2;
+        if (score < bestScore) { bestScore = score; target = candidate; }
+    });
+    if (target) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        playerTvPreviousFocus = target;
+        target.focus({ preventScroll: false });
+        return true;
+    }
+    event.preventDefault();
+    return true;
+}
+
 // 处理键盘快捷键
 function handleKeyboardShortcuts(e) {
+    if (handlePlayerTvNavigation(e)) return;
     const visualEditor = document.getElementById('visualCleanEditorModal');
     if (visualEditor && !visualEditor.classList.contains('hidden')) {
         const focusables = Array.from(visualEditor.querySelectorAll('button'));
@@ -1276,18 +1370,27 @@ const HLS_AD_CLASS_PATTERN = /CLASS=["']?(?:com\.)?(?:apple\.hls\.)?(?:interstit
 const HLS_SOURCE_FILTER_PROFILES = {
     // ikun 会在正片中插入一段来自不同目录的短片段块，前后用 DISCONTINUITY 分隔，且该块在同一清单中会重复出现。
     // 只删除满足“异目录 + 重复出现 + 短块 + 位于时间轴边界之间”的块，不按单个短时长猜广告。
+    // 同时保留原版的断点兼容行为：只移除标记，不删除任何媒体分片。
     ikun: {
         removeRepeatedForeignDiscontinuityBlocks: true,
+        stripDiscontinuityMarkers: true,
         maxSegments: 8,
         maxDuration: 30
     },
     // 暴风资源在多个真实样例中固定使用 /video/adjump/time/ 存放 9 个、约 26 秒的插播分片。
+    // 断点标记也按原版兼容方式移除，避免播放器把插播当成独立时间轴段落。
     bfzy: {
-        explicitAdPathPatterns: [/\/video\/adjump\/time\//i]
+        explicitAdPathPatterns: [/\/video\/adjump\/time\//i],
+        stripDiscontinuityMarkers: true
     },
     // 360资源在多个真实样例中固定插入同一目录的 4 分片、约 17.57 秒广告块。
     zy360: {
-        explicitAdPathPatterns: [/\/20260726\/1AS9nSvi\/hls\//i]
+        explicitAdPathPatterns: [/\/20260726\/1AS9nSvi\/hls\//i],
+        stripDiscontinuityMarkers: true
+    },
+    // 如意媒体清单的分片 URI 是纯编号，广告不会带 ad/ads 路径标识；先迁移原版断点兼容，不能按短时长猜测分片。
+    ruyi: {
+        stripDiscontinuityMarkers: true
     },
     // 原系统对红牛资源的有效兼容方式：只移除时间轴断点标记，不删除断点前后的任何媒体分片。
     hongniu2: {
@@ -1316,7 +1419,10 @@ function getHlsSegmentDirectory(uri) {
 
 function removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey) {
     const profile = getHlsSourceFilterProfile(sourceKey);
-    if (!profile || !profile.removeRepeatedForeignDiscontinuityBlocks) return sourceLines;
+    const shouldDetect = profile?.removeRepeatedForeignDiscontinuityBlocks !== false;
+    if (!shouldDetect) return sourceLines;
+    const maxSegments = Number(profile?.maxSegments) || 8;
+    const maxDuration = Number(profile?.maxDuration) || 30;
 
     const discontinuityIndexes = [];
     sourceLines.forEach((line, index) => {
@@ -1369,7 +1475,7 @@ function removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey) {
 
     const removeRanges = [];
     blocks.forEach(block => {
-        const isShort = block.segments.length <= profile.maxSegments && block.duration <= profile.maxDuration;
+        const isShort = block.segments.length <= maxSegments && block.duration <= maxDuration;
         const isSingleDirectory = block.count === block.segments.length && Boolean(block.directory);
         const isRepeated = isSingleDirectory && (directoryBlockCounts.get(block.directory) || 0) >= 2;
         const isForeignDirectory = Boolean(mainDirectory) && block.directory !== mainDirectory;
@@ -1382,7 +1488,7 @@ function removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey) {
     removeRanges.forEach(([start, end]) => {
         for (let index = start; index < end; index++) removedLines.add(index);
     });
-    console.info(`HLS ${sourceKey} 适配过滤：移除 ${removeRanges.length} 个重复异目录插播块`);
+    console.info(`HLS ${sourceKey || 'unknown'} 通用检测：移除 ${removeRanges.length} 个重复异目录短插播块`);
     return sourceLines.filter((_, index) => !removedLines.has(index));
 }
 
@@ -1427,7 +1533,9 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
     const sourceKey = options.sourceKey || getCurrentSourceCode();
     const profile = getHlsSourceFilterProfile(sourceKey);
     let removedDiscontinuityMarkers = 0;
+    // 先依据断点识别重复异目录广告块，再按来源需要移除断点标记；否则先删断点会丢失广告边界证据。
     let sourceLines = m3u8Content.split(/\r?\n/);
+    sourceLines = removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey);
     if (profile?.stripDiscontinuityMarkers) {
         sourceLines = sourceLines.filter(line => {
             const isDiscontinuity = /^\s*#EXT-X-DISCONTINUITY\s*$/i.test(line);
@@ -1435,7 +1543,6 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
             return !isDiscontinuity;
         });
     }
-    sourceLines = removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey);
     const output = [];
     let pendingSegmentTags = [];
     let insideExplicitAdBreak = false;
@@ -1576,10 +1683,11 @@ function renderEpisodes() {
         const isActive = realIndex === currentEpisodeIndex;
 
         html += `
-            <button id="episode-${realIndex}" 
-                    onclick="playEpisode(${realIndex})" 
+            <button id="episode-${realIndex}" type="button"
+                    data-episode-index="${realIndex}" aria-label="播放第 ${realIndex + 1} 集"
+                    onclick="playEpisode(${realIndex})"
                     class="px-4 py-2 ${isActive ? 'episode-active' : '!bg-[#222] hover:!bg-[#333] hover:!shadow-none'} !border ${isActive ? '!border-blue-500' : '!border-[#333]'} rounded-lg transition-colors text-center episode-btn">
-                ${realIndex + 1}
+                <span class="episode-btn-prefix">第</span><strong>${realIndex + 1}</strong><span class="episode-btn-suffix">集</span>
             </button>
         `;
     });

@@ -191,6 +191,45 @@ function getDefaultTvTarget(scope, candidates) {
     return candidates[0] || null;
 }
 
+function getSearchResultNavigationTarget(activeElement, direction) {
+    var grid = document.getElementById('results');
+    if (!grid || !activeElement || !grid.contains(activeElement)) return null;
+
+    var cards = Array.from(grid.querySelectorAll('.result-card')).filter(isTvNavigable);
+    if (!cards.length) return null;
+    var origin = getElementCenter(activeElement);
+    var sameAxis = cards.filter(function (candidate) {
+        if (candidate === activeElement) return false;
+        var target = getElementCenter(candidate);
+        if (direction === 'left' || direction === 'right') {
+            return Math.abs(target.y - origin.y) < Math.max(origin.rect.height, target.rect.height) * .55;
+        }
+        return Math.abs(target.x - origin.x) < Math.max(origin.rect.width, target.rect.width) * .7;
+    });
+    var pool = sameAxis.length ? sameAxis : cards;
+    var best = null;
+    var bestScore = Number.POSITIVE_INFINITY;
+    pool.forEach(function (candidate) {
+        var score = getDirectionalScore(origin, candidate, direction);
+        if (score < bestScore) {
+            bestScore = score;
+            best = candidate;
+        }
+    });
+    return best;
+}
+
+function handleSearchResultDirection(event, direction) {
+    var activeElement = document.activeElement;
+    var target = getSearchResultNavigationTarget(activeElement, direction);
+    if (!target) return false;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    focusTvElement(target);
+    return true;
+}
+
 function handleTvDirection(event) {
     var directionMap = {
         ArrowLeft: 'left',
@@ -206,6 +245,8 @@ function handleTvDirection(event) {
     };
     var direction = directionMap[event.key] || legacyDirectionMap[event.keyCode];
     if (!direction || event.altKey || event.ctrlKey || event.metaKey) return;
+
+    if (handleSearchResultDirection(event, direction)) return;
 
     var activeElement = document.activeElement;
     var tagName = activeElement && activeElement.tagName;
