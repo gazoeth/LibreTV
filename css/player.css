@@ -1138,3 +1138,13 @@ input:checked + .slider:before { transform: translateX(20px); }
         font-size: .78rem;
     }
 }
+
+/* ── 播放器页面 body 适配 ───────────────────────────────── */
+/* NOTE: 播放器页面不需要底部导航栏空间，覆盖 mobile-nav.css 中的 padding-bottom */
+body.player-page {
+    padding-bottom: 0 !important;
+}
+
+body.player-page .mobile-bottom-nav {
+    display: none !important;
+}

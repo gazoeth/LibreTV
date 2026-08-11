@@ -938,3 +938,67 @@ function showImportBox(fun) {
         fun(fileInput.files[0]);
     });
 }
+
+/* ── 手机端底部导航栏 ────────────────────────────────────── */
+
+/**
+ * 关闭所有侧边面板
+ */
+function closeAllPanels() {
+    var settingsPanel = document.getElementById('settingsPanel');
+    var historyPanel = document.getElementById('historyPanel');
+    var backdrop = document.getElementById('panelBackdrop');
+    if (settingsPanel) settingsPanel.classList.remove('show');
+    if (historyPanel) historyPanel.classList.remove('show');
+    if (backdrop) backdrop.classList.remove('show');
+}
+window.closeAllPanels = closeAllPanels;
+
+/**
+ * 处理手机端底部导航栏点击
+ * @param {string} target - 导航目标：'home' | 'search' | 'history' | 'settings'
+ */
+function handleMobileNav(target) {
+    // 更新导航栏激活状态
+    var navItems = document.querySelectorAll('.mobile-nav-item');
+    navItems.forEach(function (item) { item.classList.remove('active'); });
+
+    var navId = 'nav' + target.charAt(0).toUpperCase() + target.slice(1);
+    var activeItem = document.getElementById(navId);
+    if (activeItem) activeItem.classList.add('active');
+
+    switch (target) {
+        case 'home':
+            closeAllPanels();
+            if (typeof resetToHome === 'function') resetToHome();
+            break;
+
+        case 'search':
+            closeAllPanels();
+            var searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            break;
+
+        case 'history':
+            // 关闭设置面板，切换历史面板
+            var sp = document.getElementById('settingsPanel');
+            if (sp && sp.classList.contains('show')) {
+                sp.classList.remove('show');
+            }
+            toggleHistory();
+            break;
+
+        case 'settings':
+            // 关闭历史面板，切换设置面板
+            var hp = document.getElementById('historyPanel');
+            if (hp && hp.classList.contains('show')) {
+                hp.classList.remove('show');
+            }
+            toggleSettings();
+            break;
+    }
+}
+window.handleMobileNav = handleMobileNav;

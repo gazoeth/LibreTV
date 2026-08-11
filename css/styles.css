@@ -990,3 +990,89 @@ input:focus-visible,
         transition-duration: .01ms !important;
     }
 }
+
+/* ── 手机端面板改为底部滑出 sheet ────────────────────────── */
+@media (max-width: 767px) {
+    .history-panel,
+    .settings-panel {
+        /* 从侧边滑出改为底部滑出 */
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: auto;
+        max-height: 85vh;
+        border-right: none;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px 20px 0 0;
+        -webkit-transform: translateY(100%);
+        transform: translateY(100%);
+        -webkit-transition: -webkit-transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .history-panel.show,
+    .settings-panel.show {
+        -webkit-transform: translateY(0);
+        transform: translateY(0);
+    }
+
+    /* 底部 sheet 拖拽手柄 */
+    .history-panel .panel-header::before,
+    .settings-panel .panel-header::before {
+        content: '';
+        display: block;
+        width: 36px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+        margin: 0 auto 10px;
+    }
+
+    /* 防止滚动穿透 */
+    .history-list,
+    .settings-body {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+}
+
+/* ── TV 遥控器彩色按键提示条 ──────────────────────────────── */
+.tv-color-hints {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 8999;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    padding: 0.6rem 1rem;
+    background: rgba(10, 10, 15, 0.9);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.82rem;
+    color: #8a8a9a;
+}
+
+.tv-color-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.tv-color-hint.red   { color: #ef4444; }
+.tv-color-hint.green  { color: #22c55e; }
+.tv-color-hint.yellow { color: #eab308; }
+.tv-color-hint.blue   { color: #3b82f6; }
+
+/* 仅 TV 模式下显示彩色按键提示 */
+body:not(.tv-mode) .tv-color-hints {
+    display: none !important;
+}
+
+body.tv-mode .tv-color-hints {
+    display: flex;
+}

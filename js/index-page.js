@@ -285,6 +285,43 @@ function handleTvDirection(event) {
 }
 
 function initTvRemoteNavigation() {
+    // NOTE: 优先使用统一焦点管理器（tv-focus-manager.js）
+    // 若 tvFocusManager 已加载，只注册首页特有的 Back 键行为即可；
+    // 方向键/确认键导航已由 tvFocusManager 内置处理器统一管理。
+    if (window.tvFocusManager) {
+        // 注册首页 Back 键：关闭搜索结果 / 关闭弹窗
+        window.tvFocusManager.registerKeyHandler('homepage-back', {
+            match: function (event) {
+                return event.key === 'Escape'
+                    || event.key === 'BrowserBack'
+                    || event.key === 'GoBack'
+                    || event.keyCode === 27
+                    || event.keyCode === 461
+                    || event.keyCode === 10009
+                    || event.keyCode === 4;
+            },
+            handler: function (event) {
+                // 有打开的弹窗时让 tvFocusManager 的内置处理器负责（scope stack 非空）
+                if (window.tvFocusManager._scopeStack.length > 0) return false;
+
+                var resultsArea = document.getElementById('resultsArea');
+                if (resultsArea && !resultsArea.classList.contains('hidden')) {
+                    event.preventDefault();
+                    if (typeof resetToHome === 'function') resetToHome();
+                    return true;
+                }
+                return false;
+            },
+            priority: 20  // 高于 tvFocusManager 内置处理器（priority 10）
+        });
+
+        // 注册首页确认键：搜索框上弹出虚拟键盘（由 tv-keyboard.js 监听 tv-confirm 事件处理）
+        // 此处无需额外处理，tvFocusManager 内置确认键处理会触发 tv-confirm 事件
+
+        return; // 剩余逻辑由 tvFocusManager 负责
+    }
+
+    // HACK: tvFocusManager 未加载时的降级实现（保持原有代码）
     document.addEventListener('keydown', function (event) {
         var isArrowKey = (event.key && event.key.indexOf('Arrow') === 0)
             || (event.keyCode >= 37 && event.keyCode <= 40);
@@ -350,6 +387,7 @@ function initTvRemoteNavigation() {
         document.body.classList.remove('tv-navigation-active');
     }, true);
 }
+
 
 // 页面加载后处理首页控件和 URL 搜索参数
 document.addEventListener('DOMContentLoaded', function () {

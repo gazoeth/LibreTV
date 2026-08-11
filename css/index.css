@@ -541,10 +541,12 @@
 
 /* ── Results section ─────────────────────────────────────────── */
 .results-inner {
-    max-width: 960px;
+    /* NOTE: 加宽至 1200px 让 auto-fill 网格可展示更多列（每列 ≤160px，最多 ~7 列）*/
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 0 .5rem;
+    padding: 0 1rem;
 }
+
 
 .results-header {
     display: -webkit-box;
@@ -656,24 +658,27 @@
 /* 搜索结果海报卡片网格 */
 .results-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    grid-gap: 1.25rem;
-    gap: 1.25rem;
+    /* NOTE: minmax(0, 160px) 限制每列最大 160px，防止宽屏卡片过大 */
+    grid-template-columns: repeat(auto-fill, minmax(120px, 160px));
+    grid-gap: 1rem;
+    gap: 1rem;
+    /* 网格整体居左对齐（避免最后一行拉伸），同时受 results-inner max-width 约束 */
+    justify-content: start;
 }
 
 @media (max-width: 900px) {
     .results-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        grid-gap: 1rem;
-        gap: 1rem;
+        grid-template-columns: repeat(auto-fill, minmax(110px, 145px));
+        grid-gap: .85rem;
+        gap: .85rem;
     }
 }
 
 @media (max-width: 600px) {
     .results-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        grid-gap: .75rem;
-        gap: .75rem;
+        grid-template-columns: repeat(auto-fill, minmax(96px, 130px));
+        grid-gap: .65rem;
+        gap: .65rem;
     }
 }
 
@@ -704,13 +709,16 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
     -webkit-transition: all .3s cubic-bezier(.4, 0, .2, 1);
     transition: all .3s cubic-bezier(.4, 0, .2, 1);
+    /* NOTE: 限制海报最大高度，防止宽屏下图片过高 */
+    max-height: 220px;
 }
-/* 现代浏览器恢复 aspect-ratio（height:0+padding-bottom 在现代浏览器中仍能工作，此处为明确语义） */
+/* 现代浏览器恢复 aspect-ratio */
 @supports (aspect-ratio: 2/3) {
     .result-poster {
         height: auto;
         padding-bottom: 0;
         aspect-ratio: 2 / 3;
+        max-height: 220px;
     }
 }
 
@@ -2744,5 +2752,44 @@ body.tv-navigation-active .result-card:focus .result-card-name {
 
     body.tv-navigation-active .tv-spatial-item:focus {
         transform: none;
+    }
+}
+
+/* ── 手机端触控目标优化 ───────────────────────────────────── */
+/* NOTE: Apple HIG 规定最小触控目标为 44×44px */
+@media (max-width: 767px) {
+    /* 防止 iOS Safari 自动缩放 */
+    .search-input {
+        font-size: 16px;
+    }
+
+    /* 按钮最小高度保证 */
+    .hot-source-tab,
+    .recent-search-tag,
+    .results-filter-button,
+    .douban-toggle-button,
+    .douban-refresh-button {
+        min-height: 44px;
+    }
+
+    /* 热门推荐卡片触控区域增大 */
+    .trending-card,
+    .douban-card {
+        min-height: 180px;
+    }
+
+    /* 顶部角落按钮隐藏（已有底部导航栏） */
+    .app-corner {
+        display: none;
+    }
+
+    /* 为底部导航栏留出空间 */
+    body {
+        padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* 搜索结果卡片间距增大 */
+    .results-grid {
+        gap: 0.85rem;
     }
 }

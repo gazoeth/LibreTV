@@ -1,0 +1,223 @@
+/* ============================================================
+   FreeDY TV 虚拟键盘样式
+   ============================================================ */
+
+/* ── 遮罩层 ───────────────────────────────────────────────── */
+.tv-keyboard-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+/* ── 键盘面板 ─────────────────────────────────────────────── */
+.tv-keyboard-panel {
+    background: linear-gradient(180deg, #1a1a26 0%, #0e0e16 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px 24px 0 0;
+    padding: 1.5rem 2rem 2rem;
+    max-height: 60vh;
+    animation: tvKeyboardSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes tvKeyboardSlideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── 输入显示区 ───────────────────────────────────────────── */
+.tv-keyboard-input-area {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+}
+
+.tv-keyboard-input-display {
+    flex: 1;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+    color: #f1f1f1;
+    font-size: 1.15rem;
+    font-weight: 500;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.tv-keyboard-input-display.empty {
+    color: #5a5a6e;
+}
+
+/* 光标闪烁 */
+.tv-keyboard-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.3em;
+    background: #e50914;
+    margin-left: 1px;
+    animation: tvCursorBlink 1s step-end infinite;
+}
+
+@keyframes tvCursorBlink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0; }
+}
+
+.tv-keyboard-action-btn {
+    min-width: 5rem;
+    min-height: 3rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #a0a0b0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tv-keyboard-action-btn.primary {
+    background: #e50914;
+    border-color: #e50914;
+    color: #fff;
+}
+
+.tv-keyboard-action-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+    z-index: 2;
+}
+
+/* ── 键盘网格 ─────────────────────────────────────────────── */
+.tv-keyboard-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.tv-keyboard-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+/* ── 按键 ─────────────────────────────────────────────────── */
+.tv-keyboard-key {
+    min-width: 64px;
+    min-height: 56px;
+    padding: 0.5rem 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e0e0e8;
+    font-size: 1.1rem;
+    font-weight: 500;
+    font-family: 'Inter', monospace;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* 特殊功能键样式 */
+.tv-keyboard-key.key-wide {
+    min-width: 100px;
+    font-size: 0.85rem;
+}
+
+.tv-keyboard-key.key-space {
+    flex: 1;
+    min-width: 200px;
+    font-size: 0.85rem;
+    color: #8a8a9a;
+}
+
+.tv-keyboard-key.key-backspace {
+    min-width: 100px;
+    font-size: 0.85rem;
+}
+
+.tv-keyboard-key.key-search {
+    min-width: 100px;
+    background: #e50914;
+    border-color: rgba(229, 9, 20, 0.5);
+    color: #fff;
+    font-weight: 700;
+}
+
+/* 焦点态 */
+.tv-keyboard-key:focus {
+    outline: none;
+    background: rgba(229, 9, 20, 0.25);
+    border-color: #fff;
+    color: #fff;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+    transform: scale(1.05);
+    z-index: 2;
+}
+
+/* 按下态 */
+.tv-keyboard-key:active,
+.tv-keyboard-key.pressed {
+    transform: scale(0.95);
+    background: rgba(229, 9, 20, 0.4);
+}
+
+/* ── 搜索历史快捷区 ───────────────────────────────────────── */
+.tv-keyboard-history {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    margin-top: 0.5rem;
+    scrollbar-width: none;
+}
+
+.tv-keyboard-history::-webkit-scrollbar {
+    display: none;
+}
+
+.tv-keyboard-history-label {
+    color: #5a5a6e;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    padding-right: 0.5rem;
+}
+
+.tv-keyboard-history-tag {
+    min-height: 3rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #a0a0b0;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tv-keyboard-history-tag:focus {
+    outline: none;
+    border-color: #fff;
+    color: #fff;
+    background: rgba(229, 9, 20, 0.2);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #e50914;
+}

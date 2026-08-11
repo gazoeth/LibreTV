@@ -1,0 +1,268 @@
+/* ============================================================
+   FreeDY TV 模式专属样式
+   通过 body.tv-mode 类激活（由 tv-focus-manager.js 自动检测添加）
+   目标设备：小米电视盒、Android TV、夏普电视
+   设计距离：3-4 米观看
+   ============================================================ */
+
+/* ── 全局基准 ─────────────────────────────────────────────── */
+body.tv-mode {
+    font-size: 18px;
+}
+
+/* ── 交互元素最小尺寸保证 ─────────────────────────────────── */
+/* NOTE: 56px 是 TV 端从 3m 距离可轻松操控的最小触控目标 */
+body.tv-mode button:not(.episode-btn),
+body.tv-mode a[href],
+body.tv-mode [role="button"],
+body.tv-mode select,
+body.tv-mode input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]) {
+    min-height: 56px;
+}
+
+/* ── 统一高对比度焦点环 ───────────────────────────────────── */
+/* NOTE: 白色内环 + 红色外环确保在深色背景上的可见性 */
+body.tv-mode.tv-navigation-active *:focus {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 7px rgba(229, 9, 20, 0.78),
+                0 18px 45px rgba(0, 0, 0, 0.45);
+    z-index: 10;
+    position: relative;
+}
+
+/* 焦点环不影响布局 */
+body.tv-mode.tv-navigation-active *:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
+/* ── 去除 hover 效果（TV 无鼠标） ─────────────────────────── */
+body.tv-mode .result-card:hover .result-poster,
+body.tv-mode .trending-card:hover,
+body.tv-mode .douban-card:hover {
+    transform: none;
+}
+
+/* ── 滚动条加粗（视觉提示可滚动） ─────────────────────────── */
+body.tv-mode ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+body.tv-mode ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 5px;
+}
+
+body.tv-mode ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── 搜索框增大 ───────────────────────────────────────────── */
+body.tv-mode .search-box {
+    height: 5rem;
+    border-radius: 20px;
+}
+
+body.tv-mode .search-input {
+    font-size: 1.15rem;
+    padding: 0 1.5rem;
+}
+
+body.tv-mode .search-side-btn {
+    min-width: 7rem;
+    width: 7rem;
+    font-size: 1.05rem;
+}
+
+body.tv-mode .search-clear-btn {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* ── 顶部角落按钮增大 ─────────────────────────────────────── */
+body.tv-mode .top-corner-button {
+    min-height: 3.25rem;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.95rem;
+    border-radius: 14px;
+}
+
+body.tv-mode .top-corner-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+body.tv-mode .corner-btn-label {
+    font-size: 0.92rem;
+}
+
+/* ── 最近搜索标签增大 ─────────────────────────────────────── */
+body.tv-mode .recent-search-tag {
+    min-height: 3rem;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.92rem;
+}
+
+/* ── 热门推荐区域增大 ─────────────────────────────────────── */
+body.tv-mode .hot-source-tab {
+    min-height: 3.25rem;
+    padding: 0.7rem 1.2rem;
+    font-size: 0.92rem;
+}
+
+body.tv-mode .trending-card-title,
+body.tv-mode .trending-card .text-xs,
+body.tv-mode .douban-title {
+    font-size: 0.95rem;
+}
+
+body.tv-mode .douban-refresh-button,
+body.tv-mode .hot-section-controls button {
+    min-height: 3rem;
+    padding: 0.6rem 1rem;
+}
+
+/* ── 搜索结果卡片增大 ─────────────────────────────────────── */
+body.tv-mode .result-card-name {
+    font-size: 1rem;
+    min-height: 2.5rem;
+}
+
+body.tv-mode .result-card-remarks {
+    font-size: 0.8rem;
+}
+
+/* 结果筛选按钮增大 */
+body.tv-mode .results-filter-button {
+    min-height: 3.5rem;
+    padding: 0.7rem 1.2rem;
+}
+
+/* ── 播放器页面 Header 增高 ──────────────────────────────── */
+body.tv-mode .player-header-fixed {
+    height: 72px;
+}
+
+body.tv-mode.player-page {
+    padding-top: 72px;
+}
+
+/* ── 播放器集数按钮增大 ───────────────────────────────────── */
+body.tv-mode #episodesList button {
+    min-height: 3.75rem;
+    padding: 0.6rem 0.5rem;
+    font-size: 1rem;
+}
+
+/* TV 模式下减少每行集数，增大单个按钮 */
+body.tv-mode #episodesList {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+/* ── 播放器导航按钮增大 ───────────────────────────────────── */
+body.tv-mode #prevButton,
+body.tv-mode #nextButton {
+    min-height: 3.5rem;
+    padding: 0.65rem 1.2rem;
+    font-size: 1rem;
+}
+
+body.tv-mode #switchResourceBtn,
+body.tv-mode #visualCleanButton,
+body.tv-mode #episodeOrderButton {
+    min-height: 3rem;
+    padding: 0.65rem 1rem;
+}
+
+body.tv-mode #switchResourceBtn svg,
+body.tv-mode #visualCleanButton svg,
+body.tv-mode #episodeOrderButton svg {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+/* ── 设置面板增大 ─────────────────────────────────────────── */
+body.tv-mode .btn-setting-sm {
+    min-height: 3rem;
+    font-size: 0.88rem;
+}
+
+body.tv-mode .btn-danger-ghost,
+body.tv-mode .btn-ghost,
+body.tv-mode .btn-primary {
+    min-height: 3rem;
+    font-size: 0.92rem;
+}
+
+body.tv-mode .toggle-label {
+    font-size: 0.95rem;
+}
+
+body.tv-mode .toggle-desc {
+    font-size: 0.8rem;
+}
+
+body.tv-mode .settings-section-label {
+    font-size: 0.88rem;
+}
+
+body.tv-mode .settings-input {
+    min-height: 3rem;
+    font-size: 0.92rem;
+}
+
+/* ── 弹窗/模态框增大 ─────────────────────────────────────── */
+body.tv-mode .modal-close,
+body.tv-mode .resource-modal-close,
+body.tv-mode .episode-picker-close {
+    min-width: 3rem;
+    min-height: 3rem;
+    font-size: 1.5rem;
+}
+
+body.tv-mode .resource-switch-btn {
+    min-height: 3.25rem;
+    font-size: 0.95rem;
+}
+
+/* ── 焦点卡片动画 ─────────────────────────────────────────── */
+body.tv-mode.tv-navigation-active .trending-card:focus > div:first-child,
+body.tv-mode.tv-navigation-active .douban-card:focus > div:first-child,
+body.tv-mode.tv-navigation-active .result-card:focus .result-poster {
+    transform: scale(1.06);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55),
+                0 0 0 4px #fff,
+                0 0 0 8px #e50914;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.tv-mode.tv-navigation-active .result-card:focus .result-poster-overlay {
+    opacity: 1;
+}
+
+body.tv-mode.tv-navigation-active .result-card:focus .result-card-name {
+    color: #fff;
+}
+
+/* ── 页脚增大 ─────────────────────────────────────────────── */
+body.tv-mode .site-footer,
+body.tv-mode .footer {
+    font-size: 0.85rem;
+}
+
+body.tv-mode .footer-link {
+    min-height: 3rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* ── 减弱动画（TV 性能考虑） ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    body.tv-mode * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

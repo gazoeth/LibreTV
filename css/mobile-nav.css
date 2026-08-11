@@ -1,0 +1,122 @@
+/* ============================================================
+   FreeDY 手机端底部导航栏样式
+   仅在 max-width: 767px 下显示
+   ============================================================ */
+
+/* ── 底部导航栏 ───────────────────────────────────────────── */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    height: 56px;
+    /* NOTE: iOS safe area 底部安全区适配 */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(10, 10, 15, 0.96);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: none; /* 默认隐藏，仅手机端显示 */
+    justify-content: space-around;
+    align-items: center;
+}
+
+/* ── 导航项 ───────────────────────────────────────────────── */
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 16px;
+    min-width: 64px;
+    min-height: 44px;
+    color: #6a6a7a;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.2s ease;
+    position: relative;
+}
+
+.mobile-nav-item svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.8;
+    transition: transform 0.2s ease;
+}
+
+/* 激活态 */
+.mobile-nav-item.active {
+    color: #e50914;
+}
+
+.mobile-nav-item.active svg {
+    transform: scale(1.1);
+}
+
+/* 激活指示器（顶部小圆点） */
+.mobile-nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #e50914;
+}
+
+/* 按下态 */
+.mobile-nav-item:active {
+    color: #e50914;
+    opacity: 0.8;
+}
+
+.mobile-nav-item:active svg {
+    transform: scale(0.92);
+}
+
+/* ── 响应式控制 ───────────────────────────────────────────── */
+@media (max-width: 767px) {
+    .mobile-bottom-nav {
+        display: flex;
+    }
+
+    /* 为底部导航栏留出空间 */
+    body {
+        padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* 首页顶部角落按钮隐藏（已有底部导航栏） */
+    .app-corner {
+        display: none;
+    }
+}
+
+/* 非手机端不显示 */
+@media (min-width: 768px) {
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+}
+
+/* 播放器页面隐藏底部导航栏（沉浸式观看） */
+body.player-page .mobile-bottom-nav {
+    display: none !important;
+}
+
+body.player-page {
+    padding-bottom: 0 !important;
+}
+
+/* TV 模式隐藏底部导航栏 */
+body.tv-mode .mobile-bottom-nav {
+    display: none !important;
+}

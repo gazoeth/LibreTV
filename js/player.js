@@ -1,96 +1,92 @@
 const selectedAPIs = JSON.parse(localStorage.getItem('selectedAPIs') || '[]');
-const customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]'); // 存储自定义API列表
+const customAPIs = JSON.parse(localStorage.getItem('customAPIs') || '[]'); // 瀛樺偍鑷畾涔堿PI鍒楄〃
 
-// 改进返回功能
+// 鏀硅繘杩斿洖鍔熻兘
 function goBack(event) {
-    // 防止默认链接行为
+    // 闃叉榛樿閾炬帴琛屼负
     if (event) event.preventDefault();
     
-    // 1. 优先检查URL参数中的returnUrl
+    // 1. 浼樺厛妫€鏌RL鍙傛暟涓殑returnUrl
     const urlParams = new URLSearchParams(window.location.search);
     const returnUrl = urlParams.get('returnUrl');
     
     if (returnUrl) {
-        // 如果URL中有returnUrl参数，优先使用
-        window.location.href = decodeURIComponent(returnUrl);
+        // 濡傛灉URL涓湁returnUrl鍙傛暟锛屼紭鍏堜娇鐢?        window.location.href = decodeURIComponent(returnUrl);
         return;
     }
     
-    // 2. 检查localStorage中保存的lastPageUrl
+    // 2. 妫€鏌ocalStorage涓繚瀛樼殑lastPageUrl
     const lastPageUrl = localStorage.getItem('lastPageUrl');
     if (lastPageUrl && lastPageUrl !== window.location.href) {
         window.location.href = lastPageUrl;
         return;
     }
     
-    // 3. 检查是否是从搜索页面进入的播放器
-    const referrer = document.referrer;
+    // 3. 妫€鏌ユ槸鍚︽槸浠庢悳绱㈤〉闈㈣繘鍏ョ殑鎾斁鍣?    const referrer = document.referrer;
     
-    // 检查 referrer 是否包含搜索参数
+    // 妫€鏌?referrer 鏄惁鍖呭惈鎼滅储鍙傛暟
     if (referrer && (referrer.includes('/s=') || referrer.includes('?s='))) {
-        // 如果是从搜索页面来的，返回到搜索页面
+        // 濡傛灉鏄粠鎼滅储椤甸潰鏉ョ殑锛岃繑鍥炲埌鎼滅储椤甸潰
         window.location.href = referrer;
         return;
     }
     
-    // 4. 如果是在iframe中打开的，尝试关闭iframe
+    // 4. 濡傛灉鏄湪iframe涓墦寮€鐨勶紝灏濊瘯鍏抽棴iframe
     if (window.self !== window.top) {
         try {
-            // 尝试调用父窗口的关闭播放器函数
-            window.parent.closeVideoPlayer && window.parent.closeVideoPlayer();
+            // 灏濊瘯璋冪敤鐖剁獥鍙ｇ殑鍏抽棴鎾斁鍣ㄥ嚱鏁?            window.parent.closeVideoPlayer && window.parent.closeVideoPlayer();
             return;
         } catch (e) {
-            console.error('调用父窗口closeVideoPlayer失败:', e);
+            console.error('璋冪敤鐖剁獥鍙loseVideoPlayer澶辫触:', e);
         }
     }
     
-    // 5. 无法确定上一页，则返回首页
-    if (!referrer || referrer === '') {
+    // 5. 鏃犳硶纭畾涓婁竴椤碉紝鍒欒繑鍥為椤?    if (!referrer || referrer === '') {
         window.location.href = '/';
         return;
     }
     
-    // 6. 以上都不满足，使用默认行为：返回上一页
-    window.history.back();
+    // 6. 浠ヤ笂閮戒笉婊¤冻锛屼娇鐢ㄩ粯璁よ涓猴細杩斿洖涓婁竴椤?    window.history.back();
 }
 
-// 页面加载时保存当前URL到localStorage，作为返回目标
-window.addEventListener('load', function () {
-    // 保存前一页面URL
+// 椤甸潰鍔犺浇鏃朵繚瀛樺綋鍓峌RL鍒發ocalStorage锛屼綔涓鸿繑鍥炵洰鏍?window.addEventListener('load', function () {
+    // 淇濆瓨鍓嶄竴椤甸潰URL
     if (document.referrer && document.referrer !== window.location.href) {
         localStorage.setItem('lastPageUrl', document.referrer);
     }
 
-    // 提取当前URL中的重要参数，以便在需要时能够恢复当前页面
+    // 鎻愬彇褰撳墠URL涓殑閲嶈鍙傛暟锛屼互渚垮湪闇€瑕佹椂鑳藉鎭㈠褰撳墠椤甸潰
     const urlParams = new URLSearchParams(window.location.search);
     const videoId = urlParams.get('id');
     const sourceCode = getCurrentSourceCode(urlParams);
 
     if (videoId && sourceCode) {
-        // 保存当前播放状态，以便其他页面可以返回
+        // 淇濆瓨褰撳墠鎾斁鐘舵€侊紝浠ヤ究鍏朵粬椤甸潰鍙互杩斿洖
         localStorage.setItem('currentPlayingId', videoId);
         localStorage.setItem('currentPlayingSource', sourceCode);
     }
+
+    // NOTE: TV 妯″紡涓嬫樉绀洪仴鎺у櫒褰╄壊鎸夐敭鎻愮ず鏉?    if (window.tvFocusManager && window.tvFocusManager.isTvDevice) {
+        var colorHints = document.getElementById('tvColorHints');
+        if (colorHints) colorHints.style.display = 'flex';
+    }
 });
+
 
 
 // =================================
 // ============== PLAYER ==========
 // =================================
-// 全局变量
+// 鍏ㄥ眬鍙橀噺
 let currentVideoTitle = '';
 let currentEpisodeIndex = 0;
-let art = null; // 用于 ArtPlayer 实例
-let currentHls = null; // 跟踪当前HLS实例
+let art = null; // 鐢ㄤ簬 ArtPlayer 瀹炰緥
+let currentHls = null; // 璺熻釜褰撳墠HLS瀹炰緥
 let currentEpisodes = [];
 let episodesReversed = false;
-let autoplayEnabled = true; // 默认开启自动连播
-let videoHasEnded = false; // 跟踪视频是否已经自然结束
-let userClickedPosition = null; // 记录用户点击的位置
-let shortcutHintTimeout = null; // 用于控制快捷键提示显示时间
-let adFilteringEnabled = true; // 默认开启广告过滤
-let progressSaveInterval = null; // 定期保存进度的计时器
-let currentVideoUrl = ''; // 记录当前实际的视频URL
+let autoplayEnabled = true; // 榛樿寮€鍚嚜鍔ㄨ繛鎾?let videoHasEnded = false; // 璺熻釜瑙嗛鏄惁宸茬粡鑷劧缁撴潫
+let userClickedPosition = null; // 璁板綍鐢ㄦ埛鐐瑰嚮鐨勪綅缃?let shortcutHintTimeout = null; // 鐢ㄤ簬鎺у埗蹇嵎閿彁绀烘樉绀烘椂闂?let adFilteringEnabled = true; // 榛樿寮€鍚箍鍛婅繃婊?let progressSaveInterval = null; // 瀹氭湡淇濆瓨杩涘害鐨勮鏃跺櫒
+let currentVideoUrl = ''; // 璁板綍褰撳墠瀹為檯鐨勮棰慤RL
 let resourceSwitchInProgress = false;
 let playerTvNavigationMode = false;
 let playerTvPreviousFocus = null;
@@ -102,14 +98,14 @@ const VISUAL_CLEAN_AUTO_SAMPLE_DELAYS = [8000, 20000, 45000];
 const VISUAL_CLEAN_AUTO_WIDTH = 256;
 const VISUAL_CLEAN_AUTO_MIN_CONFIDENCE = 0.74;
 const VISUAL_CLEAN_MODES = [
-    { key: 'off', label: '关闭', className: '' },
-    { key: 'bottom-right', label: '右下角遮罩', className: 'clean-mask-bottom-right' },
-    { key: 'bottom-left', label: '左下角遮罩', className: 'clean-mask-bottom-left' },
-    { key: 'top-right', label: '右上角遮罩', className: 'clean-mask-top-right' },
-    { key: 'top-left', label: '左上角遮罩', className: 'clean-mask-top-left' },
-    { key: 'crop-bottom', label: '底部跑马灯', className: 'clean-crop-bottom' },
-    { key: 'crop-top', label: '顶部跑马灯', className: 'clean-crop-top' },
-    { key: 'crop-bottom-right', label: '底部+右下角', className: 'clean-crop-bottom-right' }
+    { key: 'off', label: '鍏抽棴', className: '' },
+    { key: 'bottom-right', label: '鍙充笅瑙掗伄缃?, className: 'clean-mask-bottom-right' },
+    { key: 'bottom-left', label: '宸︿笅瑙掗伄缃?, className: 'clean-mask-bottom-left' },
+    { key: 'top-right', label: '鍙充笂瑙掗伄缃?, className: 'clean-mask-top-right' },
+    { key: 'top-left', label: '宸︿笂瑙掗伄缃?, className: 'clean-mask-top-left' },
+    { key: 'crop-bottom', label: '搴曢儴璺戦┈鐏?, className: 'clean-crop-bottom' },
+    { key: 'crop-top', label: '椤堕儴璺戦┈鐏?, className: 'clean-crop-top' },
+    { key: 'crop-bottom-right', label: '搴曢儴+鍙充笅瑙?, className: 'clean-crop-bottom-right' }
 ];
 let currentVisualCleanMode = 'off';
 let visualCleanDetectionSession = null;
@@ -162,16 +158,16 @@ function applyVisualCleanMode(modeKey, options = {}) {
     if (selectedMode.className) container.classList.add(selectedMode.className);
     currentVisualCleanMode = selectedMode.key;
 
-    if (text) text.textContent = `画面净化：${selectedMode.label}`;
+    if (text) text.textContent = `鐢婚潰鍑€鍖栵細${selectedMode.label}`;
     if (button) {
         button.classList.toggle('is-active', selectedMode.key !== 'off');
-        button.setAttribute('aria-label', `画面净化：${selectedMode.label}`);
+        button.setAttribute('aria-label', `鐢婚潰鍑€鍖栵細${selectedMode.label}`);
         button.setAttribute('aria-pressed', selectedMode.key !== 'off' ? 'true' : 'false');
     }
 
     const sourceKey = getCurrentSourceCode();
     if (options.persist !== false) saveVisualCleanModeForSource(sourceKey, selectedMode.key);
-    if (options.notify) showToast(`画面净化：${selectedMode.label}`, selectedMode.key === 'off' ? 'info' : 'success');
+    if (options.notify) showToast(`鐢婚潰鍑€鍖栵細${selectedMode.label}`, selectedMode.key === 'off' ? 'info' : 'success');
 }
 
 function cycleVisualCleanMode() {
@@ -393,7 +389,7 @@ function analyzeVisualCleanFrames(frames) {
         return {
             mode: 'crop-bottom-right',
             confidence: Math.min(0.98, (bottomStrip.confidence + bottomRight.confidence) / 2),
-            reason: '检测到底部横条和右下角固定贴片'
+            reason: '妫€娴嬪埌搴曢儴妯潯鍜屽彸涓嬭鍥哄畾璐寸墖'
         };
     }
 
@@ -403,8 +399,8 @@ function analyzeVisualCleanFrames(frames) {
         mode: best.mode,
         confidence: best.confidence,
         reason: best.mode.startsWith('crop-')
-            ? `检测到${modeConfig?.label || '持续横条'}`
-            : `检测到${modeConfig?.label || '固定贴片'}`
+            ? `妫€娴嬪埌${modeConfig?.label || '鎸佺画妯潯'}`
+            : `妫€娴嬪埌${modeConfig?.label || '鍥哄畾璐寸墖'}`
     };
 }
 
@@ -432,7 +428,7 @@ function showVisualCleanConfirm(result, sourceKey) {
     const modeConfig = VISUAL_CLEAN_MODES.find(mode => mode.key === result.mode);
     const sourceName = getResourceDisplayName(sourceKey);
     const confidence = Math.round(result.confidence * 100);
-    description.textContent = `${result.reason}，建议使用“${modeConfig?.label || '画面净化'}”（置信度 ${confidence}%）。仅在你确认后应用，并保存到 ${sourceName}。`;
+    description.textContent = `${result.reason}锛屽缓璁娇鐢ㄢ€?{modeConfig?.label || '鐢婚潰鍑€鍖?}鈥濓紙缃俊搴?${confidence}%锛夈€備粎鍦ㄤ綘纭鍚庡簲鐢紝骞朵繚瀛樺埌 ${sourceName}銆俙;
     visualCleanConfirmPreviousFocus = document.activeElement;
     modal.dataset.mode = result.mode;
     modal.dataset.sourceKey = sourceKey;
@@ -483,7 +479,7 @@ function handleVisualCleanConfirm(action) {
         applyVisualCleanMode(mode, { persist: true, notify: true });
     } else if (action === 'disable') {
         disableVisualCleanAutoForSource(sourceKey);
-        showToast(`已关闭 ${getResourceDisplayName(sourceKey)} 的自动画面识别`, 'info');
+        showToast(`宸插叧闂?${getResourceDisplayName(sourceKey)} 鐨勮嚜鍔ㄧ敾闈㈣瘑鍒玚, 'info');
     }
 }
 
@@ -532,8 +528,7 @@ function startVisualCleanDetection() {
                 const frame = captureVisualCleanFrame(session);
                 if (frame) session.frames.push(frame);
             } catch (error) {
-                // 第三方视频没有 CORS 响应头时 Canvas 会被污染；静默退出，不影响播放。
-                stopVisualCleanDetection();
+                // 绗笁鏂硅棰戞病鏈?CORS 鍝嶅簲澶存椂 Canvas 浼氳姹℃煋锛涢潤榛橀€€鍑猴紝涓嶅奖鍝嶆挱鏀俱€?                stopVisualCleanDetection();
                 return;
             }
 
@@ -550,11 +545,11 @@ function startVisualCleanDetection() {
     });
 }
 
-// 页面加载
+// 椤甸潰鍔犺浇
 document.addEventListener('DOMContentLoaded', function () {
-    // 先检查用户是否已通过密码验证
+    // 鍏堟鏌ョ敤鎴锋槸鍚﹀凡閫氳繃瀵嗙爜楠岃瘉
     if (!isPasswordVerified()) {
-        // 隐藏加载提示
+        // 闅愯棌鍔犺浇鎻愮ず
         document.getElementById('player-loading').style.display = 'none';
         return;
     }
@@ -562,33 +557,31 @@ document.addEventListener('DOMContentLoaded', function () {
     initializePageContent();
 });
 
-// 监听密码验证成功事件
+// 鐩戝惉瀵嗙爜楠岃瘉鎴愬姛浜嬩欢
 document.addEventListener('passwordVerified', () => {
     document.getElementById('player-loading').style.display = 'block';
 
     initializePageContent();
 });
 
-// 初始化页面内容
-function initializePageContent() {
+// 鍒濆鍖栭〉闈㈠唴瀹?function initializePageContent() {
 
-    // 解析URL参数
+    // 瑙ｆ瀽URL鍙傛暟
     const urlParams = new URLSearchParams(window.location.search);
     let videoUrl = urlParams.get('url');
     const title = urlParams.get('title');
     const sourceCode = getCurrentSourceCode(urlParams);
     let index = parseInt(urlParams.get('index') || '0');
-    const episodesList = urlParams.get('episodes'); // 从URL获取集数信息
-    const savedPosition = parseInt(urlParams.get('position') || '0'); // 获取保存的播放位置
-    // 解决历史记录问题：检查URL是否是player.html开头的链接
-    // 如果是，说明这是历史记录重定向，需要解析真实的视频URL
+    const episodesList = urlParams.get('episodes'); // 浠嶶RL鑾峰彇闆嗘暟淇℃伅
+    const savedPosition = parseInt(urlParams.get('position') || '0'); // 鑾峰彇淇濆瓨鐨勬挱鏀句綅缃?    // 瑙ｅ喅鍘嗗彶璁板綍闂锛氭鏌RL鏄惁鏄痯layer.html寮€澶寸殑閾炬帴
+    // 濡傛灉鏄紝璇存槑杩欐槸鍘嗗彶璁板綍閲嶅畾鍚戯紝闇€瑕佽В鏋愮湡瀹炵殑瑙嗛URL
     if (videoUrl && videoUrl.includes('player.html')) {
         try {
-            // 尝试从嵌套URL中提取真实的视频链接
+            // 灏濊瘯浠庡祵濂桿RL涓彁鍙栫湡瀹炵殑瑙嗛閾炬帴
             const nestedUrlParams = new URLSearchParams(videoUrl.split('?')[1]);
-            // 从嵌套参数中获取真实视频URL
+            // 浠庡祵濂楀弬鏁颁腑鑾峰彇鐪熷疄瑙嗛URL
             const nestedVideoUrl = nestedUrlParams.get('url');
-            // 检查嵌套URL是否包含播放位置信息
+            // 妫€鏌ュ祵濂桿RL鏄惁鍖呭惈鎾斁浣嶇疆淇℃伅
             const nestedPosition = nestedUrlParams.get('position');
             const nestedIndex = nestedUrlParams.get('index');
             const nestedTitle = nestedUrlParams.get('title');
@@ -596,7 +589,7 @@ function initializePageContent() {
             if (nestedVideoUrl) {
                 videoUrl = nestedVideoUrl;
 
-                // 更新当前URL参数
+                // 鏇存柊褰撳墠URL鍙傛暟
                 const url = new URL(window.location.href);
                 if (!urlParams.has('position') && nestedPosition) {
                     url.searchParams.set('position', nestedPosition);
@@ -607,64 +600,59 @@ function initializePageContent() {
                 if (!urlParams.has('title') && nestedTitle) {
                     url.searchParams.set('title', nestedTitle);
                 }
-                // 替换当前URL
+                // 鏇挎崲褰撳墠URL
                 window.history.replaceState({}, '', url);
             } else {
-                showError('历史记录链接无效，请返回首页重新访问');
+                showError('鍘嗗彶璁板綍閾炬帴鏃犳晥锛岃杩斿洖棣栭〉閲嶆柊璁块棶');
             }
         } catch (e) {
         }
     }
 
-    // 保存当前视频URL
+    // 淇濆瓨褰撳墠瑙嗛URL
     currentVideoUrl = videoUrl || '';
 
-    // 从localStorage获取数据
-    currentVideoTitle = title || localStorage.getItem('currentVideoTitle') || '未知视频';
+    // 浠巐ocalStorage鑾峰彇鏁版嵁
+    currentVideoTitle = title || localStorage.getItem('currentVideoTitle') || '鏈煡瑙嗛';
     currentEpisodeIndex = index;
 
-    // 设置自动连播开关状态
-    autoplayEnabled = localStorage.getItem('autoplayEnabled') !== 'false'; // 默认为true
+    // 璁剧疆鑷姩杩炴挱寮€鍏崇姸鎬?    autoplayEnabled = localStorage.getItem('autoplayEnabled') !== 'false'; // 榛樿涓簍rue
     document.getElementById('autoplayToggle').checked = autoplayEnabled;
 
-    // 获取广告过滤设置
-    adFilteringEnabled = localStorage.getItem(PLAYER_CONFIG.adFilteringStorage) !== 'false'; // 默认为true
+    // 鑾峰彇骞垮憡杩囨护璁剧疆
+    adFilteringEnabled = localStorage.getItem(PLAYER_CONFIG.adFilteringStorage) !== 'false'; // 榛樿涓簍rue
 
-    // 监听自动连播开关变化
-    document.getElementById('autoplayToggle').addEventListener('change', function (e) {
+    // 鐩戝惉鑷姩杩炴挱寮€鍏冲彉鍖?    document.getElementById('autoplayToggle').addEventListener('change', function (e) {
         autoplayEnabled = e.target.checked;
         localStorage.setItem('autoplayEnabled', autoplayEnabled);
     });
 
-    // 优先使用URL传递的集数信息，否则从localStorage获取
+    // 浼樺厛浣跨敤URL浼犻€掔殑闆嗘暟淇℃伅锛屽惁鍒欎粠localStorage鑾峰彇
     try {
         if (episodesList) {
-            // 如果URL中有集数数据，优先使用它
+            // 濡傛灉URL涓湁闆嗘暟鏁版嵁锛屼紭鍏堜娇鐢ㄥ畠
             currentEpisodes = JSON.parse(decodeURIComponent(episodesList));
 
         } else {
-            // 否则从localStorage获取
+            // 鍚﹀垯浠巐ocalStorage鑾峰彇
             currentEpisodes = JSON.parse(localStorage.getItem('currentEpisodes') || '[]');
 
         }
 
-        // 检查集数索引是否有效，如果无效则调整为0
+        // 妫€鏌ラ泦鏁扮储寮曟槸鍚︽湁鏁堬紝濡傛灉鏃犳晥鍒欒皟鏁翠负0
         if (index < 0 || (currentEpisodes.length > 0 && index >= currentEpisodes.length)) {
-            // 如果索引太大，则使用最大有效索引
-            if (index >= currentEpisodes.length && currentEpisodes.length > 0) {
+            // 濡傛灉绱㈠紩澶ぇ锛屽垯浣跨敤鏈€澶ф湁鏁堢储寮?            if (index >= currentEpisodes.length && currentEpisodes.length > 0) {
                 index = currentEpisodes.length - 1;
             } else {
                 index = 0;
             }
 
-            // 更新URL以反映修正后的索引
-            const newUrl = new URL(window.location.href);
+            // 鏇存柊URL浠ュ弽鏄犱慨姝ｅ悗鐨勭储寮?            const newUrl = new URL(window.location.href);
             newUrl.searchParams.set('index', index);
             window.history.replaceState({}, '', newUrl);
         }
 
-        // 更新当前索引为验证过的值
-        currentEpisodeIndex = index;
+        // 鏇存柊褰撳墠绱㈠紩涓洪獙璇佽繃鐨勫€?        currentEpisodeIndex = index;
 
         episodesReversed = localStorage.getItem('episodesReversed') === 'true';
     } catch (e) {
@@ -673,47 +661,42 @@ function initializePageContent() {
         episodesReversed = false;
     }
 
-    // 设置页面标题
-    document.title = currentVideoTitle + ' - FreeDY 播放器';
+    // 璁剧疆椤甸潰鏍囬
+    document.title = currentVideoTitle + ' - FreeDY 鎾斁鍣?;
     document.getElementById('videoTitle').textContent = currentVideoTitle;
 
-    // 初始化播放器
+    // 鍒濆鍖栨挱鏀惧櫒
     if (videoUrl) {
         initPlayer(videoUrl);
     } else {
-        showError('无效的视频链接');
+        showError('鏃犳晥鐨勮棰戦摼鎺?);
     }
 
-    // 渲染源信息并恢复该资源站的画面净化规则
-    renderResourceInfoBar();
+    // 娓叉煋婧愪俊鎭苟鎭㈠璇ヨ祫婧愮珯鐨勭敾闈㈠噣鍖栬鍒?    renderResourceInfoBar();
     restoreVisualCleanModeForCurrentSource();
 
-    // 更新集数信息
+    // 鏇存柊闆嗘暟淇℃伅
     updateEpisodeInfo();
 
-    // 渲染集数列表
+    // 娓叉煋闆嗘暟鍒楄〃
     renderEpisodes();
 
-    // 更新按钮状态
-    updateButtonStates();
+    // 鏇存柊鎸夐挳鐘舵€?    updateButtonStates();
 
-    // 更新排序按钮状态
-    updateOrderButton();
+    // 鏇存柊鎺掑簭鎸夐挳鐘舵€?    updateOrderButton();
 
-    // 添加对进度条的监听，确保点击准确跳转
+    // 娣诲姞瀵硅繘搴︽潯鐨勭洃鍚紝纭繚鐐瑰嚮鍑嗙‘璺宠浆
     setTimeout(() => {
         setupProgressBarPreciseClicks();
     }, 1000);
 
-    // 添加键盘快捷键事件监听
-    document.addEventListener('keydown', handleKeyboardShortcuts);
+    // 娣诲姞閿洏蹇嵎閿簨浠剁洃鍚?    document.addEventListener('keydown', handleKeyboardShortcuts);
 
-    // 添加页面离开事件监听，保存播放位置并释放自动识别资源
+    // 娣诲姞椤甸潰绂诲紑浜嬩欢鐩戝惉锛屼繚瀛樻挱鏀句綅缃苟閲婃斁鑷姩璇嗗埆璧勬簮
     window.addEventListener('beforeunload', saveCurrentProgress);
     window.addEventListener('pagehide', stopVisualCleanDetection, { once: true });
 
-    // 页面隐藏时保存，并停止尚未完成的抽样；回到前台不会持续重启分析。
-    document.addEventListener('visibilitychange', function () {
+    // 椤甸潰闅愯棌鏃朵繚瀛橈紝骞跺仠姝㈠皻鏈畬鎴愮殑鎶芥牱锛涘洖鍒板墠鍙颁笉浼氭寔缁噸鍚垎鏋愩€?    document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
             saveCurrentProgress();
             stopVisualCleanDetection();
@@ -721,17 +704,16 @@ function initializePageContent() {
         }
     });
 
-    // 视频暂停时也保存
+    // 瑙嗛鏆傚仠鏃朵篃淇濆瓨
     const waitForVideo = setInterval(() => {
         if (art && art.video) {
             art.video.addEventListener('pause', saveCurrentProgress);
 
-            // 新增：播放进度变化时节流保存
+            // 鏂板锛氭挱鏀捐繘搴﹀彉鍖栨椂鑺傛祦淇濆瓨
             let lastSave = 0;
             art.video.addEventListener('timeupdate', function() {
                 const now = Date.now();
-                if (now - lastSave > 5000) { // 每5秒最多保存一次
-                    saveCurrentProgress();
+                if (now - lastSave > 5000) { // 姣?绉掓渶澶氫繚瀛樹竴娆?                    saveCurrentProgress();
                     lastSave = now;
                 }
             });
@@ -832,8 +814,7 @@ function handlePlayerTvNavigation(event) {
     return true;
 }
 
-// 处理键盘快捷键
-function handleKeyboardShortcuts(e) {
+// 澶勭悊閿洏蹇嵎閿?function handleKeyboardShortcuts(e) {
     if (handlePlayerTvNavigation(e)) return;
     const visualEditor = document.getElementById('visualCleanEditorModal');
     if (visualEditor && !visualEditor.classList.contains('hidden')) {
@@ -863,95 +844,209 @@ function handleKeyboardShortcuts(e) {
         return;
     }
 
-    // 忽略输入框中的按键事件
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    // 蹇界暐杈撳叆妗嗕腑鐨勬寜閿簨浠?    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    // Alt + 左箭头 = 上一集
-    if (e.altKey && e.key === 'ArrowLeft') {
+    // Alt + 宸︾澶?= 涓婁竴闆?    if (e.altKey && e.key === 'ArrowLeft') {
         if (currentEpisodeIndex > 0) {
             playPreviousEpisode();
-            showShortcutHint('上一集', 'left');
+            showShortcutHint('涓婁竴闆?, 'left');
             e.preventDefault();
         }
     }
 
-    // Alt + 右箭头 = 下一集
-    if (e.altKey && e.key === 'ArrowRight') {
+    // Alt + 鍙崇澶?= 涓嬩竴闆?    if (e.altKey && e.key === 'ArrowRight') {
         if (currentEpisodeIndex < currentEpisodes.length - 1) {
             playNextEpisode();
-            showShortcutHint('下一集', 'right');
+            showShortcutHint('涓嬩竴闆?, 'right');
             e.preventDefault();
         }
     }
 
-    // 左箭头 = 快退
+    // 宸︾澶?= 蹇€€
     if (!e.altKey && e.key === 'ArrowLeft') {
         if (art && art.currentTime > 5) {
             art.currentTime -= 5;
-            showShortcutHint('快退', 'left');
+            showShortcutHint('蹇€€', 'left');
             e.preventDefault();
         }
     }
 
-    // 右箭头 = 快进
+    // 鍙崇澶?= 蹇繘
     if (!e.altKey && e.key === 'ArrowRight') {
         if (art && art.currentTime < art.duration - 5) {
             art.currentTime += 5;
-            showShortcutHint('快进', 'right');
+            showShortcutHint('蹇繘', 'right');
             e.preventDefault();
         }
     }
 
-    // 上箭头 = 音量+
+    // 涓婄澶?= 闊抽噺+
     if (e.key === 'ArrowUp') {
         if (art && art.volume < 1) {
             art.volume += 0.1;
-            showShortcutHint('音量+', 'up');
+            showShortcutHint('闊抽噺+', 'up');
             e.preventDefault();
         }
     }
 
-    // 下箭头 = 音量-
+    // 涓嬬澶?= 闊抽噺-
     if (e.key === 'ArrowDown') {
         if (art && art.volume > 0) {
             art.volume -= 0.1;
-            showShortcutHint('音量-', 'down');
+            showShortcutHint('闊抽噺-', 'down');
             e.preventDefault();
         }
     }
 
-    // 空格 = 播放/暂停
+    // 绌烘牸 = 鎾斁/鏆傚仠
     if (e.key === ' ') {
         if (art) {
             art.toggle();
-            showShortcutHint('播放/暂停', 'play');
+            showShortcutHint('鎾斁/鏆傚仠', 'play');
             e.preventDefault();
         }
     }
 
-    // f 键 = 切换全屏
+    // f 閿?= 鍒囨崲鍏ㄥ睆
     if (e.key === 'f' || e.key === 'F') {
         if (art) {
             art.fullscreen = !art.fullscreen;
-            showShortcutHint('切换全屏', 'fullscreen');
+            showShortcutHint('鍒囨崲鍏ㄥ睆', 'fullscreen');
             e.preventDefault();
         }
     }
+
+    // 鈹€鈹€ 閬ユ帶鍣ㄥ獟浣撻敭鏀寔 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    // NOTE: 鐩爣璁惧锛氬皬绫崇數瑙嗙洅 (Android TV)銆佸鏅數瑙?    // MediaPlayPause / keyCode 179
+    if (e.key === 'MediaPlayPause' || e.keyCode === 179) {
+        if (art) {
+            art.toggle();
+            showShortcutHint('鎾斁/鏆傚仠', 'play');
+            e.preventDefault();
+        }
+    }
+
+    // MediaPlay
+    if (e.key === 'MediaPlay') {
+        if (art && !art.playing) {
+            art.play();
+            showShortcutHint('鎾斁', 'play');
+            e.preventDefault();
+        }
+    }
+
+    // MediaPause
+    if (e.key === 'MediaPause') {
+        if (art && art.playing) {
+            art.pause();
+            showShortcutHint('鏆傚仠', 'play');
+            e.preventDefault();
+        }
+    }
+
+    // MediaStop / keyCode 178 鈫?鍋滄骞惰繑鍥?    if (e.key === 'MediaStop' || e.keyCode === 178) {
+        if (art) {
+            art.pause();
+            showShortcutHint('宸插仠姝?, 'play');
+            e.preventDefault();
+        }
+    }
+
+    // MediaTrackNext / keyCode 176 鈫?涓嬩竴闆?    if (e.key === 'MediaTrackNext' || e.keyCode === 176) {
+        if (currentEpisodeIndex < currentEpisodes.length - 1) {
+            playNextEpisode();
+            showShortcutHint('涓嬩竴闆?, 'right');
+            e.preventDefault();
+        }
+    }
+
+    // MediaTrackPrevious / keyCode 177 鈫?涓婁竴闆?    if (e.key === 'MediaTrackPrevious' || e.keyCode === 177) {
+        if (currentEpisodeIndex > 0) {
+            playPreviousEpisode();
+            showShortcutHint('涓婁竴闆?, 'left');
+            e.preventDefault();
+        }
+    }
+
+    // ChannelUp / PageUp (keyCode 33) 鈫?涓嬩竴闆?    if (e.key === 'ChannelUp' || (!e.altKey && e.keyCode === 33)) {
+        if (currentEpisodeIndex < currentEpisodes.length - 1) {
+            playNextEpisode();
+            showShortcutHint('涓嬩竴闆?, 'right');
+            e.preventDefault();
+        }
+    }
+
+    // ChannelDown / PageDown (keyCode 34) 鈫?涓婁竴闆?    if (e.key === 'ChannelDown' || (!e.altKey && e.keyCode === 34)) {
+        if (currentEpisodeIndex > 0) {
+            playPreviousEpisode();
+            showShortcutHint('涓婁竴闆?, 'left');
+            e.preventDefault();
+        }
+    }
+
+    // 閬ユ帶鍣ㄥ僵鑹查敭锛圕olorF0Red=403 鎹㈡簮, ColorF1Green=404 鍑€鍖? ColorF2Yellow=405 鍊掑簭, ColorF3Blue=406 杩炴挱锛?    if (e.key === 'ColorF0Red' || e.keyCode === 403) {
+        var switchBtn = document.getElementById('switchResourceBtn');
+        if (switchBtn) { switchBtn.click(); e.preventDefault(); }
+    }
+    if (e.key === 'ColorF1Green' || e.keyCode === 404) {
+        var cleanBtn = document.getElementById('visualCleanButton');
+        if (cleanBtn) { cleanBtn.click(); e.preventDefault(); }
+    }
+    if (e.key === 'ColorF2Yellow' || e.keyCode === 405) {
+        var orderBtn = document.getElementById('episodeOrderButton');
+        if (orderBtn) { orderBtn.click(); e.preventDefault(); }
+    }
+    if (e.key === 'ColorF3Blue' || e.keyCode === 406) {
+        var autoplayToggle = document.getElementById('autoplayToggle');
+        if (autoplayToggle) {
+            autoplayToggle.checked = !autoplayToggle.checked;
+            autoplayToggle.dispatchEvent(new Event('change', { bubbles: true }));
+            showShortcutHint(autoplayToggle.checked ? '鑷姩杩炴挱 寮€' : '鑷姩杩炴挱 鍏?, 'play');
+            e.preventDefault();
+        }
+    }
+
+    // 鈹€鈹€ 鏁板瓧閿洿鎺ヨ烦闆嗭紙甯?1.5s debounce 鍚堝苟澶氫綅鏁帮級鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    var numKey = -1;
+    if (e.key >= '0' && e.key <= '9') numKey = parseInt(e.key, 10);
+    else if (e.keyCode >= 48 && e.keyCode <= 57) numKey = e.keyCode - 48;   // 涓婚敭鐩樻暟瀛?    else if (e.keyCode >= 96 && e.keyCode <= 105) numKey = e.keyCode - 96;  // 灏忛敭鐩樻暟瀛?
+    if (numKey >= 0) {
+        e.preventDefault();
+        // NOTE: 浣跨敤 window._tvEpisodeDigitBuffer 鏆傚瓨澶氫綅鏁?        if (!window._tvEpisodeDigitBuffer) window._tvEpisodeDigitBuffer = '';
+        window._tvEpisodeDigitBuffer += String(numKey);
+        clearTimeout(window._tvEpisodeDigitTimer);
+        window._tvEpisodeDigitTimer = setTimeout(function () {
+            var targetNum = parseInt(window._tvEpisodeDigitBuffer, 10);
+            window._tvEpisodeDigitBuffer = '';
+            var targetIdx = targetNum - 1; // 闆嗘暟浠?1 寮€濮嬶紝绱㈠紩浠?0 寮€濮?            if (targetIdx >= 0 && targetIdx < currentEpisodes.length) {
+                currentEpisodeIndex = targetIdx;
+                var ep = currentEpisodes[targetIdx];
+                if (ep) {
+                    var src = typeof ep === 'string' ? ep : (ep.url || ep);
+                    if (art) { art.url = src; art.play(); }
+                    showShortcutHint('绗?' + targetNum + ' 闆?, 'play');
+                    // 楂樹寒闆嗘暟鎸夐挳
+                    var btns = document.querySelectorAll('#episodesList button');
+                    btns.forEach(function (b, i) {
+                        b.classList.toggle('episode-active', i === targetIdx);
+                    });
+                }
+            }
+        }, 1500);
+    }
 }
 
-// 显示快捷键提示
-function showShortcutHint(text, direction) {
+
+// 鏄剧ず蹇嵎閿彁绀?function showShortcutHint(text, direction) {
     const hintElement = document.getElementById('shortcutHint');
     const textElement = document.getElementById('shortcutText');
     const iconElement = document.getElementById('shortcutIcon');
 
-    // 清除之前的超时
-    if (shortcutHintTimeout) {
+    // 娓呴櫎涔嬪墠鐨勮秴鏃?    if (shortcutHintTimeout) {
         clearTimeout(shortcutHintTimeout);
     }
 
-    // 设置文本和图标方向
-    textElement.textContent = text;
+    // 璁剧疆鏂囨湰鍜屽浘鏍囨柟鍚?    textElement.textContent = text;
 
     if (direction === 'left') {
         iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>';
@@ -967,22 +1062,21 @@ function showShortcutHint(text, direction) {
         iconElement.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"></path>';
     }
 
-    // 显示提示
+    // 鏄剧ず鎻愮ず
     hintElement.classList.add('show');
 
-    // 两秒后隐藏
-    shortcutHintTimeout = setTimeout(() => {
+    // 涓ょ鍚庨殣钘?    shortcutHintTimeout = setTimeout(() => {
         hintElement.classList.remove('show');
     }, 2000);
 }
 
-// 初始化播放器
+// 鍒濆鍖栨挱鏀惧櫒
 function initPlayer(videoUrl) {
     if (!videoUrl) {
         return
     }
 
-    // 销毁旧实例
+    // 閿€姣佹棫瀹炰緥
     stopVisualCleanDetection();
     closeVisualCleanConfirm();
     visualCleanDetectionAttemptKey = '';
@@ -991,7 +1085,7 @@ function initPlayer(videoUrl) {
         art = null;
     }
 
-    // 配置HLS.js选项
+    // 閰嶇疆HLS.js閫夐」
     const hlsConfig = {
         debug: false,
         loader: adFilteringEnabled ? CustomHlsJsLoader : Hls.DefaultConfig.loader,
@@ -1015,7 +1109,7 @@ function initPlayer(videoUrl) {
         abrBandWidthUpFactor: 0.7,
         abrMaxWithRealBitrate: true,
         stretchShortVideoTrack: true,
-        appendErrorMaxRetry: 5,  // 增加尝试次数
+        appendErrorMaxRetry: 5,  // 澧炲姞灏濊瘯娆℃暟
         liveSyncDurationCount: 3,
         liveDurationInfinity: false
     };
@@ -1056,7 +1150,7 @@ function initPlayer(videoUrl) {
         },
         customType: {
             m3u8: function (video, url) {
-                // 清理之前的HLS实例
+                // 娓呯悊涔嬪墠鐨凥LS瀹炰緥
                 if (currentHls && currentHls.destroy) {
                     try {
                         currentHls.destroy();
@@ -1064,30 +1158,28 @@ function initPlayer(videoUrl) {
                     }
                 }
 
-                // 创建新的HLS实例
+                // 鍒涘缓鏂扮殑HLS瀹炰緥
                 const hls = new Hls(hlsConfig);
                 currentHls = hls;
 
-                // 跟踪是否已经显示错误
+                // 璺熻釜鏄惁宸茬粡鏄剧ず閿欒
                 let errorDisplayed = false;
-                // 跟踪是否有错误发生
-                let errorCount = 0;
-                // 跟踪视频是否开始播放
-                let playbackStarted = false;
-                // 跟踪视频是否出现bufferAppendError
+                // 璺熻釜鏄惁鏈夐敊璇彂鐢?                let errorCount = 0;
+                // 璺熻釜瑙嗛鏄惁寮€濮嬫挱鏀?                let playbackStarted = false;
+                // 璺熻釜瑙嗛鏄惁鍑虹幇bufferAppendError
                 let bufferAppendErrorCount = 0;
 
-                // 监听视频播放事件
+                // 鐩戝惉瑙嗛鎾斁浜嬩欢
                 video.addEventListener('playing', function () {
                     playbackStarted = true;
                     document.getElementById('player-loading').style.display = 'none';
                     document.getElementById('error').style.display = 'none';
                 });
 
-                // 监听视频进度事件
+                // 鐩戝惉瑙嗛杩涘害浜嬩欢
                 video.addEventListener('timeupdate', function () {
                     if (video.currentTime > 1) {
-                        // 视频进度超过1秒，隐藏错误（如果存在）
+                        // 瑙嗛杩涘害瓒呰繃1绉掞紝闅愯棌閿欒锛堝鏋滃瓨鍦級
                         document.getElementById('error').style.display = 'none';
                     }
                 });
@@ -1096,13 +1188,12 @@ function initPlayer(videoUrl) {
                 hls.attachMedia(video);
 
                 // enable airplay, from https://github.com/video-dev/hls.js/issues/5989
-                // 检查是否已存在source元素，如果存在则更新，不存在则创建
-                let sourceElement = video.querySelector('source');
+                // 妫€鏌ユ槸鍚﹀凡瀛樺湪source鍏冪礌锛屽鏋滃瓨鍦ㄥ垯鏇存柊锛屼笉瀛樺湪鍒欏垱寤?                let sourceElement = video.querySelector('source');
                 if (sourceElement) {
-                    // 更新现有source元素的URL
+                    // 鏇存柊鐜版湁source鍏冪礌鐨刄RL
                     sourceElement.src = url;
                 } else {
-                    // 创建新的source元素
+                    // 鍒涘缓鏂扮殑source鍏冪礌
                     sourceElement = document.createElement('source');
                     sourceElement.src = url;
                     video.appendChild(sourceElement);
@@ -1115,26 +1206,24 @@ function initPlayer(videoUrl) {
                 });
 
                 hls.on(Hls.Events.ERROR, function (event, data) {
-                    // 增加错误计数
+                    // 澧炲姞閿欒璁℃暟
                     errorCount++;
 
-                    // 处理bufferAppendError
+                    // 澶勭悊bufferAppendError
                     if (data.details === 'bufferAppendError') {
                         bufferAppendErrorCount++;
-                        // 如果视频已经开始播放，则忽略这个错误
-                        if (playbackStarted) {
+                        // 濡傛灉瑙嗛宸茬粡寮€濮嬫挱鏀撅紝鍒欏拷鐣ヨ繖涓敊璇?                        if (playbackStarted) {
                             return;
                         }
 
-                        // 如果出现多次bufferAppendError但视频未播放，尝试恢复
-                        if (bufferAppendErrorCount >= 3) {
+                        // 濡傛灉鍑虹幇澶氭bufferAppendError浣嗚棰戞湭鎾斁锛屽皾璇曟仮澶?                        if (bufferAppendErrorCount >= 3) {
                             hls.recoverMediaError();
                         }
                     }
 
-                    // 如果是致命错误，且视频未播放
+                    // 濡傛灉鏄嚧鍛介敊璇紝涓旇棰戞湭鎾斁
                     if (data.fatal && !playbackStarted) {
-                        // 尝试恢复错误
+                        // 灏濊瘯鎭㈠閿欒
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
                                 hls.startLoad();
@@ -1143,22 +1232,21 @@ function initPlayer(videoUrl) {
                                 hls.recoverMediaError();
                                 break;
                             default:
-                                // 仅在多次恢复尝试后显示错误
-                                if (errorCount > 3 && !errorDisplayed) {
+                                // 浠呭湪澶氭鎭㈠灏濊瘯鍚庢樉绀洪敊璇?                                if (errorCount > 3 && !errorDisplayed) {
                                     errorDisplayed = true;
-                                    showError('视频加载失败，可能是格式不兼容或源不可用');
+                                    showError('瑙嗛鍔犺浇澶辫触锛屽彲鑳芥槸鏍煎紡涓嶅吋瀹规垨婧愪笉鍙敤');
                                 }
                                 break;
                         }
                     }
                 });
 
-                // 监听分段加载事件
+                // 鐩戝惉鍒嗘鍔犺浇浜嬩欢
                 hls.on(Hls.Events.FRAG_LOADED, function () {
                     document.getElementById('player-loading').style.display = 'none';
                 });
 
-                // 监听级别加载事件
+                // 鐩戝惉绾у埆鍔犺浇浜嬩欢
                 hls.on(Hls.Events.LEVEL_LOADED, function () {
                     document.getElementById('player-loading').style.display = 'none';
                 });
@@ -1166,44 +1254,33 @@ function initPlayer(videoUrl) {
         }
     });
 
-    // artplayer 没有 'fullscreenWeb:enter', 'fullscreenWeb:exit' 等事件
-    // 所以原控制栏隐藏代码并没有起作用
-    // 实际起作用的是 artplayer 默认行为，它支持自动隐藏工具栏
-    // 但有一个 bug： 在副屏全屏时，鼠标移出副屏后不会自动隐藏工具栏
-    // 下面进一并重构和修复：
-    let hideTimer;
+    // artplayer 娌℃湁 'fullscreenWeb:enter', 'fullscreenWeb:exit' 绛変簨浠?    // 鎵€浠ュ師鎺у埗鏍忛殣钘忎唬鐮佸苟娌℃湁璧蜂綔鐢?    // 瀹為檯璧蜂綔鐢ㄧ殑鏄?artplayer 榛樿琛屼负锛屽畠鏀寔鑷姩闅愯棌宸ュ叿鏍?    // 浣嗘湁涓€涓?bug锛?鍦ㄥ壇灞忓叏灞忔椂锛岄紶鏍囩Щ鍑哄壇灞忓悗涓嶄細鑷姩闅愯棌宸ュ叿鏍?    // 涓嬮潰杩涗竴骞堕噸鏋勫拰淇锛?    let hideTimer;
 
-    // 隐藏控制栏
-    function hideControls() {
+    // 闅愯棌鎺у埗鏍?    function hideControls() {
         if (art && art.controls) {
             art.controls.show = false;
         }
     }
 
-    // 重置计时器，计时器超时时间与 artplayer 保持一致
-    function resetHideTimer() {
+    // 閲嶇疆璁℃椂鍣紝璁℃椂鍣ㄨ秴鏃舵椂闂翠笌 artplayer 淇濇寔涓€鑷?    function resetHideTimer() {
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => {
             hideControls();
         }, Artplayer.CONTROL_HIDE_TIME);
     }
 
-    // 处理鼠标离开浏览器窗口
-    function handleMouseOut(e) {
+    // 澶勭悊榧犳爣绂诲紑娴忚鍣ㄧ獥鍙?    function handleMouseOut(e) {
         if (e && !e.relatedTarget) {
             resetHideTimer();
         }
     }
 
-    // 全屏状态切换时注册/移除 mouseout 事件，监听鼠标移出屏幕事件
-    // 从而对播放器状态栏进行隐藏倒计时
-    function handleFullScreen(isFullScreen, isWeb) {
+    // 鍏ㄥ睆鐘舵€佸垏鎹㈡椂娉ㄥ唽/绉婚櫎 mouseout 浜嬩欢锛岀洃鍚紶鏍囩Щ鍑哄睆骞曚簨浠?    // 浠庤€屽鎾斁鍣ㄧ姸鎬佹爮杩涜闅愯棌鍊掕鏃?    function handleFullScreen(isFullScreen, isWeb) {
         if (isFullScreen) {
             document.addEventListener('mouseout', handleMouseOut);
         } else {
             document.removeEventListener('mouseout', handleMouseOut);
-            // 退出全屏时清理计时器
-            clearTimeout(hideTimer);
+            // 閫€鍑哄叏灞忔椂娓呯悊璁℃椂鍣?            clearTimeout(hideTimer);
         }
 
         if (!isWeb) {
@@ -1217,35 +1294,31 @@ function initPlayer(videoUrl) {
         }
     }
 
-    // 播放器加载完成后初始隐藏工具栏
-    art.on('ready', () => {
+    // 鎾斁鍣ㄥ姞杞藉畬鎴愬悗鍒濆闅愯棌宸ュ叿鏍?    art.on('ready', () => {
         hideControls();
     });
 
-    // 全屏 Web 模式处理
+    // 鍏ㄥ睆 Web 妯″紡澶勭悊
     art.on('fullscreenWeb', function (isFullScreen) {
         handleFullScreen(isFullScreen, true);
     });
 
-    // 全屏模式处理
+    // 鍏ㄥ睆妯″紡澶勭悊
     art.on('fullscreen', function (isFullScreen) {
         handleFullScreen(isFullScreen, false);
     });
 
     art.on('video:loadedmetadata', function() {
         document.getElementById('player-loading').style.display = 'none';
-        videoHasEnded = false; // 视频加载时重置结束标志
-        // 优先使用URL传递的position参数
+        videoHasEnded = false; // 瑙嗛鍔犺浇鏃堕噸缃粨鏉熸爣蹇?        // 浼樺厛浣跨敤URL浼犻€掔殑position鍙傛暟
         const urlParams = new URLSearchParams(window.location.search);
         const savedPosition = parseInt(urlParams.get('position') || '0');
 
         if (savedPosition > 10 && savedPosition < art.duration - 2) {
-            // 如果URL中有有效的播放位置参数，直接使用它
-            art.currentTime = savedPosition;
+            // 濡傛灉URL涓湁鏈夋晥鐨勬挱鏀句綅缃弬鏁帮紝鐩存帴浣跨敤瀹?            art.currentTime = savedPosition;
             showPositionRestoreHint(savedPosition);
         } else {
-            // 否则尝试从本地存储恢复播放进度
-            try {
+            // 鍚﹀垯灏濊瘯浠庢湰鍦板瓨鍌ㄦ仮澶嶆挱鏀捐繘搴?            try {
                 const progressKey = 'videoProgress_' + getVideoId();
                 const progressStr = localStorage.getItem(progressKey);
                 if (progressStr && art.duration > 0) {
@@ -1264,70 +1337,61 @@ function initPlayer(videoUrl) {
             }
         }
 
-        // 设置进度条点击监听
-        setupProgressBarPreciseClicks();
+        // 璁剧疆杩涘害鏉＄偣鍑荤洃鍚?        setupProgressBarPreciseClicks();
 
-        // 视频加载成功后，在稍微延迟后将其添加到观看历史
-        setTimeout(saveToHistory, 3000);
+        // 瑙嗛鍔犺浇鎴愬姛鍚庯紝鍦ㄧ◢寰欢杩熷悗灏嗗叾娣诲姞鍒拌鐪嬪巻鍙?        setTimeout(saveToHistory, 3000);
 
-        // 启动定期保存播放进度
+        // 鍚姩瀹氭湡淇濆瓨鎾斁杩涘害
         startProgressSaveInterval();
     })
 
-    // 错误处理
+    // 閿欒澶勭悊
     art.on('video:error', function (error) {
-        // 如果正在切换视频，忽略错误
-        if (window.isSwitchingVideo) {
+        // 濡傛灉姝ｅ湪鍒囨崲瑙嗛锛屽拷鐣ラ敊璇?        if (window.isSwitchingVideo) {
             return;
         }
 
-        // 隐藏所有加载指示器
+        // 闅愯棌鎵€鏈夊姞杞芥寚绀哄櫒
         const loadingElements = document.querySelectorAll('#player-loading, .player-loading-container');
         loadingElements.forEach(el => {
             if (el) el.style.display = 'none';
         });
 
-        showError('视频播放失败: ' + (error.message || '未知错误'));
+        showError('瑙嗛鎾斁澶辫触: ' + (error.message || '鏈煡閿欒'));
     });
 
-    // 添加移动端长按三倍速播放功能
-    setupLongPressSpeedControl();
+    // 娣诲姞绉诲姩绔暱鎸変笁鍊嶉€熸挱鏀惧姛鑳?    setupLongPressSpeedControl();
 
-    // 视频播放结束事件
+    // 瑙嗛鎾斁缁撴潫浜嬩欢
     art.on('video:ended', function () {
         videoHasEnded = true;
 
         clearVideoProgress();
 
-        // 如果自动播放下一集开启，且确实有下一集
-        if (autoplayEnabled && currentEpisodeIndex < currentEpisodes.length - 1) {
-            // 稍长延迟以确保所有事件处理完成
-            setTimeout(() => {
-                // 确认不是因为用户拖拽导致的假结束事件
+        // 濡傛灉鑷姩鎾斁涓嬩竴闆嗗紑鍚紝涓旂‘瀹炴湁涓嬩竴闆?        if (autoplayEnabled && currentEpisodeIndex < currentEpisodes.length - 1) {
+            // 绋嶉暱寤惰繜浠ョ‘淇濇墍鏈変簨浠跺鐞嗗畬鎴?            setTimeout(() => {
+                // 纭涓嶆槸鍥犱负鐢ㄦ埛鎷栨嫿瀵艰嚧鐨勫亣缁撴潫浜嬩欢
                 playNextEpisode();
-                videoHasEnded = false; // 重置标志
+                videoHasEnded = false; // 閲嶇疆鏍囧織
             }, 1000);
         } else {
             art.fullscreen = false;
         }
     });
 
-    // 添加双击全屏支持
+    // 娣诲姞鍙屽嚮鍏ㄥ睆鏀寔
     art.on('video:playing', () => {
-        // 绑定双击事件到视频容器
-        if (art.video && !art.video.dataset.freeDyDoubleClickBound) {
+        // 缁戝畾鍙屽嚮浜嬩欢鍒拌棰戝鍣?        if (art.video && !art.video.dataset.freeDyDoubleClickBound) {
             art.video.dataset.freeDyDoubleClickBound = 'true';
             art.video.addEventListener('dblclick', () => {
                 art.fullscreen = !art.fullscreen;
                 art.play();
             });
         }
-        // 画面净化不再自动抽样弹窗；用户可通过工具栏主动选择遮罩或裁切模式。
-    });
+        // 鐢婚潰鍑€鍖栦笉鍐嶈嚜鍔ㄦ娊鏍峰脊绐楋紱鐢ㄦ埛鍙€氳繃宸ュ叿鏍忎富鍔ㄩ€夋嫨閬僵鎴栬鍒囨ā寮忋€?    });
 
-    // 10秒后如果仍在加载，但不立即显示错误
-    setTimeout(function () {
-        // 如果视频已经播放开始，则不显示错误
+    // 10绉掑悗濡傛灉浠嶅湪鍔犺浇锛屼絾涓嶇珛鍗虫樉绀洪敊璇?    setTimeout(function () {
+        // 濡傛灉瑙嗛宸茬粡鎾斁寮€濮嬶紝鍒欎笉鏄剧ず閿欒
         if (art && art.video && art.video.currentTime > 0) {
             return;
         }
@@ -1336,15 +1400,14 @@ function initPlayer(videoUrl) {
         if (loadingElement && loadingElement.style.display !== 'none') {
             loadingElement.innerHTML = `
                 <div class="loading-spinner"></div>
-                <div>视频加载时间较长，请耐心等待...</div>
-                <div style="font-size: 12px; color: #aaa; margin-top: 10px;">如长时间无响应，请尝试其他视频源</div>
+                <div>瑙嗛鍔犺浇鏃堕棿杈冮暱锛岃鑰愬績绛夊緟...</div>
+                <div style="font-size: 12px; color: #aaa; margin-top: 10px;">濡傞暱鏃堕棿鏃犲搷搴旓紝璇峰皾璇曞叾浠栬棰戞簮</div>
             `;
         }
     }, 10000);
 }
 
-// 自定义 M3U8 Loader：只在媒体播放清单阶段执行广告过滤，主清单和线路信息保持原样。
-class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
+// 鑷畾涔?M3U8 Loader锛氬彧鍦ㄥ獟浣撴挱鏀炬竻鍗曢樁娈垫墽琛屽箍鍛婅繃婊わ紝涓绘竻鍗曞拰绾胯矾淇℃伅淇濇寔鍘熸牱銆?class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
     constructor(config) {
         super(config);
         const load = this.load.bind(this);
@@ -1368,32 +1431,24 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
 const HLS_AD_MARKER_PATTERN = /(?:^|[\/_\-.])(ad|ads|advert|advertise|advertisement|commercial|promo|preroll|midroll|postroll)(?:[\/_\-.]|$)/i;
 const HLS_AD_CLASS_PATTERN = /CLASS=["']?(?:com\.)?(?:apple\.hls\.)?(?:interstitial|ad|ads|advertisement)/i;
 const HLS_SOURCE_FILTER_PROFILES = {
-    // ikun 会在正片中插入一段来自不同目录的短片段块，前后用 DISCONTINUITY 分隔，且该块在同一清单中会重复出现。
-    // 只删除满足“异目录 + 重复出现 + 短块 + 位于时间轴边界之间”的块，不按单个短时长猜广告。
-    // 同时保留原版的断点兼容行为：只移除标记，不删除任何媒体分片。
-    ikun: {
+    // ikun 浼氬湪姝ｇ墖涓彃鍏ヤ竴娈垫潵鑷笉鍚岀洰褰曠殑鐭墖娈靛潡锛屽墠鍚庣敤 DISCONTINUITY 鍒嗛殧锛屼笖璇ュ潡鍦ㄥ悓涓€娓呭崟涓細閲嶅鍑虹幇銆?    // 鍙垹闄ゆ弧瓒斥€滃紓鐩綍 + 閲嶅鍑虹幇 + 鐭潡 + 浣嶄簬鏃堕棿杞磋竟鐣屼箣闂粹€濈殑鍧楋紝涓嶆寜鍗曚釜鐭椂闀跨寽骞垮憡銆?    // 鍚屾椂淇濈暀鍘熺増鐨勬柇鐐瑰吋瀹硅涓猴細鍙Щ闄ゆ爣璁帮紝涓嶅垹闄や换浣曞獟浣撳垎鐗囥€?    ikun: {
         removeRepeatedForeignDiscontinuityBlocks: true,
         stripDiscontinuityMarkers: true,
         maxSegments: 8,
         maxDuration: 30
     },
-    // 暴风资源在多个真实样例中固定使用 /video/adjump/time/ 存放 9 个、约 26 秒的插播分片。
-    // 断点标记也按原版兼容方式移除，避免播放器把插播当成独立时间轴段落。
-    bfzy: {
+    // 鏆撮璧勬簮鍦ㄥ涓湡瀹炴牱渚嬩腑鍥哄畾浣跨敤 /video/adjump/time/ 瀛樻斁 9 涓€佺害 26 绉掔殑鎻掓挱鍒嗙墖銆?    // 鏂偣鏍囪涔熸寜鍘熺増鍏煎鏂瑰紡绉婚櫎锛岄伩鍏嶆挱鏀惧櫒鎶婃彃鎾綋鎴愮嫭绔嬫椂闂磋酱娈佃惤銆?    bfzy: {
         explicitAdPathPatterns: [/\/video\/adjump\/time\//i],
         stripDiscontinuityMarkers: true
     },
-    // 360资源在多个真实样例中固定插入同一目录的 4 分片、约 17.57 秒广告块。
-    zy360: {
+    // 360璧勬簮鍦ㄥ涓湡瀹炴牱渚嬩腑鍥哄畾鎻掑叆鍚屼竴鐩綍鐨?4 鍒嗙墖銆佺害 17.57 绉掑箍鍛婂潡銆?    zy360: {
         explicitAdPathPatterns: [/\/20260726\/1AS9nSvi\/hls\//i],
         stripDiscontinuityMarkers: true
     },
-    // 如意媒体清单的分片 URI 是纯编号，广告不会带 ad/ads 路径标识；先迁移原版断点兼容，不能按短时长猜测分片。
-    ruyi: {
+    // 濡傛剰濯掍綋娓呭崟鐨勫垎鐗?URI 鏄函缂栧彿锛屽箍鍛婁笉浼氬甫 ad/ads 璺緞鏍囪瘑锛涘厛杩佺Щ鍘熺増鏂偣鍏煎锛屼笉鑳芥寜鐭椂闀跨寽娴嬪垎鐗囥€?    ruyi: {
         stripDiscontinuityMarkers: true
     },
-    // 原系统对红牛资源的有效兼容方式：只移除时间轴断点标记，不删除断点前后的任何媒体分片。
-    hongniu2: {
+    // 鍘熺郴缁熷绾㈢墰璧勬簮鐨勬湁鏁堝吋瀹规柟寮忥細鍙Щ闄ゆ椂闂磋酱鏂偣鏍囪锛屼笉鍒犻櫎鏂偣鍓嶅悗鐨勪换浣曞獟浣撳垎鐗囥€?    hongniu2: {
         stripDiscontinuityMarkers: true
     },
     hongniu3: {
@@ -1488,7 +1543,7 @@ function removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey) {
     removeRanges.forEach(([start, end]) => {
         for (let index = start; index < end; index++) removedLines.add(index);
     });
-    console.info(`HLS ${sourceKey || 'unknown'} 通用检测：移除 ${removeRanges.length} 个重复异目录短插播块`);
+    console.info(`HLS ${sourceKey || 'unknown'} 閫氱敤妫€娴嬶細绉婚櫎 ${removeRanges.length} 涓噸澶嶅紓鐩綍鐭彃鎾潡`);
     return sourceLines.filter((_, index) => !removedLines.has(index));
 }
 
@@ -1523,9 +1578,7 @@ function isHlsAdBreakEnd(line) {
         || (/^#EXT-X-DATERANGE:/i.test(normalized) && /END-DATE=/i.test(normalized));
 }
 
-// 安全分片过滤：仅删除具有明确广告信号的媒体分片。
-// 默认不按时长猜测，也不删除结构标签；红牛 profile 仅兼容性移除 DISCONTINUITY 标记，绝不删除相邻分片。
-function filterAdsFromM3U8(m3u8Content, options = {}) {
+// 瀹夊叏鍒嗙墖杩囨护锛氫粎鍒犻櫎鍏锋湁鏄庣‘骞垮憡淇″彿鐨勫獟浣撳垎鐗囥€?// 榛樿涓嶆寜鏃堕暱鐚滄祴锛屼篃涓嶅垹闄ょ粨鏋勬爣绛撅紱绾㈢墰 profile 浠呭吋瀹规€хЩ闄?DISCONTINUITY 鏍囪锛岀粷涓嶅垹闄ょ浉閭诲垎鐗囥€?function filterAdsFromM3U8(m3u8Content, options = {}) {
     if (typeof m3u8Content !== 'string' || !m3u8Content.includes('#EXTM3U')) {
         return typeof m3u8Content === 'string' ? m3u8Content : '';
     }
@@ -1533,8 +1586,7 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
     const sourceKey = options.sourceKey || getCurrentSourceCode();
     const profile = getHlsSourceFilterProfile(sourceKey);
     let removedDiscontinuityMarkers = 0;
-    // 先依据断点识别重复异目录广告块，再按来源需要移除断点标记；否则先删断点会丢失广告边界证据。
-    let sourceLines = m3u8Content.split(/\r?\n/);
+    // 鍏堜緷鎹柇鐐硅瘑鍒噸澶嶅紓鐩綍骞垮憡鍧楋紝鍐嶆寜鏉ユ簮闇€瑕佺Щ闄ゆ柇鐐规爣璁帮紱鍚﹀垯鍏堝垹鏂偣浼氫涪澶卞箍鍛婅竟鐣岃瘉鎹€?    let sourceLines = m3u8Content.split(/\r?\n/);
     sourceLines = removeRepeatedForeignDiscontinuityBlocks(sourceLines, sourceKey);
     if (profile?.stripDiscontinuityMarkers) {
         sourceLines = sourceLines.filter(line => {
@@ -1559,8 +1611,7 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
         const trimmed = line.trim();
 
         if (isExplicitHlsAdMarker(trimmed)) {
-            // 只有能找到明确结束标记时才进入广告段，防止残缺 CUE-OUT 误删后续全部正片。
-            const hasMatchingEnd = sourceLines
+            // 鍙湁鑳芥壘鍒版槑纭粨鏉熸爣璁版椂鎵嶈繘鍏ュ箍鍛婃锛岄槻姝㈡畫缂?CUE-OUT 璇垹鍚庣画鍏ㄩ儴姝ｇ墖銆?            const hasMatchingEnd = sourceLines
                 .slice(lineIndex + 1)
                 .some(candidate => isHlsAdBreakEnd(candidate));
             if (hasMatchingEnd && (/^#EXT-X-CUE-OUT(?::|$)/i.test(trimmed) || /^#EXT-OATCLS-SCTE35:/i.test(trimmed))) {
@@ -1595,8 +1646,7 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
             return;
         }
 
-        // 结构性标签始终保留。仅在广告段内忽略分片级元数据。
-        if (!insideExplicitAdBreak || /^#EXT-X-DISCONTINUITY/i.test(trimmed)) {
+        // 缁撴瀯鎬ф爣绛惧缁堜繚鐣欍€備粎鍦ㄥ箍鍛婃鍐呭拷鐣ュ垎鐗囩骇鍏冩暟鎹€?        if (!insideExplicitAdBreak || /^#EXT-X-DISCONTINUITY/i.test(trimmed)) {
             flushPending();
             output.push(line);
         }
@@ -1604,18 +1654,18 @@ function filterAdsFromM3U8(m3u8Content, options = {}) {
 
     flushPending();
     if (removedSegments > 0) {
-        console.info(`HLS 分片广告过滤：移除 ${removedSegments} 个明确广告分片`);
+        console.info(`HLS 鍒嗙墖骞垮憡杩囨护锛氱Щ闄?${removedSegments} 涓槑纭箍鍛婂垎鐗嘸);
     }
     if (removedDiscontinuityMarkers > 0) {
-        console.info(`HLS ${sourceKey} 兼容过滤：移除 ${removedDiscontinuityMarkers} 个时间轴断点标记，媒体分片保持不变`);
+        console.info(`HLS ${sourceKey} 鍏煎杩囨护锛氱Щ闄?${removedDiscontinuityMarkers} 涓椂闂磋酱鏂偣鏍囪锛屽獟浣撳垎鐗囦繚鎸佷笉鍙榒);
     }
     return output.join('\n');
 }
 
 
-// 显示错误
+// 鏄剧ず閿欒
 function showError(message) {
-    // 在视频已经播放的情况下不显示错误
+    // 鍦ㄨ棰戝凡缁忔挱鏀剧殑鎯呭喌涓嬩笉鏄剧ず閿欒
     if (art && art.video && art.video.currentTime > 1) {
         return;
     }
@@ -1627,22 +1677,20 @@ function showError(message) {
     if (errorMsgEl) errorMsgEl.textContent = message;
 }
 
-// 更新集数信息
+// 鏇存柊闆嗘暟淇℃伅
 function updateEpisodeInfo() {
     if (currentEpisodes.length > 0) {
-        document.getElementById('episodeInfo').textContent = `第 ${currentEpisodeIndex + 1}/${currentEpisodes.length} 集`;
+        document.getElementById('episodeInfo').textContent = `绗?${currentEpisodeIndex + 1}/${currentEpisodes.length} 闆哷;
     } else {
-        document.getElementById('episodeInfo').textContent = '无集数信息';
+        document.getElementById('episodeInfo').textContent = '鏃犻泦鏁颁俊鎭?;
     }
 }
 
-// 更新按钮状态
-function updateButtonStates() {
+// 鏇存柊鎸夐挳鐘舵€?function updateButtonStates() {
     const prevButton = document.getElementById('prevButton');
     const nextButton = document.getElementById('nextButton');
 
-    // 处理上一集按钮
-    if (currentEpisodeIndex > 0) {
+    // 澶勭悊涓婁竴闆嗘寜閽?    if (currentEpisodeIndex > 0) {
         prevButton.classList.remove('bg-gray-700', 'cursor-not-allowed');
         prevButton.classList.add('bg-[#222]', 'hover:bg-[#333]');
         prevButton.removeAttribute('disabled');
@@ -1652,8 +1700,7 @@ function updateButtonStates() {
         prevButton.setAttribute('disabled', '');
     }
 
-    // 处理下一集按钮
-    if (currentEpisodeIndex < currentEpisodes.length - 1) {
+    // 澶勭悊涓嬩竴闆嗘寜閽?    if (currentEpisodeIndex < currentEpisodes.length - 1) {
         nextButton.classList.remove('bg-gray-700', 'cursor-not-allowed');
         nextButton.classList.add('bg-[#222]', 'hover:bg-[#333]');
         nextButton.removeAttribute('disabled');
@@ -1664,13 +1711,13 @@ function updateButtonStates() {
     }
 }
 
-// 渲染集数按钮
+// 娓叉煋闆嗘暟鎸夐挳
 function renderEpisodes() {
     const episodesList = document.getElementById('episodesList');
     if (!episodesList) return;
 
     if (!currentEpisodes || currentEpisodes.length === 0) {
-        episodesList.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的集数</div>';
+        episodesList.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">娌℃湁鍙敤鐨勯泦鏁?/div>';
         return;
     }
 
@@ -1678,16 +1725,16 @@ function renderEpisodes() {
     let html = '';
 
     episodes.forEach((episode, index) => {
-        // 根据倒序状态计算真实的剧集索引
+        // 鏍规嵁鍊掑簭鐘舵€佽绠楃湡瀹炵殑鍓ч泦绱㈠紩
         const realIndex = episodesReversed ? currentEpisodes.length - 1 - index : index;
         const isActive = realIndex === currentEpisodeIndex;
 
         html += `
             <button id="episode-${realIndex}" type="button"
-                    data-episode-index="${realIndex}" aria-label="播放第 ${realIndex + 1} 集"
+                    data-episode-index="${realIndex}" aria-label="鎾斁绗?${realIndex + 1} 闆?
                     onclick="playEpisode(${realIndex})"
                     class="px-4 py-2 ${isActive ? 'episode-active' : '!bg-[#222] hover:!bg-[#333] hover:!shadow-none'} !border ${isActive ? '!border-blue-500' : '!border-[#333]'} rounded-lg transition-colors text-center episode-btn">
-                <span class="episode-btn-prefix">第</span><strong>${realIndex + 1}</strong><span class="episode-btn-suffix">集</span>
+                <span class="episode-btn-prefix">绗?/span><strong>${realIndex + 1}</strong><span class="episode-btn-suffix">闆?/span>
             </button>
         `;
     });
@@ -1695,49 +1742,45 @@ function renderEpisodes() {
     episodesList.innerHTML = html;
 }
 
-// 播放指定集数
+// 鎾斁鎸囧畾闆嗘暟
 function playEpisode(index) {
-    // 确保index在有效范围内
+    // 纭繚index鍦ㄦ湁鏁堣寖鍥村唴
     if (index < 0 || index >= currentEpisodes.length) {
         return;
     }
 
-    // 保存当前播放进度（如果正在播放）
+    // 淇濆瓨褰撳墠鎾斁杩涘害锛堝鏋滄鍦ㄦ挱鏀撅級
     if (art && art.video && !art.video.paused && !videoHasEnded) {
         saveCurrentProgress();
     }
 
-    // 清除进度保存计时器
-    if (progressSaveInterval) {
+    // 娓呴櫎杩涘害淇濆瓨璁℃椂鍣?    if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
         progressSaveInterval = null;
     }
 
-    // 首先隐藏之前可能显示的错误
-    document.getElementById('error').style.display = 'none';
-    // 显示加载指示器
-    document.getElementById('player-loading').style.display = 'flex';
+    // 棣栧厛闅愯棌涔嬪墠鍙兘鏄剧ず鐨勯敊璇?    document.getElementById('error').style.display = 'none';
+    // 鏄剧ず鍔犺浇鎸囩ず鍣?    document.getElementById('player-loading').style.display = 'flex';
     document.getElementById('player-loading').innerHTML = `
         <div class="loading-spinner"></div>
-        <div>正在加载视频...</div>
+        <div>姝ｅ湪鍔犺浇瑙嗛...</div>
     `;
 
-    // 获取 sourceCode
+    // 鑾峰彇 sourceCode
     const urlParams2 = new URLSearchParams(window.location.search);
     const sourceCode = getCurrentSourceCode(urlParams2);
 
-    // 准备切换剧集的URL
+    // 鍑嗗鍒囨崲鍓ч泦鐨刄RL
     const url = currentEpisodes[index];
 
-    // 更新当前剧集索引
+    // 鏇存柊褰撳墠鍓ч泦绱㈠紩
     currentEpisodeIndex = index;
     currentVideoUrl = url;
-    videoHasEnded = false; // 重置视频结束标志
+    videoHasEnded = false; // 閲嶇疆瑙嗛缁撴潫鏍囧織
 
     clearVideoProgress();
 
-    // 更新URL参数（不刷新页面）
-    const currentUrl = new URL(window.location.href);
+    // 鏇存柊URL鍙傛暟锛堜笉鍒锋柊椤甸潰锛?    const currentUrl = new URL(window.location.href);
     currentUrl.searchParams.set('index', index);
     currentUrl.searchParams.set('url', url);
     currentUrl.searchParams.delete('position');
@@ -1749,118 +1792,102 @@ function playEpisode(index) {
         art.switch = url;
     }
 
-    // 更新UI
+    // 鏇存柊UI
     updateEpisodeInfo();
     updateButtonStates();
     renderEpisodes();
 
-    // 重置用户点击位置记录
+    // 閲嶇疆鐢ㄦ埛鐐瑰嚮浣嶇疆璁板綍
     userClickedPosition = null;
 
-    // 三秒后保存到历史记录
+    // 涓夌鍚庝繚瀛樺埌鍘嗗彶璁板綍
     setTimeout(() => saveToHistory(), 3000);
 }
 
-// 播放上一集
-function playPreviousEpisode() {
+// 鎾斁涓婁竴闆?function playPreviousEpisode() {
     if (currentEpisodeIndex > 0) {
         playEpisode(currentEpisodeIndex - 1);
     }
 }
 
-// 播放下一集
-function playNextEpisode() {
+// 鎾斁涓嬩竴闆?function playNextEpisode() {
     if (currentEpisodeIndex < currentEpisodes.length - 1) {
         playEpisode(currentEpisodeIndex + 1);
     }
 }
 
-// 复制播放链接
+// 澶嶅埗鎾斁閾炬帴
 function copyLinks() {
-    // 尝试从URL中获取参数
-    const urlParams = new URLSearchParams(window.location.search);
+    // 灏濊瘯浠嶶RL涓幏鍙栧弬鏁?    const urlParams = new URLSearchParams(window.location.search);
     const linkUrl = urlParams.get('url') || '';
     if (linkUrl !== '') {
         navigator.clipboard.writeText(linkUrl).then(() => {
-            showToast('播放链接已复制', 'success');
+            showToast('鎾斁閾炬帴宸插鍒?, 'success');
         }).catch(err => {
-            showToast('复制失败，请检查浏览器权限', 'error');
+            showToast('澶嶅埗澶辫触锛岃妫€鏌ユ祻瑙堝櫒鏉冮檺', 'error');
         });
     }
 }
 
-// 切换集数排序
+// 鍒囨崲闆嗘暟鎺掑簭
 function toggleEpisodeOrder() {
     episodesReversed = !episodesReversed;
 
-    // 保存到localStorage
+    // 淇濆瓨鍒發ocalStorage
     localStorage.setItem('episodesReversed', episodesReversed);
 
-    // 重新渲染集数列表
+    // 閲嶆柊娓叉煋闆嗘暟鍒楄〃
     renderEpisodes();
 
-    // 更新排序按钮
+    // 鏇存柊鎺掑簭鎸夐挳
     updateOrderButton();
 }
 
-// 更新排序按钮状态
-function updateOrderButton() {
+// 鏇存柊鎺掑簭鎸夐挳鐘舵€?function updateOrderButton() {
     const orderText = document.getElementById('orderText');
     const orderIcon = document.getElementById('orderIcon');
 
     if (orderText && orderIcon) {
-        orderText.textContent = episodesReversed ? '正序排列' : '倒序排列';
+        orderText.textContent = episodesReversed ? '姝ｅ簭鎺掑垪' : '鍊掑簭鎺掑垪';
         orderIcon.style.transform = episodesReversed ? 'rotate(180deg)' : '';
     }
 }
 
-// 设置进度条准确点击处理
-function setupProgressBarPreciseClicks() {
-    // 查找DPlayer的进度条元素
+// 璁剧疆杩涘害鏉″噯纭偣鍑诲鐞?function setupProgressBarPreciseClicks() {
+    // 鏌ユ壘DPlayer鐨勮繘搴︽潯鍏冪礌
     const progressBar = document.querySelector('.dplayer-bar-wrap');
     if (!progressBar || !art || !art.video) return;
 
-    // 移除可能存在的旧事件监听器
-    progressBar.removeEventListener('mousedown', handleProgressBarClick);
+    // 绉婚櫎鍙兘瀛樺湪鐨勬棫浜嬩欢鐩戝惉鍣?    progressBar.removeEventListener('mousedown', handleProgressBarClick);
 
-    // 添加新的事件监听器
-    progressBar.addEventListener('mousedown', handleProgressBarClick);
+    // 娣诲姞鏂扮殑浜嬩欢鐩戝惉鍣?    progressBar.addEventListener('mousedown', handleProgressBarClick);
 
-    // 在移动端也添加触摸事件支持
-    progressBar.removeEventListener('touchstart', handleProgressBarTouch);
+    // 鍦ㄧЩ鍔ㄧ涔熸坊鍔犺Е鎽镐簨浠舵敮鎸?    progressBar.removeEventListener('touchstart', handleProgressBarTouch);
     progressBar.addEventListener('touchstart', handleProgressBarTouch);
 
-    // 处理进度条点击
-    function handleProgressBarClick(e) {
+    // 澶勭悊杩涘害鏉＄偣鍑?    function handleProgressBarClick(e) {
         if (!art || !art.video) return;
 
-        // 计算点击位置相对于进度条的比例
-        const rect = e.currentTarget.getBoundingClientRect();
+        // 璁＄畻鐐瑰嚮浣嶇疆鐩稿浜庤繘搴︽潯鐨勬瘮渚?        const rect = e.currentTarget.getBoundingClientRect();
         const percentage = (e.clientX - rect.left) / rect.width;
 
-        // 计算点击位置对应的视频时间
-        const duration = art.video.duration;
+        // 璁＄畻鐐瑰嚮浣嶇疆瀵瑰簲鐨勮棰戞椂闂?        const duration = art.video.duration;
         let clickTime = percentage * duration;
 
-        // 处理视频接近结尾的情况
-        if (duration - clickTime < 1) {
-            // 如果点击位置非常接近结尾，稍微往前移一点
-            clickTime = Math.min(clickTime, duration - 1.5);
+        // 澶勭悊瑙嗛鎺ヨ繎缁撳熬鐨勬儏鍐?        if (duration - clickTime < 1) {
+            // 濡傛灉鐐瑰嚮浣嶇疆闈炲父鎺ヨ繎缁撳熬锛岀◢寰線鍓嶇Щ涓€鐐?            clickTime = Math.min(clickTime, duration - 1.5);
 
         }
 
-        // 记录用户点击的位置
-        userClickedPosition = clickTime;
+        // 璁板綍鐢ㄦ埛鐐瑰嚮鐨勪綅缃?        userClickedPosition = clickTime;
 
-        // 阻止默认事件传播，避免DPlayer内部逻辑将视频跳至末尾
-        e.stopPropagation();
+        // 闃绘榛樿浜嬩欢浼犳挱锛岄伩鍏岲Player鍐呴儴閫昏緫灏嗚棰戣烦鑷虫湯灏?        e.stopPropagation();
 
-        // 直接设置视频时间
+        // 鐩存帴璁剧疆瑙嗛鏃堕棿
         art.seek(clickTime);
     }
 
-    // 处理移动端触摸事件
-    function handleProgressBarTouch(e) {
+    // 澶勭悊绉诲姩绔Е鎽镐簨浠?    function handleProgressBarTouch(e) {
         if (!art || !art.video || !e.touches[0]) return;
 
         const touch = e.touches[0];
@@ -1870,28 +1897,24 @@ function setupProgressBarPreciseClicks() {
         const duration = art.video.duration;
         let clickTime = percentage * duration;
 
-        // 处理视频接近结尾的情况
-        if (duration - clickTime < 1) {
+        // 澶勭悊瑙嗛鎺ヨ繎缁撳熬鐨勬儏鍐?        if (duration - clickTime < 1) {
             clickTime = Math.min(clickTime, duration - 1.5);
         }
 
-        // 记录用户点击的位置
-        userClickedPosition = clickTime;
+        // 璁板綍鐢ㄦ埛鐐瑰嚮鐨勪綅缃?        userClickedPosition = clickTime;
 
         e.stopPropagation();
         art.seek(clickTime);
     }
 }
 
-// 在播放器初始化后添加视频到历史记录
-function saveToHistory() {
-    // 确保 currentEpisodes 非空且有当前视频URL
+// 鍦ㄦ挱鏀惧櫒鍒濆鍖栧悗娣诲姞瑙嗛鍒板巻鍙茶褰?function saveToHistory() {
+    // 纭繚 currentEpisodes 闈炵┖涓旀湁褰撳墠瑙嗛URL
     if (!currentEpisodes || currentEpisodes.length === 0 || !currentVideoUrl) {
         return;
     }
 
-    // 尝试从URL中获取参数
-    const urlParams = new URLSearchParams(window.location.search);
+    // 灏濊瘯浠嶶RL涓幏鍙栧弬鏁?    const urlParams = new URLSearchParams(window.location.search);
     const sourceCode = getCurrentSourceCode(urlParams);
     let sourceName = urlParams.get('source') || '';
     if (!sourceName && sourceCode) {
@@ -1899,7 +1922,7 @@ function saveToHistory() {
     }
     const id_from_params = urlParams.get('id'); // Get video ID from player URL (passed as 'id')
 
-    // 获取当前播放进度
+    // 鑾峰彇褰撳墠鎾斁杩涘害
     let currentPosition = 0;
     let videoDuration = 0;
 
@@ -1916,7 +1939,7 @@ function saveToHistory() {
         show_identifier_for_video_info = (currentEpisodes && currentEpisodes.length > 0) ? currentEpisodes[0] : currentVideoUrl;
     }
 
-    // 构建要保存的视频信息对象
+    // 鏋勫缓瑕佷繚瀛樼殑瑙嗛淇℃伅瀵硅薄
     const videoInfo = {
         title: currentVideoTitle,
         directVideoUrl: currentVideoUrl, // Current episode's direct URL
@@ -1935,7 +1958,7 @@ function saveToHistory() {
     try {
         const history = JSON.parse(localStorage.getItem('viewingHistory') || '[]');
 
-        // 检查是否已经存在相同的系列记录 (基于标题、来源和 showIdentifier)
+        // 妫€鏌ユ槸鍚﹀凡缁忓瓨鍦ㄧ浉鍚岀殑绯诲垪璁板綍 (鍩轰簬鏍囬銆佹潵婧愬拰 showIdentifier)
         const existingIndex = history.findIndex(item => 
             item.title === videoInfo.title && 
             item.sourceName === videoInfo.sourceName && 
@@ -1943,8 +1966,7 @@ function saveToHistory() {
         );
 
         if (existingIndex !== -1) {
-            // 存在则更新现有记录的当前集数、时间戳、播放进度和URL等
-            const existingItem = history[existingIndex];
+            // 瀛樺湪鍒欐洿鏂扮幇鏈夎褰曠殑褰撳墠闆嗘暟銆佹椂闂存埑銆佹挱鏀捐繘搴﹀拰URL绛?            const existingItem = history[existingIndex];
             existingItem.episodeIndex = videoInfo.episodeIndex;
             existingItem.timestamp = videoInfo.timestamp;
             existingItem.sourceName = videoInfo.sourceName; // Should be consistent, but update just in case
@@ -1955,11 +1977,11 @@ function saveToHistory() {
             existingItem.directVideoUrl = videoInfo.directVideoUrl; // Current episode's direct URL
             existingItem.url = videoInfo.url; // Player link for the current episode
 
-            // 更新播放进度信息
+            // 鏇存柊鎾斁杩涘害淇℃伅
             existingItem.playbackPosition = videoInfo.playbackPosition > 10 ? videoInfo.playbackPosition : (existingItem.playbackPosition || 0);
             existingItem.duration = videoInfo.duration || existingItem.duration;
             
-            // 更新集数列表（如果新的集数列表与存储的不同，例如集数增加了）
+            // 鏇存柊闆嗘暟鍒楄〃锛堝鏋滄柊鐨勯泦鏁板垪琛ㄤ笌瀛樺偍鐨勪笉鍚岋紝渚嬪闆嗘暟澧炲姞浜嗭級
             if (videoInfo.episodes && videoInfo.episodes.length > 0) {
                 if (!existingItem.episodes || 
                     !Array.isArray(existingItem.episodes) || 
@@ -1969,36 +1991,35 @@ function saveToHistory() {
                 }
             }
             
-            // 移到最前面
+            // 绉诲埌鏈€鍓嶉潰
             const updatedItem = history.splice(existingIndex, 1)[0];
             history.unshift(updatedItem);
         } else {
-            // 添加新记录到最前面
+            // 娣诲姞鏂拌褰曞埌鏈€鍓嶉潰
             history.unshift(videoInfo);
         }
 
-        // 限制历史记录数量为50条
-        if (history.length > 50) history.splice(50);
+        // 闄愬埗鍘嗗彶璁板綍鏁伴噺涓?0鏉?        if (history.length > 50) history.splice(50);
 
         localStorage.setItem('viewingHistory', JSON.stringify(history));
     } catch (e) {
     }
 }
 
-// 显示恢复位置提示
+// 鏄剧ず鎭㈠浣嶇疆鎻愮ず
 function showPositionRestoreHint(position) {
     if (!position || position < 10) return;
 
-    // 创建提示元素
+    // 鍒涘缓鎻愮ず鍏冪礌
     const hint = document.createElement('div');
     hint.className = 'position-restore-hint';
     hint.innerHTML = `
         <div class="hint-content">
-            已从 ${formatTime(position)} 继续播放
+            宸蹭粠 ${formatTime(position)} 缁х画鎾斁
         </div>
     `;
 
-    // 添加到播放器容器
+    // 娣诲姞鍒版挱鏀惧櫒瀹瑰櫒
     const playerContainer = document.querySelector('.player-container'); // Ensure this selector is correct
     if (playerContainer) { // Check if playerContainer exists
         playerContainer.appendChild(hint);
@@ -2006,11 +2027,11 @@ function showPositionRestoreHint(position) {
         return; // Exit if container not found
     }
 
-    // 显示提示
+    // 鏄剧ず鎻愮ず
     setTimeout(() => {
         hint.classList.add('show');
 
-        // 3秒后隐藏
+        // 3绉掑悗闅愯棌
         setTimeout(() => {
             hint.classList.remove('show');
             setTimeout(() => hint.remove(), 300);
@@ -2018,7 +2039,7 @@ function showPositionRestoreHint(position) {
     }, 100);
 }
 
-// 格式化时间为 mm:ss 格式
+// 鏍煎紡鍖栨椂闂翠负 mm:ss 鏍煎紡
 function formatTime(seconds) {
     if (isNaN(seconds)) return '00:00';
 
@@ -2028,26 +2049,22 @@ function formatTime(seconds) {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-// 开始定期保存播放进度
-function startProgressSaveInterval() {
-    // 清除可能存在的旧计时器
-    if (progressSaveInterval) {
+// 寮€濮嬪畾鏈熶繚瀛樻挱鏀捐繘搴?function startProgressSaveInterval() {
+    // 娓呴櫎鍙兘瀛樺湪鐨勬棫璁℃椂鍣?    if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
     }
 
-    // 每30秒保存一次播放进度
-    progressSaveInterval = setInterval(saveCurrentProgress, 30000);
+    // 姣?0绉掍繚瀛樹竴娆℃挱鏀捐繘搴?    progressSaveInterval = setInterval(saveCurrentProgress, 30000);
 }
 
-// 保存当前播放进度
+// 淇濆瓨褰撳墠鎾斁杩涘害
 function saveCurrentProgress() {
     if (!art || !art.video) return;
     const currentTime = art.video.currentTime;
     const duration = art.video.duration;
     if (!duration || currentTime < 1) return;
 
-    // 在localStorage中保存进度
-    const progressKey = `videoProgress_${getVideoId()}`;
+    // 鍦╨ocalStorage涓繚瀛樿繘搴?    const progressKey = `videoProgress_${getVideoId()}`;
     const progressData = {
         position: currentTime,
         duration: duration,
@@ -2055,18 +2072,18 @@ function saveCurrentProgress() {
     };
     try {
         localStorage.setItem(progressKey, JSON.stringify(progressData));
-        // --- 新增：同步更新 viewingHistory 中的进度 ---
+        // --- 鏂板锛氬悓姝ユ洿鏂?viewingHistory 涓殑杩涘害 ---
         try {
             const historyRaw = localStorage.getItem('viewingHistory');
             if (historyRaw) {
                 const history = JSON.parse(historyRaw);
-                // 用 title + 集数索引唯一标识
+                // 鐢?title + 闆嗘暟绱㈠紩鍞竴鏍囪瘑
                 const idx = history.findIndex(item =>
                     item.title === currentVideoTitle &&
                     (item.episodeIndex === undefined || item.episodeIndex === currentEpisodeIndex)
                 );
                 if (idx !== -1) {
-                    // 只在进度有明显变化时才更新，减少写入
+                    // 鍙湪杩涘害鏈夋槑鏄惧彉鍖栨椂鎵嶆洿鏂帮紝鍑忓皯鍐欏叆
                     if (
                         Math.abs((history[idx].playbackPosition || 0) - currentTime) > 2 ||
                         Math.abs((history[idx].duration || 0) - duration) > 2
@@ -2084,8 +2101,7 @@ function saveCurrentProgress() {
     }
 }
 
-// 设置移动端长按三倍速播放功能
-function setupLongPressSpeedControl() {
+// 璁剧疆绉诲姩绔暱鎸変笁鍊嶉€熸挱鏀惧姛鑳?function setupLongPressSpeedControl() {
     if (!art || !art.video) return;
 
     const playerElement = document.getElementById('player');
@@ -2093,100 +2109,90 @@ function setupLongPressSpeedControl() {
     let originalPlaybackRate = 1.0;
     let isLongPress = false;
 
-    // 显示快速提示
-    function showSpeedHint(speed) {
-        showShortcutHint(`${speed}倍速`, 'right');
+    // 鏄剧ず蹇€熸彁绀?    function showSpeedHint(speed) {
+        showShortcutHint(`${speed}鍊嶉€焋, 'right');
     }
 
-    // 禁用右键
+    // 绂佺敤鍙抽敭
     playerElement.oncontextmenu = () => {
-        // 检测是否为移动设备
+        // 妫€娴嬫槸鍚︿负绉诲姩璁惧
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-        // 只在移动设备上禁用右键
-        if (isMobile) {
+        // 鍙湪绉诲姩璁惧涓婄鐢ㄥ彸閿?        if (isMobile) {
             const dplayerMenu = document.querySelector(".dplayer-menu");
             const dplayerMask = document.querySelector(".dplayer-mask");
             if (dplayerMenu) dplayerMenu.style.display = "none";
             if (dplayerMask) dplayerMask.style.display = "none";
             return false;
         }
-        return true; // 在桌面设备上允许右键菜单
+        return true; // 鍦ㄦ闈㈣澶囦笂鍏佽鍙抽敭鑿滃崟
     };
 
-    // 触摸开始事件
-    playerElement.addEventListener('touchstart', function (e) {
-        // 检查视频是否正在播放，如果没有播放则不触发长按功能
+    // 瑙︽懜寮€濮嬩簨浠?    playerElement.addEventListener('touchstart', function (e) {
+        // 妫€鏌ヨ棰戞槸鍚︽鍦ㄦ挱鏀撅紝濡傛灉娌℃湁鎾斁鍒欎笉瑙﹀彂闀挎寜鍔熻兘
         if (art.video.paused) {
-            return; // 视频暂停时不触发长按功能
+            return; // 瑙嗛鏆傚仠鏃朵笉瑙﹀彂闀挎寜鍔熻兘
         }
 
-        // 保存原始播放速度
+        // 淇濆瓨鍘熷鎾斁閫熷害
         originalPlaybackRate = art.video.playbackRate;
 
-        // 设置长按计时器
-        longPressTimer = setTimeout(() => {
-            // 再次检查视频是否仍在播放
-            if (art.video.paused) {
+        // 璁剧疆闀挎寜璁℃椂鍣?        longPressTimer = setTimeout(() => {
+            // 鍐嶆妫€鏌ヨ棰戞槸鍚︿粛鍦ㄦ挱鏀?            if (art.video.paused) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
                 return;
             }
 
-            // 长按超过500ms，设置为3倍速
-            art.video.playbackRate = 3.0;
+            // 闀挎寜瓒呰繃500ms锛岃缃负3鍊嶉€?            art.video.playbackRate = 3.0;
             isLongPress = true;
             showSpeedHint(3.0);
 
-            // 只在确认为长按时阻止默认行为
+            // 鍙湪纭涓洪暱鎸夋椂闃绘榛樿琛屼负
             e.preventDefault();
         }, 500);
     }, { passive: false });
 
-    // 触摸结束事件
+    // 瑙︽懜缁撴潫浜嬩欢
     playerElement.addEventListener('touchend', function (e) {
-        // 清除长按计时器
-        if (longPressTimer) {
+        // 娓呴櫎闀挎寜璁℃椂鍣?        if (longPressTimer) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
 
-        // 如果是长按状态，恢复原始播放速度
+        // 濡傛灉鏄暱鎸夌姸鎬侊紝鎭㈠鍘熷鎾斁閫熷害
         if (isLongPress) {
             art.video.playbackRate = originalPlaybackRate;
             isLongPress = false;
             showSpeedHint(originalPlaybackRate);
 
-            // 阻止长按后的点击事件
+            // 闃绘闀挎寜鍚庣殑鐐瑰嚮浜嬩欢
             e.preventDefault();
         }
-        // 如果不是长按，则允许正常的点击事件（暂停/播放）
-    });
+        // 濡傛灉涓嶆槸闀挎寜锛屽垯鍏佽姝ｅ父鐨勭偣鍑讳簨浠讹紙鏆傚仠/鎾斁锛?    });
 
-    // 触摸取消事件
+    // 瑙︽懜鍙栨秷浜嬩欢
     playerElement.addEventListener('touchcancel', function () {
-        // 清除长按计时器
-        if (longPressTimer) {
+        // 娓呴櫎闀挎寜璁℃椂鍣?        if (longPressTimer) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
 
-        // 如果是长按状态，恢复原始播放速度
+        // 濡傛灉鏄暱鎸夌姸鎬侊紝鎭㈠鍘熷鎾斁閫熷害
         if (isLongPress) {
             art.video.playbackRate = originalPlaybackRate;
             isLongPress = false;
         }
     });
 
-    // 触摸移动事件 - 防止在长按时触发页面滚动
+    // 瑙︽懜绉诲姩浜嬩欢 - 闃叉鍦ㄩ暱鎸夋椂瑙﹀彂椤甸潰婊氬姩
     playerElement.addEventListener('touchmove', function (e) {
         if (isLongPress) {
             e.preventDefault();
         }
     }, { passive: false });
 
-    // 视频暂停时取消长按状态
-    art.video.addEventListener('pause', function () {
+    // 瑙嗛鏆傚仠鏃跺彇娑堥暱鎸夌姸鎬?    art.video.addEventListener('pause', function () {
         if (isLongPress) {
             art.video.playbackRate = originalPlaybackRate;
             isLongPress = false;
@@ -2199,7 +2205,7 @@ function setupLongPressSpeedControl() {
     });
 }
 
-// 清除视频进度记录
+// 娓呴櫎瑙嗛杩涘害璁板綍
 function clearVideoProgress() {
     const progressKey = `videoProgress_${getVideoId()}`;
     try {
@@ -2208,9 +2214,9 @@ function clearVideoProgress() {
     }
 }
 
-// 获取视频唯一标识
+// 鑾峰彇瑙嗛鍞竴鏍囪瘑
 function getVideoId() {
-    // 使用视频标题和集数索引作为唯一标识
+    // 浣跨敤瑙嗛鏍囬鍜岄泦鏁扮储寮曚綔涓哄敮涓€鏍囪瘑
     // If currentVideoUrl is available and more unique, prefer it. Otherwise, fallback.
     if (currentVideoUrl) {
         return `${encodeURIComponent(currentVideoUrl)}`;
@@ -2224,24 +2230,24 @@ function toggleControlsLock() {
     controlsLocked = !controlsLocked;
     container.classList.toggle('controls-locked', controlsLocked);
     const icon = document.getElementById('lockIcon');
-    // 切换图标：锁 / 解锁
+    // 鍒囨崲鍥炬爣锛氶攣 / 瑙ｉ攣
     icon.innerHTML = controlsLocked
         ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M12 15v2m0-8V7a4 4 0 00-8 0v2m8 0H4v8h16v-8H6v-6z\"/>'
         : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d=\"M15 11V7a3 3 0 00-6 0v4m-3 4h12v6H6v-6z\"/>';
 }
 
-// 支持在iframe中关闭播放器
+// 鏀寔鍦╥frame涓叧闂挱鏀惧櫒
 function closeEmbeddedPlayer() {
     try {
         if (window.self !== window.top) {
-            // 如果在iframe中，尝试调用父窗口的关闭方法
+            // 濡傛灉鍦╥frame涓紝灏濊瘯璋冪敤鐖剁獥鍙ｇ殑鍏抽棴鏂规硶
             if (window.parent && typeof window.parent.closeVideoPlayer === 'function') {
                 window.parent.closeVideoPlayer();
                 return true;
             }
         }
     } catch (e) {
-        console.error('尝试关闭嵌入式播放器失败:', e);
+        console.error('灏濊瘯鍏抽棴宓屽叆寮忔挱鏀惧櫒澶辫触:', e);
     }
     return false;
 }
@@ -2262,10 +2268,10 @@ function getResourceDisplayName(sourceKey) {
 
     if (sourceKey && sourceKey.startsWith('custom_')) {
         const customIndex = parseInt(sourceKey.replace('custom_', ''), 10);
-        return customAPIs[customIndex]?.name || '自定义资源';
+        return customAPIs[customIndex]?.name || '鑷畾涔夎祫婧?;
     }
 
-    return sourceKey || '未知资源';
+    return sourceKey || '鏈煡璧勬簮';
 }
 
 function closeResourceModal() {
@@ -2295,7 +2301,7 @@ function closeResourceModal() {
 function renderResourceInfoBar() {
     const container = document.getElementById('resourceInfoBarContainer');
     if (!container) {
-        console.error('找不到资源信息卡片容器');
+        console.error('鎵句笉鍒拌祫婧愪俊鎭崱鐗囧鍣?);
         return;
     }
 
@@ -2307,20 +2313,20 @@ function renderResourceInfoBar() {
     const isDefaultRecommended = currentSource && currentSource === recommendedSource;
     const regionLabel = window.getSourceRegionLabel
         ? window.getSourceRegionLabel(currentSource)
-        : '普通线路';
+        : '鏅€氱嚎璺?;
     const cachedSpeed = window.getCachedSourceSpeed
         ? window.getCachedSourceSpeed(currentSource)
         : null;
-    const speedLabel = cachedSpeed === null ? '未测速' : `${Math.round(cachedSpeed)}ms`;
+    const speedLabel = cachedSpeed === null ? '鏈祴閫? : `${Math.round(cachedSpeed)}ms`;
 
     container.innerHTML = `
       <div class="resource-info-bar-left flex">
         <div class="resource-info-primary">
           <span class="resource-info-name">${escapeResourceText(resourceName)}</span>
-          ${isDefaultRecommended ? '<span class="resource-info-recommended">默认推荐</span>' : ''}
+          ${isDefaultRecommended ? '<span class="resource-info-recommended">榛樿鎺ㄨ崘</span>' : ''}
         </div>
         <div class="resource-info-meta">
-          <span>${currentEpisodes.length} 集</span>
+          <span>${currentEpisodes.length} 闆?/span>
           <span>${escapeResourceText(regionLabel)}</span>
           <span>${escapeResourceText(speedLabel)}</span>
         </div>
@@ -2329,23 +2335,22 @@ function renderResourceInfoBar() {
         <span class="resource-switch-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
-        切换资源
+        鍒囨崲璧勬簮
       </button>
     `;
 }
 
-// 测试视频源速率的函数
-async function testVideoSourceSpeed(sourceKey, vodId) {
+// 娴嬭瘯瑙嗛婧愰€熺巼鐨勫嚱鏁?async function testVideoSourceSpeed(sourceKey, vodId) {
     try {
         const startTime = performance.now();
         
-        // 构建API参数
+        // 鏋勫缓API鍙傛暟
         let apiParams = '';
         if (sourceKey.startsWith('custom_')) {
             const customIndex = sourceKey.replace('custom_', '');
             const customApi = getCustomApiInfo(customIndex);
             if (!customApi) {
-                return { speed: -1, error: 'API配置无效' };
+                return { speed: -1, error: 'API閰嶇疆鏃犳晥' };
             }
             if (customApi.detail) {
                 apiParams = '&customApi=' + encodeURIComponent(customApi.url) + '&customDetail=' + encodeURIComponent(customApi.detail) + '&source=custom';
@@ -2356,159 +2361,151 @@ async function testVideoSourceSpeed(sourceKey, vodId) {
             apiParams = '&source=' + sourceKey;
         }
         
-        // 添加时间戳防止缓存
-        const timestamp = new Date().getTime();
+        // 娣诲姞鏃堕棿鎴抽槻姝㈢紦瀛?        const timestamp = new Date().getTime();
         const cacheBuster = `&_t=${timestamp}`;
         
-        // 获取视频详情
+        // 鑾峰彇瑙嗛璇︽儏
         const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}${cacheBuster}`, {
             method: 'GET',
             cache: 'no-cache'
         });
         
         if (!response.ok) {
-            return { speed: -1, error: '获取失败' };
+            return { speed: -1, error: '鑾峰彇澶辫触' };
         }
         
         const data = await response.json();
         
         if (!data.episodes || data.episodes.length === 0) {
-            return { speed: -1, error: '无播放源' };
+            return { speed: -1, error: '鏃犳挱鏀炬簮' };
         }
         
-        // 测试第一个播放链接的响应速度
+        // 娴嬭瘯绗竴涓挱鏀鹃摼鎺ョ殑鍝嶅簲閫熷害
         const firstEpisodeUrl = data.episodes[0];
         if (!firstEpisodeUrl) {
-            return { speed: -1, error: '链接无效' };
+            return { speed: -1, error: '閾炬帴鏃犳晥' };
         }
         
-        // 测试视频链接响应时间
+        // 娴嬭瘯瑙嗛閾炬帴鍝嶅簲鏃堕棿
         const videoTestStart = performance.now();
         try {
             const videoResponse = await fetch(firstEpisodeUrl, {
                 method: 'HEAD',
                 mode: 'no-cors',
                 cache: 'no-cache',
-                signal: AbortSignal.timeout(5000) // 5秒超时
-            });
+                signal: AbortSignal.timeout(5000) // 5绉掕秴鏃?            });
             
             const videoTestEnd = performance.now();
             const totalTime = videoTestEnd - startTime;
             
-            // 返回总响应时间（毫秒）
-            return { 
+            // 杩斿洖鎬诲搷搴旀椂闂达紙姣锛?            return { 
                 speed: Math.round(totalTime),
                 episodes: data.episodes.length,
                 error: null 
             };
         } catch (videoError) {
-            // 如果视频链接测试失败，只返回API响应时间
+            // 濡傛灉瑙嗛閾炬帴娴嬭瘯澶辫触锛屽彧杩斿洖API鍝嶅簲鏃堕棿
             const apiTime = performance.now() - startTime;
             return { 
                 speed: Math.round(apiTime),
                 episodes: data.episodes.length,
                 error: null,
-                note: 'API响应' 
+                note: 'API鍝嶅簲' 
             };
         }
         
     } catch (error) {
         return { 
             speed: -1, 
-            error: error.name === 'AbortError' ? '超时' : '测试失败' 
+            error: error.name === 'AbortError' ? '瓒呮椂' : '娴嬭瘯澶辫触' 
         };
     }
 }
 
-// 格式化速度显示
+// 鏍煎紡鍖栭€熷害鏄剧ず
 function formatSpeedDisplay(speedResult) {
     if (speedResult.speed === -1) {
-        return `<span class="speed-indicator error">❌ ${speedResult.error}</span>`;
+        return `<span class="speed-indicator error">鉂?${speedResult.error}</span>`;
     }
     
     const speed = speedResult.speed;
     let className = 'speed-indicator good';
-    let icon = '🟢';
+    let icon = '馃煝';
     
     if (speed > 2000) {
         className = 'speed-indicator poor';
-        icon = '🔴';
+        icon = '馃敶';
     } else if (speed > 1000) {
         className = 'speed-indicator medium';
-        icon = '🟡';
+        icon = '馃煛';
     }
     
     const note = speedResult.note ? ` (${speedResult.note})` : '';
     return `<span class="${className}">${icon} ${speed}ms${note}</span>`;
 }
 
-// ── 资源卡片占位图 ──────────────────────────────────────────────────────────
+// 鈹€鈹€ 璧勬簮鍗＄墖鍗犱綅鍥?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const _FALLBACK_IMG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIgcnk9IjIiPjwvcmVjdD48cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPjxwb2x5bGluZSBwb2ludHM9IjE3IDggMTIgMyA3IDgiPjwvcG9seWxpbmU+PHBhdGggZD0iTTEyIDN2MTIiPjwvcGF0aD48L3N2Zz4=";
 
-// 流式资源切换弹窗（优化版）：搜到即显卡片，速测完即更新徽章
+// 娴佸紡璧勬簮鍒囨崲寮圭獥锛堜紭鍖栫増锛夛細鎼滃埌鍗虫樉鍗＄墖锛岄€熸祴瀹屽嵆鏇存柊寰界珷
 async function showSwitchResourceModal() {
     const urlParams = new URLSearchParams(window.location.search);
     const currentSourceCode = getCurrentSourceCode(urlParams);
     const currentVideoId = urlParams.get('id');
-    const playbackRegion = window.getUserPlaybackRegion
-        ? window.getUserPlaybackRegion()
-        : { region: 'overseas', recommendationLabel: '海外优先' };
 
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
 
     if (resourceSwitchInProgress) {
-        showToast('正在切换资源，请稍候', 'warning');
+        showToast('姝ｅ湪鍒囨崲璧勬簮锛岃绋嶅€?, 'warning');
         return;
     }
 
     resourceModalPreviousFocus = document.activeElement;
-    modalTitle.innerHTML = `<span class="break-words">${escapeResourceText(currentVideoTitle)}</span><span class="resource-modal-title-sub">选择可用线路</span>`;
+    modalTitle.innerHTML = `<span class="break-words">${escapeResourceText(currentVideoTitle)}</span><span class="resource-modal-title-sub">閫夋嫨鍙敤绾胯矾</span>`;
     modal.classList.remove('hidden');
     modal.style.display = '';
     modal.setAttribute('aria-hidden', 'false');
 
+    // NOTE: 浼樺厛浣跨敤鎼滅储椤电紦瀛樼殑鍏勫紵璧勬簮锛堝悓涓€娆℃悳绱㈢粨鏋滀腑鐨勫悓鍚嶅叾浠栨潵婧愶級
+    // 缂撳瓨鐢?app.js 鐨?playVideo() 鍐欏叆锛屾爣棰樹竴鑷存椂鏈夋晥
+    let siblingResults = [];
+    try {
+        const cachedTitle = localStorage.getItem('playerSiblingTitle') || '';
+        const cachedRaw = localStorage.getItem('playerSiblingResults');
+        const normalizedCurrent = String(currentVideoTitle || '').replace(/[\s路锛?()锛堬級\-]/g, '').toLowerCase();
+        const normalizedCached = String(cachedTitle).replace(/[\s路锛?()锛堬級\-]/g, '').toLowerCase();
+        // NOTE: 鍙湁鏍囬鍖归厤鏃舵墠浣跨敤缂撳瓨锛岄槻姝㈡墦寮€鍏朵粬瑙嗛鏃惰鐢ㄤ笂娆＄殑鏁版嵁
+        if (cachedRaw && normalizedCached && normalizedCurrent && normalizedCached === normalizedCurrent) {
+            siblingResults = JSON.parse(cachedRaw);
+        }
+    } catch (e) {
+        siblingResults = [];
+    }
+
+    const playbackRegion = window.getUserPlaybackRegion
+        ? window.getUserPlaybackRegion()
+        : { region: 'overseas', recommendationLabel: '娴峰浼樺厛' };
+
     const defaultRecommendedSource = window.getDefaultRecommendedSource
         ? window.getDefaultRecommendedSource()
         : '';
-    const candidateSourceKeys = Array.from(new Set([
-        defaultRecommendedSource,
-        currentSourceCode,
-        ...selectedAPIs
-    ].filter(Boolean)));
-    const orderedSourceKeys = window.getPreferredSourceOrder
-        ? window.getPreferredSourceOrder(candidateSourceKeys)
-        : candidateSourceKeys;
-    const resourceOptions = orderedSourceKeys.map(curr => {
-        if (API_SITES[curr]) {
-            return { key: curr, name: API_SITES[curr].name };
-        }
-        if (!curr.startsWith('custom_')) return null;
-        const idx = parseInt(curr.replace('custom_', ''), 10);
-        if (!customAPIs[idx]) return null;
-        return { key: curr, name: customAPIs[idx].name || '自定义资源' };
-    }).filter(Boolean);
-    const nameMap = Object.fromEntries(resourceOptions.map(option => [option.key, option.name]));
-    const availableResults = new Map();
-    const speedSnapshot = {};
-    resourceOptions.forEach(option => {
-        const cachedSpeed = window.getCachedSourceSpeed ? window.getCachedSourceSpeed(option.key) : null;
-        if (cachedSpeed !== null) {
-            speedSnapshot[option.key] = cachedSpeed;
-        }
-    });
 
     modalContent.innerHTML = `
         <div class="resource-grid-note">
-            ${playbackRegion.region === 'mainland'
-                ? '当前按大陆网络优先推荐线路，测速完成后会继续刷新顺序。'
-                : '当前按海外网络优先推荐线路，测速完成后会继续刷新顺序。'}
+            ${siblingResults.length > 0
+                ? '浠ヤ笅涓烘湰娆℃悳绱㈢粨鏋滀腑鎵惧埌鐨勫彲鐢ㄧ嚎璺紝鐐瑰嚮鍗冲彲鍒囨崲銆?
+                : (playbackRegion.region === 'mainland'
+                    ? '褰撳墠鎸夊ぇ闄嗙綉缁滀紭鍏堟帹鑽愮嚎璺紝娴嬮€熷畬鎴愬悗浼氱户缁埛鏂伴『搴忋€?
+                    : '褰撳墠鎸夋捣澶栫綉缁滀紭鍏堟帹鑽愮嚎璺紝娴嬮€熷畬鎴愬悗浼氱户缁埛鏂伴『搴忋€?)}
         </div>
         <div id="resource-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4"></div>
     `;
     const grid = document.getElementById('resource-grid');
     let resourceModalHasFocusedCard = false;
+    const availableResults = new Map();
+    const speedSnapshot = {};
 
     function getFocusableResourceCards() {
         return Array.from(grid.querySelectorAll('.resource-source-card:not(:disabled)'));
@@ -2646,19 +2643,16 @@ async function showSwitchResourceModal() {
 
         const isCurrent = String(sourceKey) === String(currentSourceCode)
             && String(result.vod_id) === String(currentVideoId);
-        const sourceName = nameMap[sourceKey] || '未知资源';
+        const sourceName = result.source_name || getResourceDisplayName(sourceKey);
         const sourceRegionLabel = window.getSourceRegionLabel
             ? window.getSourceRegionLabel(sourceKey)
-            : '普通线路';
-        const defaultRecommendedSource = window.getDefaultRecommendedSource
-            ? window.getDefaultRecommendedSource()
-            : '';
+            : '鏅€氱嚎璺?;
         const isDefaultRecommended = sourceKey === defaultRecommendedSource;
         const isRecommended = getRecommendedSourceKeyForGrid() === sourceKey;
         const episodeCount = nextSpeedResult?.episodes || result.episodes?.length || 0;
         const speedText = nextSpeedResult
             ? formatSpeedDisplay(nextSpeedResult)
-            : '<span class="speed-indicator resource-speed-pending">测速中</span>';
+            : '<span class="speed-indicator resource-speed-pending">娴嬮€熶腑</span>';
 
         let card = document.getElementById(`rcard-${sourceKey}`);
         if (!card) {
@@ -2672,25 +2666,25 @@ async function showSwitchResourceModal() {
         card.disabled = isCurrent || resourceSwitchInProgress;
         card.dataset.sourceKey = sourceKey;
         card.dataset.vodId = result.vod_id;
-        card.setAttribute('aria-label', `${sourceName}，${sourceRegionLabel}${episodeCount ? `，${episodeCount}集` : ''}${isCurrent ? '，当前播放' : ''}${isDefaultRecommended ? '，默认推荐' : ''}`);
+        card.setAttribute('aria-label', `${sourceName}锛?{sourceRegionLabel}${episodeCount ? `锛?{episodeCount}闆哷 : ''}${isCurrent ? '锛屽綋鍓嶆挱鏀? : ''}${isDefaultRecommended ? '锛岄粯璁ゆ帹鑽? : ''}`);
         card.onclick = isCurrent ? null : (() => switchToResource(sourceKey, result.vod_id, card));
         card.innerHTML = `
             <div class="resource-source-poster">
                 <img src="${escapeResourceText(result.vod_pic || _FALLBACK_IMG)}" alt="${escapeResourceText(result.vod_name)}"
                      onerror="this.src='${_FALLBACK_IMG}'">
                 <div class="resource-source-badges">
-                    ${isDefaultRecommended ? '<span class="resource-recommend-badge default">默认推荐</span>' : (isRecommended ? '<span class="resource-recommend-badge">推荐</span>' : '')}
-                    ${isCurrent ? '<span class="resource-current-badge">当前播放</span>' : ''}
+                    ${isDefaultRecommended ? '<span class="resource-recommend-badge default">榛樿鎺ㄨ崘</span>' : (isRecommended ? '<span class="resource-recommend-badge">鎺ㄨ崘</span>' : '')}
+                    ${isCurrent ? '<span class="resource-current-badge">褰撳墠鎾斁</span>' : ''}
                 </div>
                 <div class="resource-speed-badge">${speedText}</div>
-                <div class="resource-switching-state" aria-hidden="true"><span class="resource-switching-spinner"></span><span>正在切换</span></div>
+                <div class="resource-switching-state" aria-hidden="true"><span class="resource-switching-spinner"></span><span>姝ｅ湪鍒囨崲</span></div>
             </div>
             <div class="resource-source-copy">
                 <strong title="${escapeResourceText(result.vod_name)}">${escapeResourceText(result.vod_name)}</strong>
                 <span title="${escapeResourceText(sourceName)}">${escapeResourceText(sourceName)}</span>
                 <div class="resource-source-meta">
                     <span class="resource-region-tag">${escapeResourceText(sourceRegionLabel)}</span>
-                    <span>${episodeCount ? `${episodeCount}集` : '集数待确认'}</span>
+                    <span>${episodeCount ? `${episodeCount}闆哷 : '闆嗘暟寰呯‘璁?}</span>
                 </div>
             </div>`;
 
@@ -2703,14 +2697,14 @@ async function showSwitchResourceModal() {
             if (!speedResult || speedResult.speed < 0) {
                 return {
                     speed: -1,
-                    error: speedResult?.error === 'timeout' ? '超时' : '测试失败'
+                    error: speedResult?.error === 'timeout' ? '瓒呮椂' : '娴嬭瘯澶辫触'
                 };
             }
             return {
                 speed: speedResult.speed,
                 episodes: speedResult.episodes,
                 error: null,
-                note: speedResult.cached ? '缓存' : ''
+                note: speedResult.cached ? '缂撳瓨' : ''
             };
         }
 
@@ -2726,19 +2720,19 @@ async function showSwitchResourceModal() {
                 })()
                 : `&source=${sourceKey}`;
             if (apiParams === null) {
-                return { speed: -1, error: 'API配置无效' };
+                return { speed: -1, error: 'API閰嶇疆鏃犳晥' };
             }
 
             const response = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${apiParams}`, {
                 signal: AbortSignal.timeout(6000)
             });
             if (!response.ok) {
-                return { speed: -1, error: '获取失败' };
+                return { speed: -1, error: '鑾峰彇澶辫触' };
             }
 
             const detail = await response.json();
             if (!detail.episodes?.length) {
-                return { speed: -1, error: '无播放源' };
+                return { speed: -1, error: '鏃犳挱鏀炬簮' };
             }
 
             const measuredSpeed = Math.round(performance.now() - startAt);
@@ -2758,10 +2752,65 @@ async function showSwitchResourceModal() {
         } catch (error) {
             return {
                 speed: -1,
-                error: error.name === 'TimeoutError' || error.name === 'AbortError' ? '超时' : '测试失败'
+                error: error.name === 'TimeoutError' || error.name === 'AbortError' ? '瓒呮椂' : '娴嬭瘯澶辫触'
             };
         }
     }
+
+    // 鈹€鈹€ 浣跨敤缂撳瓨鍏勫紵璧勬簮锛堟潵鑷悳绱㈢粨鏋滈〉锛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    if (siblingResults.length > 0) {
+        // NOTE: 鐩存帴灞曠ず缂撳瓨鐨勬悳绱㈢粨鏋滐紝鏃犻渶閲嶆柊鎼滅储 API
+        let foundAny = false;
+        siblingResults.forEach(sibling => {
+            foundAny = true;
+            upsertCard(sibling.source_code, {
+                vod_id: sibling.vod_id,
+                vod_name: sibling.vod_name,
+                vod_pic: sibling.vod_pic || '',
+                source_name: sibling.source_name || sibling.source_code
+            }, null);
+            // 寮傛娴嬮€?            testSpeedFast(sibling.source_code, sibling.vod_id)
+                .then(speedResult => upsertCard(sibling.source_code, {
+                    vod_id: sibling.vod_id,
+                    vod_name: sibling.vod_name,
+                    vod_pic: sibling.vod_pic || '',
+                    source_name: sibling.source_name || sibling.source_code
+                }, speedResult))
+                .catch(() => {});
+        });
+
+        if (!foundAny) {
+            modalContent.innerHTML = '<div class="resource-empty-state">鏈壘鍒板尮閰嶈祫婧愶紝璇疯繑鍥炲悗缁х画浣跨敤褰撳墠绾胯矾銆?/div>';
+        } else {
+            focusPreferredResourceCard();
+        }
+        return;
+    }
+
+    // 鈹€鈹€ 鏃犵紦瀛樻椂锛氳法 API 閲嶆柊鎼滅储锛堝師鏈夐€昏緫锛?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+    const candidateSourceKeys = Array.from(new Set([
+        defaultRecommendedSource,
+        currentSourceCode,
+        ...selectedAPIs
+    ].filter(Boolean)));
+    const orderedSourceKeys = window.getPreferredSourceOrder
+        ? window.getPreferredSourceOrder(candidateSourceKeys)
+        : candidateSourceKeys;
+    const resourceOptions = orderedSourceKeys.map(curr => {
+        if (API_SITES[curr]) {
+            return { key: curr, name: API_SITES[curr].name };
+        }
+        if (!curr.startsWith('custom_')) return null;
+        const idx = parseInt(curr.replace('custom_', ''), 10);
+        if (!customAPIs[idx]) return null;
+        return { key: curr, name: customAPIs[idx].name || '鑷畾涔夎祫婧? };
+    }).filter(Boolean);
+    resourceOptions.forEach(option => {
+        const cachedSpeed = window.getCachedSourceSpeed ? window.getCachedSourceSpeed(option.key) : null;
+        if (cachedSpeed !== null) {
+            speedSnapshot[option.key] = cachedSpeed;
+        }
+    });
 
     let foundAny = false;
     await Promise.all(resourceOptions.map(async option => {
@@ -2770,10 +2819,10 @@ async function showSwitchResourceModal() {
             if (!Array.isArray(queryResult) || !queryResult.length) return;
 
             let result = queryResult[0];
-            const normalizedTitle = String(currentVideoTitle || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+            const normalizedTitle = String(currentVideoTitle || '').replace(/[\s路锛?()锛堬級\-]/g, '').toLowerCase();
             let bestScore = -1;
             queryResult.forEach(currentResult => {
-                const resultTitle = String(currentResult.vod_name || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+                const resultTitle = String(currentResult.vod_name || '').replace(/[\s路锛?()锛堬級\-]/g, '').toLowerCase();
                 let score = 0;
                 if (resultTitle === normalizedTitle) score = 100;
                 else if (resultTitle.includes(normalizedTitle) || normalizedTitle.includes(resultTitle)) score = 60;
@@ -2789,99 +2838,44 @@ async function showSwitchResourceModal() {
                 .then(speedResult => upsertCard(option.key, result, speedResult))
                 .catch(() => {});
         } catch (error) {
-            console.warn(`资源 ${option.key} 搜索失败:`, error.message);
+            console.warn(`璧勬簮 ${option.key} 鎼滅储澶辫触:`, error.message);
         }
     }));
 
     if (!foundAny) {
-        modalContent.innerHTML = '<div class="resource-empty-state">未找到匹配资源，请返回后继续使用当前线路。</div>';
+        modalContent.innerHTML = '<div class="resource-empty-state">鏈壘鍒板尮閰嶈祫婧愶紝璇疯繑鍥炲悗缁х画浣跨敤褰撳墠绾胯矾銆?/div>';
     } else {
         focusPreferredResourceCard();
     }
 }
 
-function waitForPlayerReady(timeoutMs = 12000) {
-    return new Promise((resolve, reject) => {
-        const video = art?.video;
-        if (!video) {
-            reject(new Error('播放器尚未就绪'));
-            return;
-        }
-
-        if (video.readyState >= 2 && !video.error) {
-            resolve();
-            return;
-        }
-
-        let settled = false;
-        const cleanup = () => {
-            clearTimeout(timer);
-            video.removeEventListener('loadeddata', handleReady);
-            video.removeEventListener('canplay', handleReady);
-            video.removeEventListener('playing', handleReady);
-            video.removeEventListener('error', handleError);
-        };
-        const handleReady = () => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            resolve();
-        };
-        const handleError = () => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            reject(new Error('目标线路无法播放'));
-        };
-        const timer = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            reject(new Error('目标线路加载超时'));
-        }, timeoutMs);
-
-        video.addEventListener('loadeddata', handleReady, { once: true });
-        video.addEventListener('canplay', handleReady, { once: true });
-        video.addEventListener('playing', handleReady, { once: true });
-        video.addEventListener('error', handleError, { once: true });
-    });
-}
-
-async function loadResourceIntoPlayer(videoUrl, restorePosition = 0) {
-    window.isSwitchingVideo = true;
-
-    if (isWebkit || !art) {
-        initPlayer(videoUrl);
-        await waitForPlayerReady();
-    } else if (typeof art.switchUrl === 'function') {
-        // switchUrl 返回 Promise，只有目标地址达到可播放状态才会 resolve。
-        await Promise.race([
-            art.switchUrl(videoUrl),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('目标线路加载超时')), 15000))
-        ]);
-    } else {
-        art.switch = videoUrl;
-        await waitForPlayerReady();
-    }
-
-    if (restorePosition > 0 && art?.duration > restorePosition + 2) {
-        art.currentTime = restorePosition;
-    }
-    if (art?.play) {
-        await art.play().catch(() => {});
-    }
-}
-
+/**
+ * 设置资源卡片的切换中状态
+ * @param {HTMLElement|null} activeCard - 当前点击的卡片（显示 spinner），null 表示所有卡片
+ * @param {boolean} isSwitching - true 进入切换中状态，false 恢复正常
+ */
 function setResourceCardsSwitching(activeCard, isSwitching) {
-    document.querySelectorAll('.resource-source-card').forEach(card => {
-        card.disabled = isSwitching || card.classList.contains('current');
-        card.classList.toggle('is-switching', isSwitching && card === activeCard);
-        card.setAttribute('aria-busy', isSwitching && card === activeCard ? 'true' : 'false');
+    const grid = document.getElementById('resource-grid');
+    if (!grid) return;
+    const allCards = Array.from(grid.querySelectorAll('.resource-source-card'));
+    allCards.forEach(card => {
+        if (isSwitching) {
+            card.disabled = true;
+            if (card === activeCard) {
+                card.classList.add('is-switching');
+            }
+        } else {
+            // 恢复时只解除非"当前播放"卡片的禁用状态
+            if (!card.classList.contains('current')) {
+                card.disabled = false;
+            }
+            card.classList.remove('is-switching');
+        }
     });
 }
 
-// 原地切换资源：目标线路确认可播放后才提交状态，失败时自动恢复旧线路。
 async function switchToResource(sourceKey, vodId, activeCard = null) {
+
     if (resourceSwitchInProgress) {
         showToast('正在切换资源，请勿重复操作', 'warning');
         return;
@@ -2939,7 +2933,7 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
         targetLoadStarted = true;
         await loadResourceIntoPlayer(targetUrl, snapshot.position);
 
-        // 目标线路已可播放，此时才原子提交应用状态。
+        // 目标线路已可播放，此时才原子提交应用状态
         currentEpisodes = data.episodes;
         currentEpisodeIndex = targetIndex;
         currentVideoUrl = targetUrl;
@@ -2965,7 +2959,7 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
             localStorage.setItem('currentPlayingSource', sourceKey);
         } catch (error) {}
 
-        // 用户主动选源时优先恢复播放，只有原播放器明确处于暂停状态且已有播放进度才保持暂停。
+        // 用户主动选源时优先恢复播放
         if (snapshot.wasPaused && snapshot.position > 1 && art?.pause) {
             art.pause();
         }
@@ -2980,7 +2974,6 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
     } catch (error) {
         console.error('切换资源失败:', error);
 
-        // 若目标流已经替换进播放器，恢复旧流、旧集数、旧 URL 和原播放位置。
         currentEpisodes = snapshot.episodes;
         currentEpisodeIndex = snapshot.episodeIndex;
         currentVideoUrl = snapshot.videoUrl;
@@ -3010,4 +3003,66 @@ async function switchToResource(sourceKey, vodId, activeCard = null) {
             activeCard?.focus({ preventScroll: true });
         }
     }
+}
+
+function waitForPlayerReady(timeoutMs = 12000) {
+    return new Promise((resolve, reject) => {
+        const video = art?.video;
+        if (!video) {
+            reject(new Error('播放器尚未就绪'));
+            return;
+        }
+
+        if (video.readyState >= 2 && !video.error) {
+            resolve();
+            return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+            clearTimeout(timer);
+            video.removeEventListener('loadeddata', handleReady);
+            video.removeEventListener('error', handleError);
+        };
+        const handleReady = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+        };
+        const handleError = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error('视频加载出错'));
+        };
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error('视频加载超时'));
+        }, timeoutMs);
+
+        video.addEventListener('loadeddata', handleReady);
+        video.addEventListener('error', handleError);
+    });
+}
+
+async function loadResourceIntoPlayer(url, resumePosition = 0) {
+    if (!art) throw new Error('播放器实例不存在');
+
+    art.url = url;
+
+    try {
+        await waitForPlayerReady(12000);
+    } catch (err) {
+        // NOTE: 超时不阻断切换，允许继续（部分电视浏览器 readyState 更新慢）
+        console.warn('loadResourceIntoPlayer: waitForPlayerReady failed:', err.message);
+    }
+
+    if (resumePosition > 1 && art.video) {
+        try { art.video.currentTime = resumePosition; } catch (e) {}
+    }
+
+    art.play();
 }

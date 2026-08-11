@@ -1018,6 +1018,8 @@ async function search() {
             });
 
             resultBuckets.set(sourceCode, existingBucket.concat(normalizedResults));
+            // NOTE: 暴露精简版到 window，供全局函数 playVideo 构建兄弟资源缓存
+            window.lastSearchResultBuckets = resultBuckets;
             renderSortedResults();
 
             const cacheEntry = window.getSourceSpeedCacheEntry
@@ -1330,6 +1332,40 @@ function playVideo(url, vod_name, sourceCode, episodeIndex = 0, vodId = '') {
         localStorage.setItem('lastPlayTime', Date.now());
         localStorage.setItem('lastSearchPage', currentPath);
         localStorage.setItem('lastPageUrl', currentPath);  // 确保保存返回页面URL
+
+        // NOTE: 收集搜索结果中同名的其他 API 源，供播放器切换资源使用
+        // 通过 window.lastSearchResultBuckets（由 collectResults 同步）跨函数访问 resultBuckets
+        const normalizedTitle = String(vod_name || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+        const siblingResults = [];
+        const buckets = window.lastSearchResultBuckets;
+        if (buckets instanceof Map) {
+            buckets.forEach(function (items, bucketSourceCode) {
+                items.forEach(function (item) {
+                    const itemTitle = String(item.vod_name || '').replace(/[\s·：:()（）\-]/g, '').toLowerCase();
+                    const isMatch = itemTitle === normalizedTitle
+                        || itemTitle.includes(normalizedTitle)
+                        || normalizedTitle.includes(itemTitle);
+                    if (isMatch) {
+                        siblingResults.push({
+                            vod_id: item.vod_id,
+                            vod_name: item.vod_name,
+                            vod_pic: item.vod_pic || '',
+                            vod_remarks: item.vod_remarks || '',
+                            source_code: bucketSourceCode,
+                            source_name: item.source_name || bucketSourceCode
+                        });
+                    }
+                });
+            });
+        }
+        if (siblingResults.length > 0) {
+            localStorage.setItem('playerSiblingResults', JSON.stringify(siblingResults));
+            localStorage.setItem('playerSiblingTitle', vod_name || '');
+        } else {
+            // 搜索结果未加载时清除旧缓存，避免误用上次的数据
+            localStorage.removeItem('playerSiblingResults');
+            localStorage.removeItem('playerSiblingTitle');
+        }
     } catch (e) {
         console.error('保存播放状态失败:', e);
     }

@@ -101,6 +101,9 @@
     <link rel="stylesheet" href="css/styles.css?v=20260730-recommend1">
     <link rel="stylesheet" href="css/index.css?v=20260804-tvflow1">
     <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
+    <link rel="stylesheet" href="css/tv-mode.css?v=20260811-tvrefactor">
+    <link rel="stylesheet" href="css/tv-keyboard.css?v=20260811-tvrefactor">
+    <link rel="stylesheet" href="css/mobile-nav.css?v=20260811-tvrefactor">
 </head>
 
 <body class="page-bg text-white">
@@ -492,6 +495,38 @@
         </div>
     </footer>
 
+    <!-- ══════ 手机端底部导航栏 ═══════════════════════════════════════════ -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="底部导航">
+        <button type="button" class="mobile-nav-item active" id="navHome" onclick="handleMobileNav('home')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/>
+            </svg>
+            <span>首页</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="navSearch" onclick="handleMobileNav('search')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <span>搜索</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="navHistory" onclick="handleMobileNav('history')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>历史</span>
+        </button>
+        <button type="button" class="mobile-nav-item" id="navSettings" onclick="handleMobileNav('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span>设置</span>
+        </button>
+    </nav>
+
+    <!-- TV 虚拟键盘容器 -->
+    <div id="tvKeyboardOverlay" class="tv-keyboard-overlay" style="display:none" aria-hidden="true"></div>
+
     <!-- ══════ Modals — 全部用 style="display:none" 代替 hidden class ══════ -->
 
     <!-- 详情模态框 -->
@@ -583,7 +618,10 @@
         window.__ENV__.GEO_SOURCE = window.__ENV__.GEO_SOURCE || '';
     </script>
 
-    <script src="js/index-page.js?v=20260803-tvepisodes1"></script>
+    <script src="js/tv-focus-manager.js?v=20260811-tvrefactor"></script>
+    <script src="js/tv-keyboard.js?v=20260811-tvrefactor"></script>
+    <script src="js/touch-gestures.js?v=20260811-tvrefactor"></script>
+    <script src="js/index-page.js?v=20260811-tvrefactor"></script>
 </body>
 
 </html>
