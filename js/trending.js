@@ -246,8 +246,9 @@ function renderTrendingCards(items) {
         const safeTitle = item.title
             .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-        // TMDB 图片 CDN 支持跨域，直接引用无需代理
-        const imgSrc = item.poster || '';
+        // 海报图片：支持 CDN 加速与容灾
+        const originalImgSrc = item.poster || '';
+        const imgSrc = originalImgSrc ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(originalImgSrc) : originalImgSrc) : '';
 
         const showRating = item.rating && parseFloat(item.rating) > 0;
 
@@ -262,14 +263,14 @@ function renderTrendingCards(items) {
             <div class="relative aspect-[2/3] rounded-lg overflow-hidden bg-[#1a1a1a] shadow-lg
                          group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-blue-900/30
                          transition-all duration-300">
-                ${imgSrc
+                ${originalImgSrc
                 ? `<img src="${imgSrc}" alt="${safeTitle}"
                             class="w-full h-full object-cover"
-                            loading="lazy"
-                            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                            loading="lazy" referrerpolicy="no-referrer"
+                            onerror="if(window.handleImageFallback){window.handleImageFallback(this,'${originalImgSrc}')}else{this.style.display='none';this.nextElementSibling.style.display='flex'}">`
                 : ''
             }
-                <div class="w-full h-full ${imgSrc ? 'hidden' : 'flex'} items-center justify-center
+                <div class="w-full h-full ${originalImgSrc ? 'hidden' : 'flex'} items-center justify-center
                              bg-gradient-to-br from-[#1e2a3a] to-[#111] absolute inset-0">
                     <span class="text-3xl font-bold text-gray-600">${item.title[0] || '?'}</span>
                 </div>

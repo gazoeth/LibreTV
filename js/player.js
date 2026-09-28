@@ -1584,7 +1584,7 @@ function renderResourceInfoBar() {
         <span>加载中...</span>
         <span class="resource-info-bar-videos">-</span>
       </div>
-      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()">
+      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="returnToSearchResults()">
         <span class="resource-switch-icon">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
@@ -1610,7 +1610,7 @@ function renderResourceInfoBar() {
         <span>${resourceName}</span>
         <span class="resource-info-bar-videos">${currentEpisodes.length} 个视频</span>
       </div>
-      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="showSwitchResourceModal()">
+      <button class="resource-switch-btn flex" id="switchResourceBtn" onclick="returnToSearchResults()">
         <span class="resource-switch-icon">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 4v16m0 0l-6-6m6 6l6-6" stroke="#a67c2d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
@@ -1706,6 +1706,58 @@ async function testVideoSourceSpeed(sourceKey, vodId) {
 }
 
 // 格式化速度显示
+function decodeUrlValue(value) {
+    let decoded = String(value || '');
+    for (let i = 0; i < 3; i += 1) {
+        try {
+            const next = decodeURIComponent(decoded);
+            if (next === decoded) break;
+            decoded = next;
+        } catch (error) {
+            break;
+        }
+    }
+    return decoded;
+}
+
+function isSearchResultsUrl(value) {
+    try {
+        const url = new URL(value, window.location.origin);
+        return url.origin === window.location.origin
+            && (url.pathname.startsWith('/s=') || url.searchParams.has('s'));
+    } catch (error) {
+        return false;
+    }
+}
+
+function returnToSearchResults() {
+    const params = new URLSearchParams(window.location.search);
+    const candidates = [
+        params.get('returnUrl'),
+        params.get('back'),
+        localStorage.getItem('searchPageUrl'),
+        localStorage.getItem('lastSearchPage'),
+        localStorage.getItem('lastPageUrl'),
+        document.referrer
+    ];
+
+    for (const candidate of candidates) {
+        const decoded = decodeUrlValue(candidate);
+        if (isSearchResultsUrl(decoded)) {
+            window.location.href = new URL(decoded, window.location.origin).toString();
+            return;
+        }
+    }
+
+    const fallbackTitle = localStorage.getItem('currentVideoTitle') || currentVideoTitle;
+    if (fallbackTitle && !/[�%]/.test(fallbackTitle)) {
+        window.location.href = `/s=${encodeURIComponent(fallbackTitle)}`;
+        return;
+    }
+
+    window.location.href = '/';
+}
+
 function formatSpeedDisplay(speedResult) {
     if (speedResult.speed === -1) {
         return `<span class="speed-indicator error">❌ ${speedResult.error}</span>`;
@@ -1741,6 +1793,8 @@ async function showSwitchResourceModal() {
     const modalContent = document.getElementById('modalContent');
 
     modalTitle.innerHTML = `<span class="break-words">${currentVideoTitle}</span><span style="font-size:.75em;color:#888;margin-left:.5em">选择可用线路</span>`;
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
     modal.classList.remove('hidden');
 
     // NOTE: 优先使用搜索页缓存的兄弟资源（同一次搜索结果中的同名其他来源）
@@ -1763,9 +1817,13 @@ async function showSwitchResourceModal() {
     const resourceOptions = selectedAPIs.map(curr => {
         if (API_SITES[curr]) return { key: curr, name: API_SITES[curr].name };
         const idx = parseInt(curr.replace('custom_', ''), 10);
-        return { key: curr, name: customAPIs[idx]?.name || '自定义资源' };
+        const customItem = (typeof customAPIs !== 'undefined' && customAPIs) ? customAPIs[idx] : null;
+        return { key: curr, name: (customItem && customItem.name) ? customItem.name : '自定义资源' };
     });
-    const nameMap = Object.fromEntries(resourceOptions.map(o => [o.key, o.name]));
+    const nameMap = {};
+    resourceOptions.forEach(o => {
+        nameMap[o.key] = o.name;
+    });
 
     function upsertCard(sourceKey, result, speedResult) {
         const isCurrent  = String(sourceKey) === String(currentSourceCode)
@@ -1783,16 +1841,19 @@ async function showSwitchResourceModal() {
             if (!isCurrent) card.onclick = () => switchToResource(sourceKey, result.vod_id);
             grid.appendChild(card);
         }
+        const picSrc = result.vod_pic ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(result.vod_pic) : result.vod_pic) : '';
+        const epCountText = (speedResult && speedResult.episodes) ? (speedResult.episodes + '集') : '';
         card.innerHTML = `
             <div class="aspect-[2/3] rounded-lg overflow-hidden bg-gray-800 relative">
-                <img src="${result.vod_pic || ''}" alt="${result.vod_name}" class="w-full h-full object-cover"
-                     onerror="this.src='${_FALLBACK_IMG}'">
+                <img src="${picSrc}" alt="${result.vod_name}" class="w-full h-full object-cover"
+                     referrerpolicy="no-referrer"
+                     onerror="if(window.handleImageFallback){window.handleImageFallback(this,'${result.vod_pic || ''}')}else{this.src='${_FALLBACK_IMG}'}">
                 ${speedHtml}
             </div>
             <div class="mt-2">
                 <div class="text-xs font-medium text-gray-200 truncate">${result.vod_name}</div>
                 <div class="text-[10px] text-gray-400 truncate">${sourceName}</div>
-                <div class="text-[10px] text-gray-500 mt-1">${speedResult?.episodes ? speedResult.episodes+'集' : ''}</div>
+                <div class="text-[10px] text-gray-500 mt-1">${epCountText}</div>
             </div>
             ${isCurrent ? `<div class="absolute inset-0 flex items-center justify-center">
                 <div class="bg-blue-600 bg-opacity-75 rounded-lg px-2 py-0.5 text-xs text-white font-medium">当前播放</div>
@@ -1814,20 +1875,25 @@ async function showSwitchResourceModal() {
                 : `&source=${sourceKey}`;
             if (ap === null) return { speed: -1, error: 'API配置无效' };
 
-            const resp = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${ap}`, {
-                signal: AbortSignal.timeout(6000)
-            });
+            let resp;
+            if (window.fetchWithLegacyTimeout) {
+                resp = await window.fetchWithLegacyTimeout(`/api/detail?id=${encodeURIComponent(vodId)}${ap}`, {}, 6000);
+            } else {
+                resp = await fetch(`/api/detail?id=${encodeURIComponent(vodId)}${ap}`);
+            }
             if (!resp.ok) return { speed: -1, error: '获取失败' };
             const detail = await resp.json();
-            if (!detail.episodes?.length) return { speed: -1, error: '无播放源' };
+            if (!detail.episodes || !detail.episodes.length) return { speed: -1, error: '无播放源' };
 
             try {
-                await fetch(detail.episodes[0], { method: 'HEAD', mode: 'no-cors', cache: 'no-cache', signal: AbortSignal.timeout(3000) });
-            } catch {}
+                if (window.fetchWithLegacyTimeout) {
+                    await window.fetchWithLegacyTimeout(detail.episodes[0], { method: 'HEAD', mode: 'no-cors', cache: 'no-cache' }, 3000);
+                }
+            } catch (e) {}
 
             return { speed: Math.round(performance.now() - t0), episodes: detail.episodes.length, error: null };
         } catch (e) {
-            return { speed: -1, error: e.name === 'TimeoutError' || e.name === 'AbortError' ? '超时' : '测试失败' };
+            return { speed: -1, error: (e.name === 'TimeoutError' || e.name === 'AbortError') ? '超时' : '测试失败' };
         }
     }
 

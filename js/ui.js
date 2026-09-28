@@ -138,6 +138,7 @@ function closeModal() {
     const modal = document.getElementById('modal');
     if (!modal) return;
     modal.style.display = 'none';
+    modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('episode-picker-open');
     document.getElementById('modalContent').innerHTML = '';

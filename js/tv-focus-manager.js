@@ -16,12 +16,14 @@
         '[tabindex]:not([tabindex="-1"])'
     ].join(',');
 
-    // NOTE: TV 设备 User-Agent 关键词
+    // NOTE: TV 设备 User-Agent 关键词（包含飞狐浏览器及主流电视品牌）
     var TV_UA_KEYWORDS = [
         'SmartTV', 'SMART-TV', 'AndroidTV', 'Android TV',
         'Tizen', 'webOS', 'Web0S', 'BRAVIA', 'MIBOX', 'MiTV',
         'Sharp', 'Hisense', 'VIDAA', 'Roku', 'FireTV', 'AFT',
-        'CrKey', 'AppleTV', 'tvOS', 'STB', 'NETTV', 'HbbTV'
+        'CrKey', 'AppleTV', 'tvOS', 'STB', 'NETTV', 'HbbTV',
+        'FlyFox', 'FoxBrowser', 'TVBrowser', 'Skyworth', 'Coocaa',
+        'Konka', 'TCL', 'Changhong', 'LeTV', 'Dangbei', 'Whaley'
     ];
 
     // NOTE: 方向键映射表（兼容旧版 keyCode）
@@ -221,10 +223,11 @@
                 var isTextEntry = tag === 'INPUT' || tag === 'TEXTAREA';
                 if (isTextEntry && (direction === 'left' || direction === 'right')) return false;
 
-                // 激活 TV 导航模式
+                // 激活 TV 导航模式和 TV 大屏样式
                 if (!self.isActive) {
                     self.isActive = true;
                     document.body.classList.add('tv-navigation-active');
+                    document.body.classList.add('tv-mode');
                 }
 
                 event.preventDefault();

@@ -397,9 +397,9 @@ async function renderDoubanCards(data, container) {
         const rate = parseFloat(item.rate) || 0;
         const showRate = rate > 0;
 
-        // 豆瓣图片：直接引用会被豆瓣返回 418，因为无法伪造 Referer，所以直接统一通过有伪造 Referer 逻辑的 CF /proxy/ 服务端路由进行代理加载
+        // 豆瓣图片：优先走国内高速免VPN的 CDN 镜像加速，失败时自动走服务端伪装代理多级回退
         const originalCoverUrl = item.cover || '';
-        const proxiedCoverUrl = originalCoverUrl ? `${PROXY_URL}${encodeURIComponent(originalCoverUrl)}${authSuffix}` : '';
+        const initialCoverUrl = originalCoverUrl ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(originalCoverUrl) : `${PROXY_URL}${encodeURIComponent(originalCoverUrl)}${authSuffix}`) : '';
 
         const card = document.createElement('div');
         card.className = 'douban-card tv-spatial-item group cursor-pointer';
@@ -414,10 +414,10 @@ async function renderDoubanCards(data, container) {
                          group-hover:shadow-xl group-hover:shadow-black/50
                          group-hover:scale-[1.04] transition-all duration-300">
                 ${originalCoverUrl ? `
-                    <img src="${proxiedCoverUrl}" alt="${safeTitle}"
+                    <img src="${initialCoverUrl}" alt="${safeTitle}"
                          class="w-full h-full object-cover"
-                         loading="lazy"
-                         onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';">
+                         loading="lazy" referrerpolicy="no-referrer"
+                         onerror="if(window.handleImageFallback){window.handleImageFallback(this,'${originalCoverUrl}')}else{this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';}">
                     <div class="hidden w-full h-full items-center justify-center bg-gradient-to-br from-[#1e2535] to-[#0f0f0f] absolute inset-0">
                         <span class="text-2xl font-bold text-gray-700">${safeTitle[0] || '?'}</span>
                     </div>` :

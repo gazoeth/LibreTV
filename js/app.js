@@ -907,8 +907,8 @@ async function search() {
                 const speedInfo = window.formatSourceSpeedText
                     ? window.formatSourceSpeedText(item)
                     : { className: 'pending', text: '测速中' };
-                const qualityLabel = item.__qualityLabel || '质量未知';
-                const qualityClass = item.__qualityKey || 'unknown';
+                const rawVodPic = item.vod_pic || '';
+                const posterSrc = rawVodPic ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(rawVodPic) : rawVodPic) : '';
 
                 const div = document.createElement('div');
                 div.className = 'result-card tv-spatial-item group cursor-pointer';
@@ -921,10 +921,10 @@ async function search() {
                 div.innerHTML = `
                     <div class="result-poster">
                         ${hasCover ? `
-                        <img src="${item.vod_pic}" alt="${safeName}"
+                        <img src="${posterSrc}" alt="${safeName}"
                              class="result-poster-img"
-                             loading="lazy"
-                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                             loading="lazy" referrerpolicy="no-referrer"
+                             onerror="if(window.handleImageFallback){window.handleImageFallback(this,'${rawVodPic}')}else{this.style.display='none';this.nextElementSibling.style.display='flex'}">
                         <div class="result-poster-fallback" style="display:none">
                             <span>${safeName[0] || '?'}</span>
                         </div>` : `
@@ -1278,7 +1278,10 @@ async function showDetails(id, vod_name, sourceCode) {
                     <button type="button" onclick="closeModal()" class="episode-picker-tool-button" data-tv-default>返回搜索结果</button>
                 </div>
             `;
-            requestAnimationFrame(() => modalContent.querySelector('[data-tv-default]')?.focus());
+            requestAnimationFrame(() => {
+                const defaultBtn = modalContent.querySelector('[data-tv-default]');
+                if (defaultBtn && typeof defaultBtn.focus === 'function') defaultBtn.focus();
+            });
         }
 
         // modal 已在请求前打开，此处无需再次 remove('hidden')
@@ -1295,7 +1298,10 @@ async function showDetails(id, vod_name, sourceCode) {
                     <button type="button" onclick="closeModal()" class="episode-picker-tool-button secondary">返回搜索结果</button>
                 </div>
             </div>`;
-        requestAnimationFrame(() => modalContent.querySelector('[data-tv-default]')?.focus());
+        requestAnimationFrame(() => {
+            const defaultBtn = modalContent.querySelector('[data-tv-default]');
+            if (defaultBtn && typeof defaultBtn.focus === 'function') defaultBtn.focus();
+        });
         showToast('获取详情失败，请稍后重试', 'error');
     } finally {
         hideLoading();
@@ -1542,8 +1548,9 @@ function copyLinks() {
 
 // 切换排序状态的函数
 function toggleEpisodeOrder(sourceCode, vodId) {
-    const focusedEpisode = document.activeElement?.classList.contains('episode-btn')
-        ? Number(document.activeElement.dataset.episodeIndex)
+    const activeEl = document.activeElement;
+    const focusedEpisode = (activeEl && activeEl.classList && activeEl.classList.contains('episode-btn'))
+        ? Number(activeEl.dataset.episodeIndex)
         : currentEpisodeIndex;
     episodesReversed = !episodesReversed;
 

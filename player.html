@@ -322,7 +322,7 @@
     <div class="resource-modal-panel bg-[#16161f] p-8 rounded-2xl w-11/12 max-w-4xl border border-[rgba(255,255,255,0.08)] max-h-[90vh] flex flex-col shadow-2xl">
         <div class="flex justify-between items-center mb-6 flex-none">
             <h2 id="modalTitle" class="resource-modal-title text-xl font-bold text-white break-words pr-4 max-w-[80%]"></h2>
-            <button type="button" onclick="closeResourceModal()" aria-label="关闭资源选择"
+            <button type="button" onclick="closeModal()" aria-label="关闭资源选择"
                     class="resource-modal-close text-[#5a5a6e] hover:text-white text-2xl transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[rgba(255,255,255,0.06)]">
                 &times;
             </button>
@@ -385,10 +385,10 @@
         document.write('<script src="js/proxy-auth.js"><\/script>');
         document.write('<script src="js/customer_site.js?v=20260707-routing"><\/script>');
         document.write('<script src="js/password.js"><\/script>');
-        document.write('<script src="js/ui.js"><\/script>');
+        document.write('<script src="js/ui.js?v=20260812-modalclose"><\/script>');
         document.write('<script src="js/api.js"><\/script>');
         document.write('<script src="js/search.js?v=20260707-routing"><\/script>');
-        document.write('<script src="js/player.js?v=20260811-sharefix1"><\/script>');
+        document.write('<script src="js/player.js?v=20260812-searchback1"><\/script>');
         document.write('<script src="js/player-recommend.js?v=20260730-tmdbfix1"><\/script>');
     } else {
         document.write('<script src="js/legacy-compat.js"><\/script>');

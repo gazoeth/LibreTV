@@ -1584,7 +1584,7 @@ body.episode-picker-open {
 .episode-btn {
     min-height: 5rem;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: center;
     gap: .25rem;
     border: 2px solid rgba(255, 255, 255, .13);

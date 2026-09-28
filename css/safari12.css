@@ -1,4 +1,8 @@
-/* Static utility fallbacks for WebKit versions that cannot parse the bundled Tailwind runtime. */
+/* ========================================================================
+   FreeDY — Safari 12 / iOS 12.5.8 (iPad mini 2) & Legacy Browser 兼容样式表
+   ======================================================================== */
+
+/* ── 基础布局与盒模型回退 ─────────────────────────────────────────── */
 .legacy-browser .container { width: 100%; margin-left: auto; margin-right: auto; }
 .legacy-browser .mx-auto { margin-left: auto; margin-right: auto; }
 .legacy-browser .px-4 { padding-left: 1rem; padding-right: 1rem; }
@@ -14,169 +18,192 @@
 .legacy-browser .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
 .legacy-browser .z-10 { z-index: 10; }
 .legacy-browser .z-40 { z-index: 40; }
+.legacy-browser .z-50 { z-index: 50; }
 .legacy-browser .w-full { width: 100%; }
 .legacy-browser .h-full { height: 100%; }
 .legacy-browser .hidden { display: none !important; }
 .legacy-browser .flex { display: -webkit-box; display: -ms-flexbox; display: flex; }
+.legacy-browser .inline-flex { display: -webkit-inline-box; display: -ms-inline-flexbox; display: inline-flex; }
+.legacy-browser .flex-col { -webkit-box-orient: vertical; -webkit-box-direction: normal; -ms-flex-direction: column; flex-direction: column; }
+.legacy-browser .flex-wrap { -webkit-flex-wrap: wrap; -ms-flex-wrap: wrap; flex-wrap: wrap; }
 .legacy-browser .items-center { -webkit-box-align: center; -ms-flex-align: center; align-items: center; }
+.legacy-browser .items-start { -webkit-box-align: start; -ms-flex-align: start; align-items: flex-start; }
 .legacy-browser .items-end { -webkit-box-align: end; -ms-flex-align: end; align-items: flex-end; }
 .legacy-browser .justify-center { -webkit-box-pack: center; -ms-flex-pack: center; justify-content: center; }
+.legacy-browser .justify-between { -webkit-box-pack: justify; -ms-flex-pack: justify; justify-content: space-between; }
+.legacy-browser .justify-end { -webkit-box-pack: end; -ms-flex-pack: end; justify-content: flex-end; }
+.legacy-browser .flex-1 { -webkit-box-flex: 1; -ms-flex: 1 1 0%; flex: 1 1 0%; }
+.legacy-browser .flex-shrink-0 { -webkit-flex-shrink: 0; -ms-flex-negative: 0; flex-shrink: 0; }
+.legacy-browser .min-w-0 { min-width: 0; }
+
 .legacy-browser .overflow-hidden { overflow: hidden; }
+.legacy-browser .overflow-auto { overflow: auto; -webkit-overflow-scrolling: touch; }
+.legacy-browser .overflow-y-auto { overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .legacy-browser .object-cover { -o-object-fit: cover; object-fit: cover; }
 .legacy-browser .cursor-pointer { cursor: pointer; }
 .legacy-browser .text-center { text-align: center; }
 .legacy-browser .text-white { color: #fff; }
 .legacy-browser .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.legacy-browser .aspect-\[2\/3\] { height: 0; padding-bottom: 150%; }
+
+/* ── 2:3 海报宽高比（iOS 12 不支持 aspect-ratio 回退）─────────── */
+.legacy-browser .aspect-\[2\/3\],
+.legacy-browser .result-poster {
+    height: 0 !important;
+    padding-bottom: 150% !important; /* 3/2 = 150% */
+    position: relative !important;
+    overflow: hidden !important;
+}
 .legacy-browser .aspect-\[2\/3\] > img,
-.legacy-browser .aspect-\[2\/3\] > div { position: absolute; }
-.legacy-browser .trending-grid { display: -ms-grid; display: grid; }
-.legacy-browser .trending-card,
-.legacy-browser .douban-card { min-width: 0; }
-.legacy-browser .hot-hub-actions > * + *,
-.legacy-browser .hot-source-switch > * + *,
-.legacy-browser .hot-source-toolbar > * + *,
-.legacy-browser .hot-section-controls > * + *,
-.legacy-browser .hot-source-caption > * + * { margin-left: 1rem; }
-
-@media (min-width: 768px) and (max-width: 1024px) {
-    .legacy-browser .app-shell { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
-    .legacy-browser .search-area { min-height: 24rem; padding-top: 2rem; padding-bottom: 1.5rem; }
-    .legacy-browser .hot-hub-header {
-        -webkit-box-align: start; -ms-flex-align: start; align-items: flex-start;
-        -webkit-box-orient: vertical; -webkit-box-direction: normal;
-        -ms-flex-direction: column; flex-direction: column;
-    }
-    .legacy-browser .hot-hub-header > * + * { margin-left: 0; margin-top: 1rem; }
-    .legacy-browser .hot-hub-actions {
-        width: 100%; -webkit-box-pack: justify; -ms-flex-pack: justify; justify-content: space-between;
-    }
-    .legacy-browser .hot-recommend-hub .trending-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .legacy-browser .hot-recommend-hub .douban-grid > * { width: calc(25% - 1rem); }
-    .legacy-browser .settings-panel { width: 24rem; max-width: 88vw; }
+.legacy-browser .aspect-\[2\/3\] > div,
+.legacy-browser .result-poster > img,
+.legacy-browser .result-poster > div {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
 }
 
-@media (max-width: 767px) {
-    .legacy-browser .hot-hub-actions { display: block; }
-    .legacy-browser .hot-hub-actions > * + * { margin-left: 0; margin-top: .75rem; }
-    .legacy-browser .hot-source-switch { display: -webkit-box; display: -ms-flexbox; display: flex; }
-    .legacy-browser .hot-source-tab { -webkit-box-flex: 1; -ms-flex: 1 1 0; flex: 1 1 0; }
-}
-
-/* ========================================================================
-   播放器页面 — Safari 12 / iOS 12 兼容样式
-   ======================================================================== */
-
-/* 播放器页面 Tailwind utility 回退（player.html 使用的额外类） */
-.legacy-browser .flex-1 { -webkit-box-flex: 1; -ms-flex: 1 1 0%; flex: 1 1 0%; }
-.legacy-browser .flex-shrink-0 { -webkit-flex-shrink: 0; -ms-flex-negative: 0; flex-shrink: 0; }
-.legacy-browser .min-w-0 { min-width: 0; }
-.legacy-browser .gap-2 { gap: 0; } /* gap 在旧 WebKit 上不生效，用 margin 代替 */
+/* ── Flex gap 回退（iOS 12 不支持 flexbox gap）─────────────────── */
+.legacy-browser .gap-1 > * + * { margin-left: 0.25rem; }
+.legacy-browser .gap-1\.5 > * + * { margin-left: 0.375rem; }
 .legacy-browser .gap-2 > * + * { margin-left: 0.5rem; }
-.legacy-browser .gap-3 { gap: 0; }
+.legacy-browser .gap-2\.5 > * + * { margin-left: 0.625rem; }
 .legacy-browser .gap-3 > * + * { margin-left: 0.75rem; }
-.legacy-browser .gap-4 { gap: 0; }
 .legacy-browser .gap-4 > * + * { margin-left: 1rem; }
+.legacy-browser .gap-6 > * + * { margin-left: 1.5rem; }
+.legacy-browser .space-y-2 > * + * { margin-top: 0.5rem; }
 .legacy-browser .space-y-3 > * + * { margin-top: 0.75rem; }
-.legacy-browser .items-start { -webkit-box-align: start; -ms-flex-align: start; align-items: flex-start; }
-.legacy-browser .justify-between { -webkit-box-pack: justify; -ms-flex-pack: justify; justify-content: space-between; }
-.legacy-browser .justify-end { -webkit-box-pack: end; -ms-flex-pack: end; justify-content: flex-end; }
-.legacy-browser .flex-wrap { -webkit-flex-wrap: wrap; -ms-flex-wrap: wrap; flex-wrap: wrap; }
-.legacy-browser .flex-col { -webkit-box-orient: vertical; -webkit-box-direction: normal; -ms-flex-direction: column; flex-direction: column; }
-.legacy-browser .sticky { position: -webkit-sticky; position: sticky; }
-.legacy-browser .self-start { -ms-flex-item-align: start; align-self: flex-start; }
-.legacy-browser .mr-auto { margin-right: auto; }
-.legacy-browser .mb-0 { margin-bottom: 0; }
-.legacy-browser .mb-1 { margin-bottom: 0.25rem; }
-.legacy-browser .mb-6 { margin-bottom: 1.5rem; }
-.legacy-browser .mt-1 { margin-top: 0.25rem; }
-.legacy-browser .mt-4 { margin-top: 1rem; }
-.legacy-browser .py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
-.legacy-browser .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
-.legacy-browser .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-.legacy-browser .py-6 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
-.legacy-browser .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
-.legacy-browser .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
-.legacy-browser .px-10 { padding-left: 2.5rem; padding-right: 2.5rem; }
-.legacy-browser .p-8 { padding: 2rem; }
+.legacy-browser .space-y-4 > * + * { margin-top: 1rem; }
+
+/* ── 圆角、文字与间距 ─────────────────────────────────────────── */
+.legacy-browser .rounded-md { border-radius: 0.375rem; }
 .legacy-browser .rounded-lg { border-radius: 0.5rem; }
 .legacy-browser .rounded-xl { border-radius: 0.75rem; }
 .legacy-browser .rounded-2xl { border-radius: 1rem; }
+.legacy-browser .rounded-full { border-radius: 9999px; }
 .legacy-browser .text-xs { font-size: 0.75rem; }
 .legacy-browser .text-sm { font-size: 0.875rem; }
 .legacy-browser .text-base { font-size: 1rem; }
+.legacy-browser .text-lg { font-size: 1.125rem; }
 .legacy-browser .text-xl { font-size: 1.25rem; }
 .legacy-browser .text-2xl { font-size: 1.5rem; }
 .legacy-browser .font-medium { font-weight: 500; }
 .legacy-browser .font-semibold { font-weight: 600; }
 .legacy-browser .font-bold { font-weight: 700; }
 .legacy-browser .whitespace-nowrap { white-space: nowrap; }
-.legacy-browser .overflow-auto { overflow: auto; }
-.legacy-browser .animate-spin { -webkit-animation: legacy-spin 1s linear infinite; animation: legacy-spin 1s linear infinite; }
-@-webkit-keyframes legacy-spin { from { -webkit-transform: rotate(0deg); } to { -webkit-transform: rotate(360deg); } }
-@keyframes legacy-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* grid 回退 */
-.legacy-browser .grid { display: -ms-grid; display: grid; }
-.legacy-browser .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.legacy-browser .col-span-full { grid-column: 1 / -1; }
+.legacy-browser .animate-spin {
+    -webkit-animation: legacy-spin 1s linear infinite;
+    animation: legacy-spin 1s linear infinite;
+}
+@-webkit-keyframes legacy-spin {
+    from { -webkit-transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); }
+}
+@keyframes legacy-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
 
-/* 原生播放器样式 */
+/* ── 首页主布局与栅格系统 ───────────────────────────────────────── */
+.legacy-browser .app-shell {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.legacy-browser #douban-results,
+.legacy-browser #trendingGrid,
+.legacy-browser #results {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-flex-wrap: wrap;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+}
+
+.legacy-browser .douban-card,
+.legacy-browser .trending-card,
+.legacy-browser .result-card {
+    padding: 0.5rem;
+    box-sizing: border-box;
+}
+
+/* ── iPad mini 2 (768px - 1024px 4:3 屏幕特别优化) ─────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .legacy-browser .app-shell {
+        max-width: 100% !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+    }
+
+    .legacy-browser .search-area {
+        min-height: 20rem;
+        padding-top: 2rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .legacy-browser .douban-card,
+    .legacy-browser .trending-card,
+    .legacy-browser .result-card {
+        width: 25% !important; /* iPad 上一行 4 列最为清晰适宜 */
+    }
+
+    .legacy-browser .settings-panel,
+    .legacy-browser .history-panel {
+        width: 22rem;
+        max-width: 85vw;
+    }
+
+    .legacy-browser .hot-hub-actions {
+        width: 100%;
+        display: -webkit-box;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-box-pack: justify;
+        -ms-flex-pack: justify;
+        justify-content: space-between;
+    }
+}
+
+/* ── 手机与窄屏端 ( < 768px ) ──────────────────────────────────── */
+@media (max-width: 767px) {
+    .legacy-browser .douban-card,
+    .legacy-browser .trending-card,
+    .legacy-browser .result-card {
+        width: 33.333% !important; /* 手机端一行 3 列 */
+    }
+
+    .legacy-browser .hot-hub-actions {
+        display: block;
+    }
+    .legacy-browser .hot-hub-actions > * + * {
+        margin-left: 0;
+        margin-top: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .legacy-browser .douban-card,
+    .legacy-browser .trending-card,
+    .legacy-browser .result-card {
+        width: 50% !important; /* 超小屏一行 2 列 */
+    }
+}
+
+/* ── 播放器页面 Safari 12 兼容 ─────────────────────────────────── */
 .legacy-browser .legacy-player-wrapper {
+    position: relative !important;
     width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 56.25% !important; /* 16:9 */
     background: #000 !important;
     border-radius: 12px !important;
-    overflow: hidden !important;
-    position: relative !important;
-}
-
-.legacy-browser .legacy-video {
-    width: 100% !important;
-    display: block !important;
-    background: #000 !important;
-    /* NOTE: iOS Safari 原生控件在此生效 */
-}
-
-/* 密码验证弹窗：旧 Safari 下 Tailwind .hidden 不生效，手动隐藏 */
-.legacy-browser #passwordModal.hidden {
-    display: none !important;
-}
-
-/* 换源/加载模态框同理 */
-.legacy-browser #modal.hidden,
-.legacy-browser #loading.hidden {
-    display: none !important;
-}
-
-/* iPad 播放器页面布局 */
-@media (min-width: 768px) and (max-width: 1024px) {
-    .legacy-browser main { padding-left: 1rem !important; padding-right: 1rem !important; }
-    .legacy-browser #sideRecommend { display: none !important; }
-}
-
-@media (max-width: 767px) {
-    .legacy-browser .player-header-fixed {
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-    }
-    .legacy-browser #sideRecommend { display: none !important; }
-    .legacy-browser .home-btn-text { display: none; }
-}
-
-/* ── aspect-ratio 回退（Safari 12 不支持该属性）── */
-/* NOTE: 用 padding-bottom 技巧实现 16:9 比例，替代 aspect-ratio: 16/9 */
-.legacy-browser .player-placeholder {
-    height: 0 !important;
-    padding-bottom: 56.25% !important; /* 16:9 = 9/16 = 56.25% */
-    aspect-ratio: unset !important;
-    position: relative !important;
-}
-
-/* 原生视频在旧版播放器容器内撑满父元素 */
-.legacy-browser .legacy-player-wrapper {
-    position: relative !important;
-    height: 0 !important;
-    padding-bottom: 56.25% !important;
     overflow: hidden !important;
 }
 
@@ -186,28 +213,26 @@
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    display: block !important;
     background: #000 !important;
 }
 
-/* 旧版浏览器下 inset:0 速记属性回退 */
+.legacy-browser .player-placeholder {
+    height: 0 !important;
+    padding-bottom: 56.25% !important;
+    position: relative !important;
+}
+
 .legacy-browser .player-loading-overlay {
+    position: absolute !important;
     top: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
     left: 0 !important;
 }
 
-/* 旧版加载动画 — 移除 gap，改用 margin */
-.legacy-browser .player-loading-overlay > * + * {
-    margin-top: 1rem;
-}
-
-/* error-container 在旧版下使用 block 而不是 flex（兼容性更好） */
-.legacy-browser .error-container {
-    display: none;
-    padding: 3rem;
-    text-align: center;
-}
-.legacy-browser .error-container[style*="flex"] {
-    display: block !important;
+.legacy-browser #passwordModal.hidden,
+.legacy-browser #modal.hidden,
+.legacy-browser #loading.hidden {
+    display: none !important;
 }

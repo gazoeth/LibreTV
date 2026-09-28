@@ -35,18 +35,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadSideRecommend();
 
-    document.getElementById('sideRecommendRefresh')?.addEventListener('click', () => {
-        if (_prPool.length === 0) return;
-        _prOffset = (_prOffset + PR_PER_PAGE) % _prPool.length;
-        renderSideCards(_prPool.slice(_prOffset, _prOffset + PR_PER_PAGE));
-    });
+    const refreshBtn = document.getElementById('sideRecommendRefresh');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            if (_prPool.length === 0) return;
+            _prOffset = (_prOffset + PR_PER_PAGE) % _prPool.length;
+            renderSideCards(_prPool.slice(_prOffset, _prOffset + PR_PER_PAGE));
+        });
+    }
 });
 
 // ── 构造代理 URL（复用已有鉴权）────────────────────────────────────────────
 async function _prProxyUrl(rawUrl) {
-    const authSuffix = window.ProxyAuth?.getAuthPrefix
-        ? await window.ProxyAuth.getAuthPrefix()
-        : (window.ProxyAuth?.getAuthSuffix ? window.ProxyAuth.getAuthSuffix() : '');
+    let authSuffix = '';
+    if (window.ProxyAuth) {
+        if (typeof window.ProxyAuth.getAuthPrefix === 'function') {
+            authSuffix = await window.ProxyAuth.getAuthPrefix();
+        } else if (typeof window.ProxyAuth.getAuthSuffix === 'function') {
+            authSuffix = window.ProxyAuth.getAuthSuffix();
+        }
+    }
     return (typeof PROXY_URL !== 'undefined' ? PROXY_URL : '/proxy/')
         + encodeURIComponent(rawUrl) + authSuffix;
 }
@@ -82,7 +90,8 @@ async function _prFetchTmdb(rawUrl) {
         if (!proxyResponse.ok) throw new Error(`代理 HTTP ${proxyResponse.status}`);
         return proxyResponse.json();
     } catch (proxyError) {
-        throw new Error(`${directError?.message || 'TMDB直连失败'}；${proxyError.message}`);
+        const directMsg = (directError && directError.message) ? directError.message : 'TMDB直连失败';
+        throw new Error(directMsg + '；' + proxyError.message);
     }
 }
 
@@ -156,7 +165,7 @@ async function loadSideRecommend() {
         if (!merged.length) {
             const errors = [movieResult, tvResult]
                 .filter(result => result.status === 'rejected')
-                .map(result => result.reason?.message)
+                .map(result => (result.reason && result.reason.message) ? result.reason.message : '')
                 .filter(Boolean);
             throw new Error(errors.join('；') || 'TMDB 未返回推荐数据');
         }
@@ -166,7 +175,9 @@ async function loadSideRecommend() {
     } catch (error) {
         console.warn('侧栏推荐加载失败，使用缓存或本地推荐:', error.message);
         const expiredCache = _prReadCache(true);
-        _prUseItems(expiredCache?.items?.length ? expiredCache.items : PR_FALLBACK_ITEMS, expiredCache?.ts || 0);
+        const fallbackList = (expiredCache && expiredCache.items && expiredCache.items.length) ? expiredCache.items : PR_FALLBACK_ITEMS;
+        const fallbackTs = (expiredCache && expiredCache.ts) ? expiredCache.ts : 0;
+        _prUseItems(fallbackList, fallbackTs);
     }
 }
 
@@ -198,16 +209,19 @@ function renderSideCards(items) {
             window.location.href = `/?s=${encodeURIComponent(item.title)}`;
         };
 
+        const posterSrc = item.poster ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(item.poster) : item.poster) : '';
+
         card.innerHTML = `
             <div class="flex gap-2.5 items-start">
                 <!-- 封面 -->
                 <div class="relative flex-shrink-0 rounded-md overflow-hidden bg-[#1a1a1a]
                              shadow-md group-hover:shadow-lg transition-shadow duration-200"
                      style="width:64px;height:88px">
-                    ${item.poster
-                        ? `<img src="${item.poster}" alt="${safeTitle}"
+                    ${posterSrc
+                        ? `<img src="${posterSrc}" alt="${safeTitle}"
                                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                 loading="lazy" onerror="this.style.display='none'">`
+                                 loading="lazy" referrerpolicy="no-referrer"
+                                 onerror="if(window.handleImageFallback){window.handleImageFallback(this,'${item.poster}')}else{this.style.display='none'}">`
                         : `<div class="w-full h-full flex items-center justify-center text-xl font-bold text-gray-600">
                                ${item.title[0]||'?'}
                            </div>`
