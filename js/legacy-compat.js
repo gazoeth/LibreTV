@@ -118,8 +118,17 @@
         if (nextStep === 1) {
             // 步骤1：尝试走站点的 /proxy/ 伪装代理
             var proxyBase = (typeof PROXY_URL !== 'undefined') ? PROXY_URL : '/proxy/';
-            var authSuffix = (window.ProxyAuth && window.ProxyAuth.getAuthPrefixSync) ? window.ProxyAuth.getAuthPrefixSync() : '';
-            imgEl.src = proxyBase + encodeURIComponent(originalUrl) + authSuffix;
+            var authPromise = window.ProxyAuth && window.ProxyAuth.getAuthPrefix
+                ? window.ProxyAuth.getAuthPrefix()
+                : Promise.resolve(window.ProxyAuth && window.ProxyAuth.getAuthSuffix ? window.ProxyAuth.getAuthSuffix() : '');
+            authPromise.then(function (authSuffix) {
+                if (parseInt(imgEl.getAttribute('data-retry-step') || '0', 10) !== nextStep) return;
+                imgEl.src = proxyBase + encodeURIComponent(originalUrl) + (authSuffix || '');
+            }).catch(function () {
+                if (parseInt(imgEl.getAttribute('data-retry-step') || '0', 10) !== nextStep) return;
+                imgEl.referrerPolicy = 'no-referrer';
+                imgEl.src = originalUrl;
+            });
         } else if (nextStep === 2) {
             // 步骤2：尝试直接原图 (加 no-referrer)
             imgEl.referrerPolicy = 'no-referrer';

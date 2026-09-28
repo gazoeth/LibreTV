@@ -907,6 +907,8 @@ async function search() {
                 const speedInfo = window.formatSourceSpeedText
                     ? window.formatSourceSpeedText(item)
                     : { className: 'pending', text: '测速中' };
+                const qualityClass = item.__qualityKey || 'unknown';
+                const qualityLabel = item.__qualityLabel || '质量未知';
                 const rawVodPic = item.vod_pic || '';
                 const posterSrc = rawVodPic ? (window.getDoubanImageUrl ? window.getDoubanImageUrl(rawVodPic) : rawVodPic) : '';
 
