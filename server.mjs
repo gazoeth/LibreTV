@@ -209,14 +209,21 @@ app.get('/proxy/:encodedUrl', async (req, res) => {
 
     const makeRequest = async () => {
       try {
+        const reqHeaders = {
+          'User-Agent': config.userAgent,
+          'Accept': '*/*',
+        };
+        // 针对豆瓣防盗链进行专门的伪装头处理
+        if (targetUrl.includes('doubanio.com') || targetUrl.includes('douban.com')) {
+          reqHeaders['Referer'] = 'https://movie.douban.com/';
+        }
+
         return await axios({
           method: 'get',
           url: targetUrl,
           responseType: 'stream',
           timeout: config.timeout,
-          headers: {
-            'User-Agent': config.userAgent
-          }
+          headers: reqHeaders
         });
       } catch (error) {
         if (retries < maxRetries) {
