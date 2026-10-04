@@ -1,0 +1,137 @@
+{
+  "checkedAt": "2026-10-04T07:03:24.131Z",
+  "results": [
+    {
+      "source": "bfzy",
+      "samples": [],
+      "errors": [
+        "https://fengbao12.com/video/jietoushijiedoushibiandaozhizhan/b23383f8db54/index.m3u8: HTTP 404",
+        "https://p.bvvvvvvvvv1f.com/video/shishangwanjia/20221102期/index.m3u8: HTTP 404",
+        "https://p.bvvvvvvvvv1f.com/video/jingrendexingqiliu/20221111/index.m3u8: HTTP 404"
+      ]
+    },
+    {
+      "source": "zy360",
+      "samples": [
+        {
+          "url": "https://vod1.maowushi.com/20260913/X43njthA//2180kb/hls/index.m3u8",
+          "original": 1668,
+          "kept": 1656,
+          "removed": 12,
+          "removedSeconds": 52.701,
+          "unchanged": false
+        },
+        {
+          "url": "https://vod1.maowushi.com/20261004/izLeRLnp/2134kb/hls/index.m3u8",
+          "original": 4189,
+          "kept": 4165,
+          "removed": 24,
+          "removedSeconds": 105.402,
+          "unchanged": false
+        },
+        {
+          "url": "https://vod1.maowushi.com/20261004/CMtP4kMN/1592kb/hls/index.m3u8",
+          "original": 2779,
+          "kept": 2763,
+          "removed": 16,
+          "removedSeconds": 70.268,
+          "unchanged": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "source": "ruyi",
+      "samples": [],
+      "errors": [
+        "https://svip.ryplay14.com/20261004/20146_3c53c67e/index.m3u8: HTTP 403",
+        "https://svip.ryplay14.com/20261004/20135_cb918aaf/index.m3u8: HTTP 403",
+        "https://svip.ryplay14.com/20260913/19257_922d9f80/index.m3u8: HTTP 403"
+      ]
+    },
+    {
+      "source": "hongniu2",
+      "samples": [
+        {
+          "url": "https://hn.bfvvs.com/play/dNk8vrLe/index.m3u8",
+          "original": 788,
+          "kept": 788,
+          "removed": 0,
+          "removedSeconds": 0,
+          "unchanged": true
+        },
+        {
+          "url": "https://hn.bfvvs.com/play/bYEMKD0b/index.m3u8",
+          "original": 2411,
+          "kept": 2411,
+          "removed": 0,
+          "removedSeconds": 0,
+          "unchanged": true
+        },
+        {
+          "url": "https://hn.bfvvs.com/play/e5yWDoxe/index.m3u8",
+          "original": 1615,
+          "kept": 1615,
+          "removed": 0,
+          "removedSeconds": 0,
+          "unchanged": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "source": "ikun",
+      "samples": [
+        {
+          "url": "https://bfikuncdn.com/20261004/wwR96GFh/2134kb/hls/index.m3u8",
+          "original": 2824,
+          "kept": 2776,
+          "removed": 48,
+          "removedSeconds": 141.12,
+          "unchanged": false
+        },
+        {
+          "url": "https://bfikuncdn.com/20260821/C6JTG4CL/2170kb/hls/index.m3u8",
+          "original": 310,
+          "kept": 310,
+          "removed": 0,
+          "removedSeconds": 0,
+          "unchanged": true
+        },
+        {
+          "url": "https://bfikuncdn.com/20261004/UPeHrLEB/1230kb/hls/index.m3u8",
+          "original": 3201,
+          "kept": 3147,
+          "removed": 54,
+          "removedSeconds": 158.76,
+          "unchanged": false
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "browserVerification": {
+    "ikun": {
+      "durationSeconds": 8329.04,
+      "observedTimeSeconds": 58.523663,
+      "readyState": 4,
+      "playing": true
+    },
+    "zy360": {
+      "durationSeconds": 3311.48,
+      "readyState": 4,
+      "playingStarted": true,
+      "observedTimeSeconds": 20.247495,
+      "playing": true
+    }
+  },
+  "limitations": [
+    "bfzy samples returned HTTP 404; ruyi samples returned HTTP 403",
+    "No frame-level identification of unlabeled same-directory advertisements",
+    "Native HLS/embedded third-party players are outside the custom HLS loader",
+    "Live and byte-range playlists are preserved to avoid sequence/offset corruption"
+  ],
+  "jevCalls": 0,
+  "jevReason": "No TypeSafe credential was available",
+  "fixtures": "tools/fixtures/hls-20261004.json.gz"
+}

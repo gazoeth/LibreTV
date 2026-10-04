@@ -901,13 +901,14 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
             // 拦截manifest和level请求
             if (context.type === 'manifest' || context.type === 'level') {
                 const onSuccess = callbacks.onSuccess;
-                callbacks.onSuccess = function (response, stats, context) {
+                callbacks.onSuccess = function (response, stats, context, networkDetails) {
                     // 如果是m3u8文件，处理内容以移除广告分段
                     if (response.data && typeof response.data === 'string') {
                         // 过滤掉广告段 - 实现更精确的广告过滤逻辑
-                        response.data = filterAdsFromM3U8(response.data, true);
+                        response.data = filterAdsFromM3U8(response.data, true, response.url || context.url,
+                            new URLSearchParams(window.location.search).get('source'));
                     }
-                    return onSuccess(response, stats, context);
+                    return onSuccess(response, stats, context, networkDetails);
                 };
             }
             // 执行原始load方法
@@ -917,18 +918,129 @@ class CustomHlsJsLoader extends Hls.DefaultConfig.loader {
 }
 
 // 过滤可疑的广告内容
-function filterAdsFromM3U8(m3u8Content, strictMode = false) {
+function filterAdsFromM3U8(m3u8Content, strictMode = false, baseUrl = 'https://playlist.invalid/', sourceKey = '') {
     if (!m3u8Content) return '';
+    const lines = m3u8Content.split(/\r?\n/);
+    // 不改主清单、直播或隐式字节偏移清单，避免破坏序号和偏移关系。
+    if (!lines.some(line => line.trim() === '#EXTM3U') ||
+        !lines.some(line => line.trim() === '#EXT-X-ENDLIST') ||
+        lines.some(line => /^#EXT-X-(?:STREAM-INF|BYTERANGE|PART):/.test(line.trim()))) return m3u8Content;
 
-    // 按行分割M3U8内容
-    const lines = m3u8Content.split('\n');
-    const filteredLines = [];
-
+    const segments = [];
+    let start = -1;
+    let key = '';
+    let sequence = 0n;
+    let boundary = 0;
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        const line = lines[i].trim();
+        if (/^#EXT-X-MEDIA-SEQUENCE:\d+$/.test(line)) sequence = BigInt(line.split(':')[1]);
+        if (line.startsWith('#EXT-X-KEY:')) key = line;
+        if (line === '#EXT-X-DISCONTINUITY') boundary++;
+        if (line.startsWith('#EXTINF:')) start = i;
+        if (line && !line.startsWith('#')) {
+            if (start < 0) return m3u8Content;
+            let url;
+            try {
+                url = new URL(line, baseUrl);
+                // 部署代理会把原始地址编码进 /proxy/，识别时还原，输出仍保留代理地址。
+                if (url.pathname.startsWith('/proxy/')) {
+                    const target = decodeURIComponent(url.pathname.slice(7));
+                    if (/^https?:\/\//i.test(target)) url = new URL(target);
+                }
+            } catch (error) { return m3u8Content; }
+            segments.push({ start, end: i, uri: url.origin + url.pathname,
+                directory: url.origin + url.pathname.slice(0, url.pathname.lastIndexOf('/')),
+                duration: parseFloat(lines[start].trim().slice(8)), boundary, key, sequence });
+            sequence++;
+            start = -1;
+        }
+    }
+    if (!segments.length || start >= 0) return m3u8Content;
 
-        // 只过滤#EXT-X-DISCONTINUITY标识
-        if (!line.includes('#EXT-X-DISCONTINUITY')) {
+    const removed = new Set();
+    // 只使用路径证据，不把签名查询参数或单独的短时长当作广告。
+    for (const segment of segments) {
+        const path = new URL(segment.uri).pathname;
+        if (/(?:^|\/)(?:ads?|advert(?:isement)?|commercial|preroll|midroll|postroll)(?:[\/_.-]|$)/i.test(path) ||
+            /\/video\/adjump\/time\//i.test(path) ||
+            (sourceKey === 'zy360' && /\/20260726\/1AS9nSvi\/hls\//.test(path))) removed.add(segment);
+    }
+
+    // 完整 CUE 边界才可删除；残缺标记不能吞掉后续正片。
+    const cueLines = new Set();
+    let cueStart = -1;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (/^#EXT-X-CUE-OUT(?::|$)/.test(line)) cueStart = i;
+        if (/^#EXT-X-CUE-IN(?::|$)/.test(line) && cueStart >= 0) {
+            segments.filter(segment => segment.start > cueStart && segment.end < i).forEach(segment => removed.add(segment));
+            for (let j = cueStart; j <= i; j++) {
+                if (/^#EXT-X-CUE-|^#EXT-OATCLS-SCTE35/.test(lines[j].trim())) cueLines.add(j);
+            }
+            cueStart = -1;
+        }
+    }
+
+    if (strictMode) {
+        const directories = new Map();
+        segments.forEach(segment => directories.set(segment.directory, (directories.get(segment.directory) || 0) + 1));
+        const [mainDirectory, mainCount] = [...directories].sort((a, b) => b[1] - a[1])[0];
+        const blocks = [];
+        for (const segment of segments) {
+            const previous = blocks[blocks.length - 1];
+            if (previous && previous[0].boundary === segment.boundary) previous.push(segment);
+            else blocks.push([segment]);
+        }
+        const candidates = blocks.filter((block, i) => i > 0 && i < blocks.length - 1 &&
+            block.length <= 8 && block.every(segment => segment.directory !== mainDirectory && segment.duration > 0) &&
+            block.reduce((total, segment) => total + segment.duration, 0) <= 30 &&
+            blocks[i - 1].every(segment => segment.directory === mainDirectory) &&
+            blocks[i + 1].every(segment => segment.directory === mainDirectory));
+        // ponytail: 只识别反复插入的相同 URI 块；无标记同目录广告需要新的真实样本。
+        const signature = block => block.map(segment => segment.uri).join('\n');
+        const counts = new Map();
+        candidates.forEach(block => counts.set(signature(block), (counts.get(signature(block)) || 0) + 1));
+        if (mainCount / segments.length >= 0.6) {
+            // 片头/片尾若与已确认的重复插播块完全相同，也一并移除。
+            blocks.filter(block => counts.get(signature(block)) >= 2).forEach(block => block.forEach(segment => removed.add(segment)));
+        }
+    }
+    if (!removed.size || removed.size === segments.length) return m3u8Content;
+
+    const discarded = new Set(cueLines);
+    for (const segment of removed) {
+        for (let i = segment.start; i <= segment.end; i++) {
+            // KEY/MAP 是持续状态，不能随广告丢弃。
+            if (!/^#EXT-X-(?:KEY|MAP):/.test(lines[i].trim())) discarded.add(i);
+        }
+        for (let i = segment.start - 1; i >= 0 && lines[i].trim().startsWith('#'); i--) {
+            if (/^#EXT-X-(?:PROGRAM-DATE-TIME|BYTERANGE):/.test(lines[i].trim())) discarded.add(i);
+            else if (!/^#EXT-X-(?:KEY|MAP|DISCONTINUITY)(?::|$)/.test(lines[i].trim())) break;
+        }
+    }
+
+    const insertions = new Map();
+    let skipped = false;
+    for (const segment of segments) {
+        if (removed.has(segment)) { skipped = true; continue; }
+        const tags = [];
+        if (skipped) tags.push('#EXT-X-DISCONTINUITY');
+        // AES-128 的隐式 IV 使用原始序号；删片后必须显式写回，避免解密失败。
+        if (/METHOD=AES-128(?:,|$)/.test(segment.key) && !/(?:^|,)IV=/.test(segment.key)) {
+            tags.push(`${segment.key},IV=0x${segment.sequence.toString(16).padStart(32, '0')}`);
+        }
+        if (tags.length) insertions.set(segment.start, tags);
+        skipped = false;
+    }
+    const filteredLines = [];
+    let pendingBoundary = false;
+    for (let i = 0; i < lines.length; i++) {
+        if (discarded.has(i)) continue;
+        for (const line of [...(insertions.get(i) || []), lines[i]]) {
+            if (line.trim() === '#EXT-X-DISCONTINUITY') {
+                if (pendingBoundary) continue;
+                pendingBoundary = true;
+            } else if (line.trim() && !line.trim().startsWith('#')) pendingBoundary = false;
             filteredLines.push(line);
         }
     }
