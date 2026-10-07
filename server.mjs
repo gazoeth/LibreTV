@@ -103,12 +103,15 @@ async function renderPage(filePath, password, geo = { country: '', region: '', s
   return content.replace('window.__ENV__.PASSWORD = "{{PASSWORD}}";', envScript);
 }
 
-app.get(['/', '/index.html', '/player.html'], async (req, res) => {
+app.get(['/', '/index.html', '/player.html', '/live.html'], async (req, res) => {
   try {
     let filePath;
     switch (req.path) {
       case '/player.html':
         filePath = path.join(__dirname, 'player.html');
+        break;
+      case '/live.html':
+        filePath = path.join(__dirname, 'live.html');
         break;
       default:
         filePath = path.join(__dirname, 'index.html');

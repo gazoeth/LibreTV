@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="same-origin">
+    <meta name="robots" content="noindex,follow,noarchive">
+    <meta name="googlebot" content="noindex,follow,noarchive">
+    <link rel="canonical" href="https://freedy.xx.kg/">
+    <title>FreeDY 电视直播 · 免费高清直播频道</title>
+    <meta name="description" content="FreeDY 电视直播：聚合公开 M3U 直播源，支持分组浏览、频道检索、节目单与遥控器换台，无需注册。">
+    <link rel="icon" href="image/logo.png">
+    <link rel="apple-touch-icon" href="image/logo-black.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+
+    <script>
+        (function () {
+            var supportsModernSyntax = true;
+            try {
+                new Function('var value = {}; return value?.name ?? "";');
+            } catch (error) {
+                supportsModernSyntax = false;
+            }
+            window.__legacyBrowser = !supportsModernSyntax;
+            if (supportsModernSyntax) {
+                document.write('<script src="libs/tailwindcss.min.js"><\/script>');
+            } else {
+                document.documentElement.className += ' legacy-browser';
+            }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="css/styles.css?v=20260730-recommend1">
+    <link rel="stylesheet" href="css/live.css?v=20261007-live2">
+    <link rel="stylesheet" href="css/safari12.css?v=20260724-fix1">
+    <link rel="stylesheet" href="css/tv-mode.css?v=20260811-tvrefactor">
+    <link rel="stylesheet" href="css/mobile-nav.css?v=20261007-live2">
+</head>
+
+<body class="page-bg text-white live-page">
+
+    <!-- ══════ 顶栏 ═══════════════════════════════════════════════ -->
+    <header class="live-topbar">
+        <a class="live-brand" href="index.html" aria-label="返回 FreeDY 首页">
+            <span class="live-brand-icon" aria-hidden="true">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+            </span>
+            <span class="live-brand-text">FreeDY</span>
+        </a>
+
+        <span class="live-brand-divider" aria-hidden="true"></span>
+
+        <h1 class="live-title">
+            <span class="live-title-dot" aria-hidden="true"></span>
+            电视直播
+        </h1>
+
+        <p class="live-topbar-meta" id="liveTopbarMeta" aria-live="polite">正在准备直播源…</p>
+
+        <div class="live-topbar-actions">
+            <button type="button" class="live-ghost-btn" id="liveRefreshButton">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span class="live-btn-label">刷新</span>
+            </button>
+            <button type="button" class="live-primary-btn" id="liveManageButton" aria-haspopup="dialog"
+                aria-controls="liveDrawer" aria-expanded="false">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 6h16M4 12h16M4 18h10" />
+                </svg>
+                <span class="live-btn-label">直播源</span>
+                <span class="live-count-pill" id="liveSourceCount">0</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ══════ 主体 ═══════════════════════════════════════════════ -->
+    <main class="live-shell">
+
+        <!-- 播放区 -->
+        <section class="live-stage" aria-label="直播播放区">
+            <div class="live-stage-frame" id="liveStageFrame">
+                <div class="live-player-box" id="livePlayerBox"></div>
+
+                <div class="live-stage-overlay" id="liveStageOverlay" data-state="idle">
+                    <div class="live-stage-overlay-inner">
+                        <div class="live-spinner" aria-hidden="true"></div>
+                        <p class="live-stage-message" id="liveStageMessage">选择一个频道开始观看</p>
+                        <p class="live-stage-hint" id="liveStageHint">左侧列表可按分组浏览，支持搜索与测速</p>
+                        <button type="button" class="live-primary-btn live-stage-action" id="liveStageAction"
+                            hidden>重新加载</button>
+                    </div>
+                </div>
+
+                <div class="live-status" id="liveStatus" data-state="idle">
+                    <span class="live-status-dot" aria-hidden="true"></span>
+                    <span class="live-signal" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="live-status-text" id="liveStatusText">待机</span>
+                </div>
+            </div>
+
+            <div class="live-now" aria-live="polite">
+                <div class="live-now-main">
+                    <p class="live-now-name" id="liveNowName">尚未选择频道</p>
+                    <p class="live-now-meta" id="liveNowMeta">从右侧列表挑选一个频道，或用遥控器方向键浏览</p>
+                </div>
+                <div class="live-now-actions">
+                    <span class="live-quality" id="liveQuality" hidden></span>
+                    <button type="button" class="live-ghost-btn live-icon-only" id="livePrevButton"
+                        aria-label="上一个频道" title="上一个频道（PageUp）">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <button type="button" class="live-ghost-btn live-icon-only" id="liveNextButton"
+                        aria-label="下一个频道" title="下一个频道（PageDown）">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                    <button type="button" class="live-ghost-btn" id="liveCopyButton">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span class="live-btn-label" id="liveCopyLabel">复制地址</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 节目单 -->
+            <section class="live-epg" aria-labelledby="liveEpgHeading">
+                <div class="live-epg-head">
+                    <span class="live-epg-kicker" id="liveEpgHeading">节目单</span>
+                    <span class="live-epg-now" id="liveEpgNow">当前频道未提供 EPG</span>
+                </div>
+                <ol class="live-epg-track" id="liveEpgTrack"></ol>
+            </section>
+        </section>
+
+        <!-- 频道列表 -->
+        <aside class="live-rail" aria-label="频道列表">
+            <div class="live-rail-head">
+                <div class="live-search">
+                    <svg class="live-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" id="liveSearchInput" class="live-search-input"
+                        placeholder="搜索频道 / 分组 / tvg-id" autocomplete="off" spellcheck="false"
+                        aria-label="搜索直播频道">
+                    <button type="button" class="live-search-clear" id="liveSearchClear" aria-label="清空搜索"
+                        hidden>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="live-rail-tools">
+                    <div class="live-menu-wrap">
+                        <button type="button" class="live-tool-btn" id="liveSortButton" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span class="live-tool-label">排序</span>
+                            <span class="live-tool-value" id="liveSortValue">默认</span>
+                            <svg class="live-caret" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div class="live-menu" id="liveSortMenu" role="menu" hidden></div>
+                    </div>
+
+                    <div class="live-menu-wrap">
+                        <button type="button" class="live-tool-btn" id="liveFilterButton" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span class="live-tool-label">可用性</span>
+                            <span class="live-tool-value" id="liveFilterValue">全部</span>
+                            <svg class="live-caret" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div class="live-menu" id="liveFilterMenu" role="menu" hidden></div>
+                    </div>
+
+                    <button type="button" class="live-tool-btn live-tool-action" id="liveProbeButton">
+                        <svg class="live-tool-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span class="live-tool-value">测速</span>
+                    </button>
+                </div>
+
+                <div class="live-chips" id="liveGroupChips" role="tablist" aria-label="频道分组"></div>
+            </div>
+
+            <div class="live-rail-body">
+                <div class="live-list" id="liveList" role="listbox" aria-label="直播频道"
+                    aria-describedby="liveListSummary"></div>
+                <p class="live-visually-hidden" id="liveListSummary" aria-live="polite"></p>
+                <div class="live-list-empty" id="liveListEmpty" hidden></div>
+                <div class="live-sentinel" id="liveListSentinel" aria-hidden="true"></div>
+            </div>
+
+            <div class="live-rail-foot">
+                <span id="liveListCount">—</span>
+                <span class="live-rail-foot-hint">PageUp / PageDown 换台</span>
+            </div>
+        </aside>
+    </main>
+
+    <!-- ══════ 直播源管理抽屉 ═══════════════════════════════════════ -->
+    <div class="live-drawer-backdrop" id="liveDrawerBackdrop" hidden></div>
+    <aside class="live-drawer" id="liveDrawer" role="dialog" aria-modal="true" aria-labelledby="liveDrawerTitle"
+        aria-hidden="true">
+        <header class="live-drawer-head">
+            <div>
+                <h2 class="live-drawer-title" id="liveDrawerTitle">直播源</h2>
+                <p class="live-drawer-sub">M3U 订阅会在浏览器本地保存，不经过账户体系</p>
+            </div>
+            <button type="button" class="live-icon-btn" id="liveDrawerClose" aria-label="关闭直播源管理">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </header>
+
+        <div class="live-drawer-body">
+            <form class="live-form" id="liveSourceForm" novalidate>
+                <div class="live-form-row">
+                    <label class="live-field">
+                        <span class="live-field-label">名称</span>
+                        <input type="text" id="liveSourceName" class="live-input" placeholder="例如：自建 IPTV" autocomplete="off">
+                    </label>
+                </div>
+                <div class="live-form-row">
+                    <label class="live-field">
+                        <span class="live-field-label">订阅地址（M3U / M3U8）</span>
+                        <input type="text" id="liveSourceUrl" class="live-input" placeholder="https://example.com/list.m3u" autocomplete="off" inputmode="url">
+                    </label>
+                </div>
+                <div class="live-form-row">
+                    <label class="live-field">
+                        <span class="live-field-label">节目单 EPG（可选，XMLTV）</span>
+                        <input type="text" id="liveSourceEpg" class="live-input" placeholder="https://example.com/epg.xml.gz" autocomplete="off" inputmode="url">
+                    </label>
+                </div>
+                <div class="live-form-actions">
+                    <button type="submit" class="live-primary-btn" id="liveSourceSubmit">添加直播源</button>
+                    <button type="button" class="live-ghost-btn" id="liveSourceCancel" hidden>取消编辑</button>
+                </div>
+                <p class="live-form-error" id="liveSourceError" role="alert" hidden></p>
+            </form>
+
+            <div class="live-source-heading">
+                <span class="live-field-label">已添加（<span id="liveSourceTotal">0</span>）</span>
+                <button type="button" class="live-link-btn" id="liveSourceToggleAll">全部启用</button>
+            </div>
+            <ul class="live-source-list" id="liveSourceList"></ul>
+        </div>
+
+        <footer class="live-drawer-foot">
+            <button type="button" class="live-ghost-btn live-foot-btn" id="liveSourceImport">
+                <span>导入 JSON</span>
+            </button>
+            <button type="button" class="live-ghost-btn live-foot-btn" id="liveSourceExport">
+                <span>导出 JSON</span>
+            </button>
+            <button type="button" class="live-ghost-btn live-foot-btn" id="liveSourceReset">
+                <span>恢复推荐源</span>
+            </button>
+        </footer>
+        <input type="file" id="liveSourceFile" accept="application/json,.json,.m3u,.m3u8,text/plain" hidden>
+    </aside>
+
+    <!-- ══════ 手机端底部导航 ═══════════════════════════════════════ -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="底部导航">
+        <a class="mobile-nav-item" href="index.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" />
+            </svg>
+            <span>首页</span>
+        </a>
+        <a class="mobile-nav-item" href="index.html#search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>搜索</span>
+        </a>
+        <a class="mobile-nav-item active" href="live.html" aria-current="page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span>直播</span>
+        </a>
+        <a class="mobile-nav-item" href="index.html#history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>历史</span>
+        </a>
+        <a class="mobile-nav-item" href="index.html#settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>设置</span>
+        </a>
+    </nav>
+
+    <!-- ══════ Toast ═══════════════════════════════════════════════ -->
+    <div class="live-toast" id="liveToast" role="status" aria-live="polite" hidden></div>
+
+    <script src="js/legacy-compat.js?v=20261007-live1"></script>
+    <script src="libs/sha256.min.js"></script>
+    <script>window._jsSha256 = window.sha256;</script>
+    <script src="js/config.js?v=20260730-freedy1"></script>
+    <script src="js/proxy-auth.js"></script>
+    <script src="libs/hls.min.js"></script>
+    <script src="libs/artplayer.min.js"></script>
+    <script src="js/live-data.js?v=20261007-live1"></script>
+    <script src="js/live-sources.js?v=20261007-live1"></script>
+    <script src="js/live-player.js?v=20261007-live1"></script>
+    <script>
+        window.__ENV__ = window.__ENV__ || {};
+        window.__ENV__.PASSWORD = "{{PASSWORD}}";
+        window.__ENV__.LIVE_SOURCES = window.__ENV__.LIVE_SOURCES || '';
+    </script>
+    <script src="js/live-page.js?v=20261007-live1"></script>
+</body>
+
+</html>
