@@ -333,17 +333,18 @@
     <script src="libs/sha256.min.js"></script>
     <script>window._jsSha256 = window.sha256;</script>
     <script src="js/config.js?v=20260730-freedy1"></script>
+    <!-- 必须在 proxy-auth.js 之前：它加载时即预热鉴权，此时需已可读到 __ENV__.PASSWORD -->
+    <script>
+        window.__ENV__ = window.__ENV__ || {};
+        window.__ENV__.PASSWORD = "{{PASSWORD}}";
+        window.__ENV__.LIVE_SOURCES = window.__ENV__.LIVE_SOURCES || '';
+    </script>
     <script src="js/proxy-auth.js"></script>
     <script src="libs/hls.min.js"></script>
     <script src="libs/artplayer.min.js"></script>
     <script src="js/live-data.js?v=20261007-live1"></script>
     <script src="js/live-sources.js?v=20261007-live1"></script>
     <script src="js/live-player.js?v=20261007-live1"></script>
-    <script>
-        window.__ENV__ = window.__ENV__ || {};
-        window.__ENV__.PASSWORD = "{{PASSWORD}}";
-        window.__ENV__.LIVE_SOURCES = window.__ENV__.LIVE_SOURCES || '';
-    </script>
     <script src="js/live-page.js?v=20261007-live1"></script>
 </body>
 
