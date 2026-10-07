@@ -21,7 +21,8 @@
     var PRESET_SOURCES = [
         { key: 'preset_cn', name: 'iptv-org · 中国大陆', url: 'https://iptv-org.github.io/iptv/countries/cn.m3u', group: '推荐' },
         { key: 'preset_zho', name: 'iptv-org · 中文频道', url: 'https://iptv-org.github.io/iptv/languages/zho.m3u', group: '推荐' },
-        { key: 'preset_hk', name: 'iptv-org · 中国香港', url: 'https://iptv-org.github.io/iptv/countries/hk.m3u', group: '推荐' }
+        { key: 'preset_hk', name: 'iptv-org · 中国香港', url: 'https://iptv-org.github.io/iptv/countries/hk.m3u', group: '推荐' },
+        { key: 'preset_all', name: 'iptv-org · 全球频道', url: 'https://iptv-org.github.io/iptv/index.m3u', group: '推荐' }
     ];
 
     var DEFAULT_PREFS = {
