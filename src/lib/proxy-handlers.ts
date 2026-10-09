@@ -79,12 +79,17 @@ export async function handleProxyRequest(req: Request, targetUrl: string): Promi
     return new NextResponse('不允许访问私有/保留网络地址', { status: 403 });
   }
 
-  const headers: Record<string, string> = { 'User-Agent': UA, Accept: '*/*' };
+  const requestAccept = req.headers.get('accept') || '';
+  const isImageRequest = requestAccept.includes('image/');
+  const headers: Record<string, string> = {
+    'User-Agent': isImageRequest ? req.headers.get('user-agent') || UA : UA,
+    Accept: isImageRequest ? requestAccept : '*/*',
+  };
   try {
     const target = new URL(targetUrl);
     if (isDoubanHost(target.hostname)) {
       headers.Referer = 'https://movie.douban.com/';
-    } else if (req.headers.get('accept')?.includes('image/')) {
+    } else if (isImageRequest) {
       headers.Referer = `${target.origin}/`;
     }
   } catch { /* 忽略非法 URL */ }

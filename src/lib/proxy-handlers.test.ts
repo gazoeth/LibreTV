@@ -22,11 +22,14 @@ describe('handleProxyRequest image referer', () => {
 
   it('uses the image host origin as referer for provider posters', async () => {
     const target = 'https://img.example.test/poster.jpg';
+    const accept = 'image/png,image/jpeg,image/*,*/*;q=0.8';
     await handleProxyRequest(new Request('https://site.test/api/proxy', {
-      headers: { accept: 'image/avif,image/webp,image/*,*/*;q=0.8' },
+      headers: { accept, 'user-agent': 'iPad Safari 12' },
     }), target);
 
     expect(fetchWithSafeRedirects.mock.calls[0][1].headers.Referer).toBe('https://img.example.test/');
+    expect(fetchWithSafeRedirects.mock.calls[0][1].headers.Accept).toBe(accept);
+    expect(fetchWithSafeRedirects.mock.calls[0][1].headers['User-Agent']).toBe('iPad Safari 12');
   });
 
   it('keeps the required Douban referer', async () => {
