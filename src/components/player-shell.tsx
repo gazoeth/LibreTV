@@ -12,6 +12,7 @@ import {
 } from '@/lib/video-prefetcher';
 import { loadCacheSettings } from '@/lib/video-cache';
 import { formatTime } from '@/lib/utils';
+import { getHlsPlaybackEngine } from '@/lib/player-compat';
 
 /**
  * 播放器外壳：ArtPlayer + hls.js（旧版 player.js 的 React 化）。
@@ -60,6 +61,7 @@ export function PlayerShell({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const artRef = useRef<any>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const nativeHlsRef = useRef(false);
   const [error, setError] = useState('');
   const [hint, setHint] = useState('');
   // 起播前的品牌占位图（沿用旧版 nomedia 素材），实际开始播放后隐藏
@@ -156,6 +158,32 @@ export function PlayerShell({
   const setupHls = (video: HTMLVideoElement, mediaUrl: string, allowProxyFallback: boolean) => {
     hlsRef.current?.destroy();
     currentMediaUrlRef.current = mediaUrl;
+    const nativeMimeSupport = video.canPlayType('application/vnd.apple.mpegurl') ||
+      video.canPlayType('application/x-mpegURL');
+    const engine = getHlsPlaybackEngine(Hls.isSupported(), nativeMimeSupport);
+    if (engine === 'native') {
+      nativeHlsRef.current = true;
+      const fallbackToProxy = () => {
+        if (allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
+          showHint('直连失败，改用代理重试...');
+          setupHls(video, `/api/proxy?url=${encodeURIComponent(mediaUrl)}`, false);
+        } else {
+          setError('视频播放失败，请尝试其他视频源');
+        }
+      };
+      video.addEventListener('error', fallbackToProxy, { once: true });
+      video.src = mediaUrl;
+      video.load();
+      const playResult = video.play();
+      if (playResult && typeof playResult.catch === 'function') playResult.catch(() => {});
+      return;
+    }
+    if (engine === 'unsupported') {
+      nativeHlsRef.current = false;
+      setError('此浏览器不支持 HLS 视频播放');
+      return;
+    }
+    nativeHlsRef.current = false;
     const hls = new Hls(buildHlsConfig());
     hlsRef.current = hls;
 
@@ -318,6 +346,7 @@ export function PlayerShell({
     });
     art.on('video:error', () => {
       mediaHealthyRef.current = false;
+      if (nativeHlsRef.current) return;
       // 起播阶段的 video 元素级错误（MSE/解码偶发失败）：重建一次播放链路自愈，
       // 而不是直接钉死错误遮罩——重建后视频轨重新 append，黑屏有声即可解除
       if (!playbackStartedRef.current && !videoErrorRetryUsedRef.current) {
