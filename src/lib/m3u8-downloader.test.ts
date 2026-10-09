@@ -38,6 +38,15 @@ describe('decryptSegment', () => {
     expect(new Uint8Array(out1)).toEqual(PLAINTEXT);
   });
 
+  it('无 IV 属性：较大媒体序列号按大端字节逐位编码', async () => {
+    const sequence = 0x01020304050607;
+    const iv = new Uint8Array(16);
+    iv.set([1, 2, 3, 4, 5, 6, 7], 9);
+    const cipher = await encryptForIv(PLAINTEXT, iv);
+    const out = await decryptSegment(cipher, asBuf(KEY), undefined, sequence, 0);
+    expect(new Uint8Array(out)).toEqual(PLAINTEXT);
+  });
+
   it('回归：旧实现恒用零向量 IV——对非零序列号分片解密必然失败', async () => {
     // 分片按正确 IV=6 加密；旧实现对无 IV 属性的 KEY 恒用零向量 → 解不出明文
     const cipher = await encryptForIv(PLAINTEXT, ivOf6());

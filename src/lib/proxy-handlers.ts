@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { guardRequest, jsonError } from '@/lib/api-guard';
 import { checkLiveUrlAllowed, isBlockedByDNS, isValidProxyUrl } from '@/lib/ssrf';
 import { fetchWithSafeRedirects } from '@/lib/fetch-utils';
-import { rewriteM3u8, LIVE_STREAM_BASE } from '@/lib/m3u8';
+import { rewriteM3u8, stripAdGroups, LIVE_STREAM_BASE } from '@/lib/m3u8';
 
 /**
  * 代理目标地址的两种传入形式：
@@ -121,7 +121,7 @@ export async function handleProxyRequest(req: Request, targetUrl: string): Promi
   // m3u8 文本：重写为代理地址（以重定向后的最终 URL 为 base 解析相对地址）
   if (isM3u8) {
     const text = await response.text();
-    return new NextResponse(rewriteM3u8(text, finalUrl), {
+    return new NextResponse(rewriteM3u8(stripAdGroups(text), finalUrl), {
       status: response.status,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl',
@@ -219,7 +219,7 @@ export async function handleLiveStreamRequest(req: Request, targetUrl: string): 
   // 关键：以重定向后的最终 URL 为 base 解析相对地址（gslb 调度源 302 后路径会变）
   if (isM3u8) {
     const text = await response.text();
-    return new NextResponse(rewriteM3u8(text, finalUrl, 0, LIVE_STREAM_BASE), {
+    return new NextResponse(rewriteM3u8(stripAdGroups(text), finalUrl, 0, LIVE_STREAM_BASE), {
       status: response.status,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl',

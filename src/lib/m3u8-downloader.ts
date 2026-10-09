@@ -89,10 +89,12 @@ async function fetchSegment(url: string, signal: AbortSignal): Promise<ArrayBuff
  * 首片恰好正确、后续全部解密失败。
  */
 function ivForSegment(mediaSequence: number, segmentIndexZeroBased: number): Uint8Array {
-  const seq = BigInt(mediaSequence + segmentIndexZeroBased);
+  let sequence = mediaSequence + segmentIndexZeroBased;
   const iv = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    iv[15 - i] = Number((seq >> BigInt(8 * i)) & 0xffn);
+  // Use byte division instead of BigInt syntax so Safari 12 can parse this client bundle.
+  for (let i = 15; i >= 0 && sequence > 0; i--) {
+    iv[i] = sequence % 256;
+    sequence = Math.floor(sequence / 256);
   }
   return iv;
 }
