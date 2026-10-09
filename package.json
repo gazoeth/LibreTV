@@ -39,5 +39,17 @@
     "tailwindcss": "^3.4.15",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "browserslist": {
+    "production": [
+      "defaults",
+      "iOS >= 12",
+      "Safari >= 12"
+    ],
+    "development": [
+      "last 1 Chrome version",
+      "last 1 Firefox version",
+      "last 1 Safari version"
+    ]
   }
 }

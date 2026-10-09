@@ -20,9 +20,34 @@ const nextConfig: NextConfig = {
   // 本地 next start 在 standalone 模式下不受支持，故按环境切换
   output: process.env.DOCKER_BUILD === '1' ? 'standalone' : undefined,
   reactStrictMode: true,
+  transpilePackages: [
+    '@tanstack/query-core',
+    '@tanstack/react-query',
+    '@tanstack/react-virtual',
+    '@tanstack/virtual-core',
+    'artplayer',
+    'hls.js',
+  ],
   env: { APP_VERSION: readAppVersion() },
   // 采集站/豆瓣等上游地址在运行时由用户配置，构建期无法枚举，关闭图片优化改用 <img>
   images: { unoptimized: true },
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      // Next's app-browser layer can leave modern dependency syntax untouched.
+      // Lower only the player/query packages to syntax Safari 12 can parse.
+      config.module.rules.unshift({
+        test: /\.(?:js|mjs)$/,
+        include: [
+          path.join(process.cwd(), 'node_modules', '@tanstack'),
+          path.join(process.cwd(), 'node_modules', 'artplayer'),
+          path.join(process.cwd(), 'node_modules', 'hls.js'),
+        ],
+        enforce: 'pre',
+        use: [path.join(process.cwd(), 'tools', 'safari12-compat-loader.cjs')],
+      });
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
