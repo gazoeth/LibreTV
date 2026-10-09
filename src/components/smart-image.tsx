@@ -19,7 +19,7 @@ interface SmartImageProps {
  * 带降级链的封面图组件：direct 模式按 buildImageCandidates 的顺序加载，
  * onError 逐级回退（豆瓣图：直连 → 公共镜像 → 内置代理）；
  * 全部失败后触发 onExhausted 并停止渲染，由调用方展示占位图。
- * referrerPolicy=no-referrer：不向图床暴露来源页，规避部分站点的 Referer 校验。
+ * 仅向图床发送站点来源，避免来源校验拦截，同时不暴露完整页面地址。
  */
 export function SmartImage({
   url,
@@ -49,7 +49,7 @@ export function SmartImage({
       alt={alt}
       className={className}
       loading={loading}
-      referrerPolicy="no-referrer"
+      referrerPolicy="origin"
       onError={() => setIdx((i) => i + 1)}
     />
   );
