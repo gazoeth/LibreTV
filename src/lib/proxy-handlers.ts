@@ -81,8 +81,11 @@ export async function handleProxyRequest(req: Request, targetUrl: string): Promi
 
   const headers: Record<string, string> = { 'User-Agent': UA, Accept: '*/*' };
   try {
-    if (isDoubanHost(new URL(targetUrl).hostname)) {
+    const target = new URL(targetUrl);
+    if (isDoubanHost(target.hostname)) {
       headers.Referer = 'https://movie.douban.com/';
+    } else if (req.headers.get('accept')?.includes('image/')) {
+      headers.Referer = `${target.origin}/`;
     }
   } catch { /* 忽略非法 URL */ }
 
