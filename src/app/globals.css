@@ -125,6 +125,26 @@ body {
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
+/* iOS 12 Safari lacks aspect-ratio; the pseudo-element keeps poster/player frames sized. */
+.poster-frame,
+.video-frame {
+  position: relative;
+}
+.poster-frame { aspect-ratio: 2 / 3; }
+.video-frame { aspect-ratio: 16 / 9; }
+.poster-frame::before,
+.video-frame::before {
+  content: '';
+  display: block;
+  width: 100%;
+}
+.poster-frame::before { padding-top: 150%; }
+.video-frame::before { padding-top: 56.25%; }
+@supports (aspect-ratio: 1 / 1) {
+  .poster-frame::before,
+  .video-frame::before { display: none; }
+}
+
 /* 播放器集数激活态 */
 .episode-active {
   background: rgb(var(--c-accent)) !important;

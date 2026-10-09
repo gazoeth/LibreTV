@@ -224,28 +224,30 @@ function LiveContent() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           {/* 主栏：播放器 + 信息条 + 节目单 */}
           <div className="min-w-0">
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {currentUrl ? (
-                <LivePlayer
-                  url={currentUrl}
-                  title={currentChannel?.name || '直播'}
-                  onPrevChannel={goPrevChannel}
-                  onNextChannel={goNextChannel}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
-                  <span className="live-dot" />
-                  <p className="text-white/60 text-sm">
-                    {sources.length === 0
-                      ? liveEnvSources.length + liveSubscriptions.length > 0
-                        ? '所有直播源均已停用，请在设置中勾选启用'
-                        : '请先在设置中添加直播源（M3U 订阅）'
-                      : playlistsQuery.isLoading
-                        ? '频道列表加载中...'
-                        : '从右侧选择一个频道开始观看'}
-                  </p>
-                </div>
-              )}
+            <div className="video-frame bg-black rounded-lg overflow-hidden">
+              <div className="absolute inset-0">
+                {currentUrl ? (
+                  <LivePlayer
+                    url={currentUrl}
+                    title={currentChannel?.name || '直播'}
+                    onPrevChannel={goPrevChannel}
+                    onNextChannel={goNextChannel}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
+                    <span className="live-dot" />
+                    <p className="text-white/60 text-sm">
+                      {sources.length === 0
+                        ? liveEnvSources.length + liveSubscriptions.length > 0
+                          ? '所有直播源均已停用，请在设置中勾选启用'
+                          : '请先在设置中添加直播源（M3U 订阅）'
+                        : playlistsQuery.isLoading
+                          ? '频道列表加载中...'
+                          : '从右侧选择一个频道开始观看'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 频道信息条 */}

@@ -234,32 +234,34 @@ function WatchContent() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
           <div>
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              {currentUrl ? (
-                <PlayerShell
-                  url={currentUrl}
-                  title={videoTitle}
-                  adFilter={store.adFilter}
-                  autoplayNext={store.autoplayNext}
-                  episodeKey={`${sourceKey}:${vodId}:${currentIndex}`}
-                  nextUrl={currentIndex + 1 < episodes.length ? episodes[currentIndex + 1] : undefined}
-                  nextEpisodeKey={currentIndex + 1 < episodes.length ? `${sourceKey}:${vodId}:${currentIndex + 1}` : undefined}
-                  getRestorePosition={getRestorePosition}
-                  onTimeUpdate={handleProgress}
-                  onPause={handleProgress}
-                  onEnded={handleEnded}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  {detailQuery.isLoading ? (
-                    <Spinner size="lg" />
-                  ) : (
-                    <p className="text-faint text-sm">
-                      {detailQuery.isError ? '视频加载失败，请尝试其他资源' : '无可用播放地址'}
-                    </p>
-                  )}
-                </div>
-              )}
+            <div className="video-frame bg-black rounded-lg overflow-hidden">
+              <div className="absolute inset-0">
+                {currentUrl ? (
+                  <PlayerShell
+                    url={currentUrl}
+                    title={videoTitle}
+                    adFilter={store.adFilter}
+                    autoplayNext={store.autoplayNext}
+                    episodeKey={`${sourceKey}:${vodId}:${currentIndex}`}
+                    nextUrl={currentIndex + 1 < episodes.length ? episodes[currentIndex + 1] : undefined}
+                    nextEpisodeKey={currentIndex + 1 < episodes.length ? `${sourceKey}:${vodId}:${currentIndex + 1}` : undefined}
+                    getRestorePosition={getRestorePosition}
+                    onTimeUpdate={handleProgress}
+                    onPause={handleProgress}
+                    onEnded={handleEnded}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {detailQuery.isLoading ? (
+                      <Spinner size="lg" />
+                    ) : (
+                      <p className="text-faint text-sm">
+                        {detailQuery.isError ? '视频加载失败，请尝试其他资源' : '无可用播放地址'}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 操作栏 */}
