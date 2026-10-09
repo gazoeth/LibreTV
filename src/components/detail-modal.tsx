@@ -122,6 +122,18 @@ export function DetailModal({ item, onClose }: { item: SearchResultItem | null; 
     info?.remarks && ['备注', info.remarks],
   ].filter(Boolean) as [string, string][];
 
+  const poster = item.pic && !posterFailed ? (
+    <SmartImage
+      url={item.pic}
+      mode={store.imageProxyMode}
+      customProxy={store.customImageProxy}
+      alt={item.name}
+      className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-lg bg-chip shrink-0 self-center sm:self-start"
+      loading="eager"
+      onExhausted={() => setPosterFailed(true)}
+    />
+  ) : null;
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/80 py-10 px-4 animate-fade-in"
@@ -154,24 +166,24 @@ export function DetailModal({ item, onClose }: { item: SearchResultItem | null; 
         </div>
 
         <div className="p-5 pt-4">
-          {loading && <LoadingState label="正在获取剧集信息..." />}
+          {loading && (
+            <div className="flex items-center gap-4 mb-4">
+              {poster}
+              <div className="flex-1 min-w-0"><LoadingState label="正在获取剧集信息..." /></div>
+            </div>
+          )}
 
-          {!loading && error && <ErrorState message={error || '获取失败'} />}
+          {!loading && error && (
+            <div className="flex items-center gap-4 mb-4">
+              {poster}
+              <div className="flex-1 min-w-0"><ErrorState message={error || '获取失败'} /></div>
+            </div>
+          )}
 
           {!loading && !error && detail && (
             <>
               <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                {item?.pic && !posterFailed && (
-                  <SmartImage
-                    url={item.pic}
-                    mode={store.imageProxyMode}
-                    customProxy={store.customImageProxy}
-                    alt={item.name}
-                    className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-lg bg-chip shrink-0 self-center sm:self-start"
-                    loading="eager"
-                    onExhausted={() => setPosterFailed(true)}
-                  />
-                )}
+                {poster}
                 <div className="min-w-0 space-y-3">
                   {metaRows.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
