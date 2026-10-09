@@ -35,7 +35,7 @@ export function parseSearchList(
       sourceName: source.name,
       vodId: String(vod.vod_id ?? ''),
       name: String(vod.vod_name ?? ''),
-      pic: typeof vod.vod_pic === 'string' ? vod.vod_pic : undefined,
+      pic: resolveSourceImage(vod.vod_pic, source.url),
       typeName: typeof vod.type_name === 'string' ? vod.type_name : undefined,
       year: typeof vod.vod_year === 'string' ? vod.vod_year : undefined,
       area: typeof vod.vod_area === 'string' ? vod.vod_area : undefined,
@@ -94,7 +94,7 @@ export function parseDetail(
     episodes,
     videoInfo: {
       title: str(vod.vod_name),
-      cover: str(vod.vod_pic),
+      cover: resolveSourceImage(vod.vod_pic, source.url),
       desc: str(vod.vod_content),
       typeName: str(vod.type_name),
       year: str(vod.vod_year),
@@ -112,6 +112,17 @@ export function parseDetail(
 function str(v: unknown): string | undefined {
   const s = typeof v === 'string' ? v.trim() : '';
   return s || undefined;
+}
+
+/** 搜索源有时返回相对封面路径；以资源站域名为基址，避免请求落到 LibreTV 自身。 */
+function resolveSourceImage(value: unknown, sourceUrl: string): string | undefined {
+  const image = str(value);
+  if (!image) return undefined;
+  try {
+    return new URL(image, `${new URL(sourceUrl).origin}/`).href;
+  } catch {
+    return image;
+  }
 }
 
 /**

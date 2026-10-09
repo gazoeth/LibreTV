@@ -37,6 +37,21 @@ describe('parseSearchList', () => {
     expect(items[0].name).toBe('');
   });
 
+  it('把相对封面路径解析到资源站域名', () => {
+    const items = parseSearchList({
+      list: [
+        { vod_pic: '/upload/poster.jpg' },
+        { vod_pic: '//cdn.example.com/poster.jpg' },
+        { vod_pic: 'https://images.example.com/poster.jpg' },
+      ],
+    }, source);
+    expect(items.map((item) => item.pic)).toEqual([
+      'https://api.example.com/upload/poster.jpg',
+      'https://cdn.example.com/poster.jpg',
+      'https://images.example.com/poster.jpg',
+    ]);
+  });
+
   it('拒绝无效响应；list 缺失或 null 视为空结果', () => {
     expect(() => parseSearchList(null, source)).toThrow();
     expect(() => parseSearchList({ list: 'nope' }, source)).toThrow();
@@ -94,13 +109,14 @@ describe('parseDetail', () => {
   it('解析详情并提取分集', () => {
     const data = {
       list: [{
-        vod_id: 1, vod_name: '三体', vod_content: '科幻剧',
+        vod_id: 1, vod_name: '三体', vod_content: '科幻剧', vod_pic: '/upload/santi.jpg',
         vod_play_url: '第1集$https://cdn/1.m3u8#第2集$https://cdn/2.m3u8',
       }],
     };
     const detail = parseDetail(data, source);
     expect(detail.episodes).toHaveLength(2);
     expect(detail.videoInfo.title).toBe('三体');
+    expect(detail.videoInfo.cover).toBe('https://api.example.com/upload/santi.jpg');
     expect(detail.videoInfo.sourceName).toBe('测试源');
   });
 
