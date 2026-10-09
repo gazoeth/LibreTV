@@ -216,18 +216,18 @@ export function SwitchSourceModal({
                   onClick={() => !isCurrent && switchTo(c)}
                   disabled={isCurrent}
                 >
-                  <div className="relative aspect-[2/3] bg-chip">
+                  <div className="poster-frame bg-chip">
                     {img && !coverFailed ? (
                       <SmartImage
                         url={c.result.pic}
                         mode={store.imageProxyMode}
                         customProxy={store.customImageProxy}
                         alt={c.result.name}
-                        className="w-full h-full object-cover"
+                        className="absolute inset-0 w-full h-full object-cover"
                         onExhausted={() => setImgFailed((prev) => ({ ...prev, [cardKey]: true }))}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-faint">
+                      <div className="absolute inset-0 flex items-center justify-center text-faint">
                         <Icon name="link" className="w-6 h-6" />
                       </div>
                     )}
