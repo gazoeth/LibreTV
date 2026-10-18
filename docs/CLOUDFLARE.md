@@ -1,36 +1,43 @@
-# FreeDY Cloudflare 部署
+# FreeDY Cloudflare Pages 部署
 
-## 为什么 Pages 显示旧页面
+## 当前生产路径
 
-2026-10-18 的 Pages `libretv` 生产部署拉取了 `2220781`，但日志显示 `No build command specified. Skipping build step.`，直接发布根目录旧 HTML 与 `/functions`。新版位于 `src/app`，需要 Next.js 服务端运行环境，发布仓库根目录不会发布新版。
+继续使用原 `gazoeth/LibreTV` 仓库和 `libretv` Pages 项目，生产分支 `main`。保留现有自定义域名和 PASSWORD 环境配置。
 
-## 新版构建
+- 构建命令：`npm run build:pages`
+- 输出目录：`.pages-output`
+- 根目录：仓库根目录
+- 运行配置：根目录 `wrangler.jsonc`
 
-保留 Next.js 15，使用 OpenNext Cloudflare 适配器，部署至 Workers：
+构建先通过 OpenNext 生成 Next.js 服务端，然后由 `tools/package-cloudflare-pages.mjs` 编译 Pages 高级模式 `_worker.js` 并复制静态资源。`cloudflare/pages-entry.js` 仅导出请求处理函数，静态 JS／图标走内建 ASSETS，其他页面及 API 交给 Next.js。原根目录旧 HTML 与 `/functions` 不参与此次输出。
 
-- 安装：`npm ci`
-- 构建：`npm run build:cloudflare`
-- 部署：`npx opennextjs-cloudflare deploy`
-- 本地 Workers 预览：`npm run preview:cloudflare`
-- 生产分支：`main`，根目录：仓库根目录。
-- Worker 名称：`freedy`，构建入口 `.open-next/worker.js`，资源目录 `.open-next/assets`。
+这是项目自行实现的 Pages 打包适配，基于 Cloudflare 公开的高级模式协议；不宣称是 OpenNext 官方 Pages 适配器。当前无持久 ISR 缓存、Durable Objects、图片优化或服务自绑定需求；若新增这些能力，需重新验证 Pages 支持范围。
 
-`npm run build`、`npm run dev` 及原有 Docker 部署继续使用 Next.js 原路径。
+## 访问保护与回滚
 
-环境变量和口令必须配置在 Cloudflare，不提交 `.env`、`.dev.vars` 或令牌。`CLOUDFLARE_WORKERS=1` 用于选择 Workers 支持的 DNS 解析方法；`global_fetch_strictly_public` 约束公共出网。鉴权 Cookie、来源和访问口令等配置应从旧项目按需迁入，不能把密码写进公开构建配置。新部署不得因迁移而取消既有访问保护。
+沿用原 Pages 项目的 PASSWORD，密码不会写入仓库。入口设置 `REQUIRE_ACCESS_PASSWORD=1`，没有口令时 API 拒绝访问。设置 `CLOUDFLARE_WORKERS=1` 选用 Workers 支持的 DNS 解析；公共出网限制继续启用。
 
-## 上线步骤
+当前生产部署可在 Pages 历史中回滚，原始旧版代码保存在 `backup/pre-freedy-20261018`。恢复旧版构建时需同时恢复其空构建命令和根目录发布配置。
 
-先在 Worker 预览域名核对首页、影视、电视、广播、关于、搜索与来源接口，再为 `dy.dayiwu.com` 切换路由。保留旧 Pages 部署用于回滚。构建成功、Worker 发布成功和正式域名验证通过是三个独立状态。
+## 本地复现
 
-## 参考
+```sh
+npm ci
+npm run build:pages
+npm run preview:pages
+```
 
-- https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/
+本地 smoke 核验使用临时口令，正式口令不进入聊天或测试文件。页面、真实 JS 资源、登录、广播、电视和魔都电视剧目录已在 Pages 本地运行环境检查，接口返回 200，魔都目录返回 20 条。
+
+原 `npm run build`、Docker 和本地 Next.js 路径保持可用。另保留 `wrangler.worker.jsonc` 用于独立 Worker 打包，但原 Pages 项目发布不依赖 Workers Builds 或新建 Worker。
+
+## 原因记录
+
+旧 Pages 部署 `2220781` 日志显示 `No build command specified. Skipping build step.`，直接发布仓库根目录，因而看不到 `src/app` 中的新版。
+
+## 官方资料
+
+- https://developers.cloudflare.com/pages/functions/advanced-mode/
+- https://developers.cloudflare.com/pages/functions/wrangler-configuration/
 - https://opennext.js.org/cloudflare/get-started
 - https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/
-
-## 本次适配验证
-
-提交 `20d8eb4`：OpenNext 生产构建及类型／lint 检查完成；Wrangler 打包约 8,643 KiB，gzip 约 1,816 KiB。workerd 本地运行首页、关于、影视及广播目录返回 200，魔都电视剧目录返回 20 条。验证内容接口时仅在本地命令覆盖 `REQUIRE_ACCESS_PASSWORD=0`；正式配置保持 `REQUIRE_ACCESS_PASSWORD=1`，未设置 `PASSWORD` 时目录接口返回 503，状态返回 `verified=false`。
-
-旧 Pages 项目配置了 PASSWORD。正式 Worker 必须先由运营者配置 PASSWORD 密钥再切换域名；不要把密码发到聊天、构建脚本或公开仓库。构建表单会自动创建包含多类账户资源编辑权限的 API 令牌，创建此令牌前须明确确认权限范围；不将代码推送或本地构建成功当作已经上线。

@@ -43,3 +43,7 @@ outputs/
 .open-next/
 .wrangler/
 .dev.vars*
+
+# Pages 高级模式构建产物
+.pages-output/
+.pages-bundle/

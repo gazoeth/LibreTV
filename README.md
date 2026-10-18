@@ -256,4 +256,4 @@ CI 校验通过后自动构建并推送 `ghcr.io/librespark/libretv:<版本>`（
 
 ## Cloudflare 新版部署
 
-当前新版需要 Workers 运行 Next.js 服务端，不能继续发布仓库根目录旧 HTML。构建命令为 `npm run build:cloudflare`，部署命令为 `npx opennextjs-cloudflare deploy`；完整配置见 [Cloudflare 部署指南](docs/CLOUDFLARE.md)。
+原 Cloudflare Pages 项目使用高级模式发布新版 Next.js 服务端：构建命令 `npm run build:pages`，输出目录 `.pages-output`，生产分支 `main`。继续使用原域名和口令配置；完整说明见 [Cloudflare 部署指南](docs/CLOUDFLARE.md)。
