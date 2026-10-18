@@ -20,6 +20,11 @@ export function isPasswordConfigured(): boolean {
   return getPassword().length > 0;
 }
 
+/** 部署迁移时可强制口令保护；未配置口令期间保持关闭访问。 */
+export function requiresPassword(): boolean {
+  return isPasswordConfigured() || process.env.REQUIRE_ACCESS_PASSWORD === '1';
+}
+
 function getSecret(): string {
   if (process.env.PROXY_SECRET) return process.env.PROXY_SECRET;
   return crypto.createHash('sha256').update(getPassword() + ':libretv::session-salt').digest('hex');

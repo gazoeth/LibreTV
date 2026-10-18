@@ -253,3 +253,7 @@ CI 校验通过后自动构建并推送 `ghcr.io/librespark/libretv:<版本>`（
 - 更新公开目录：`node tools/update-tv-directory.mjs`、`node tools/update-radio-directory.mjs`。
 
 详细实现及验证边界见 [ZIP0 整合记录](docs/ZIP0-INTEGRATION.md)。
+
+## Cloudflare 新版部署
+
+当前新版需要 Workers 运行 Next.js 服务端，不能继续发布仓库根目录旧 HTML。构建命令为 `npm run build:cloudflare`，部署命令为 `npx opennextjs-cloudflare deploy`；完整配置见 [Cloudflare 部署指南](docs/CLOUDFLARE.md)。

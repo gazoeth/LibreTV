@@ -38,3 +38,8 @@ out/
 # 本地截图、核验产物及修改前备份
 artifacts/
 outputs/
+
+# Cloudflare 构建与本地密钥
+.open-next/
+.wrangler/
+.dev.vars*

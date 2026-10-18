@@ -59,6 +59,13 @@ export async function isBlockedByDNS(urlString: string): Promise<boolean> {
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':')) {
       return isPrivateIP(hostname);
     }
+    if (process.env.CLOUDFLARE_WORKERS === '1') {
+      // Workers 不实现 lookup；分别解析两种地址，避免迁移后跳过 DNS 安全校验。
+      const answers = await Promise.allSettled([dns.resolve4(hostname), dns.resolve6(hostname)]);
+      const addresses = answers.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+      if (!addresses.length) return true;
+      return addresses.some(isPrivateIP);
+    }
     const result = await dns.lookup(hostname, { all: true });
     return result.some((r) => isPrivateIP(r.address));
   } catch {

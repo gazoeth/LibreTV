@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "freedy",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-18",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": { "CLOUDFLARE_WORKERS": "1", "REQUIRE_ACCESS_PASSWORD": "1" },
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "freedy" }]
+}
