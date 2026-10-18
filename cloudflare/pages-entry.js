@@ -10,8 +10,9 @@ export default {
     return application.fetch(request, {
       ...env,
       CLOUDFLARE_WORKERS: '1',
-      // 未迁入密码时保持拒绝访问，不因发布方式改变保护状态。
-      REQUIRE_ACCESS_PASSWORD: '1',
+      // 此公开站点按运营者要求不设访问口令。
+      PASSWORD: '',
+      REQUIRE_ACCESS_PASSWORD: '0',
     }, ctx);
   },
 };

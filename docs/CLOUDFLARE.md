@@ -2,7 +2,7 @@
 
 ## 当前生产路径
 
-继续使用原 `gazoeth/LibreTV` 仓库和 `libretv` Pages 项目，生产分支 `main`。保留现有自定义域名和 PASSWORD 环境配置。
+继续使用原 `gazoeth/LibreTV` 仓库和 `libretv` Pages 项目，生产分支 `main`。保留现有自定义域名；站点按运营者要求公开访问，不设 PASSWORD。
 
 - 构建命令：`npm run build:pages`
 - 输出目录：`.pages-output`
@@ -15,7 +15,7 @@
 
 ## 访问保护与回滚
 
-PASSWORD 在原 Pages 后台管理，密码不会写入仓库。请勿新增根目录 wrangler.jsonc 接管生产配置：空 vars 会覆盖后台文本变量。入口设置 `REQUIRE_ACCESS_PASSWORD=1`，没有口令时 API 拒绝访问。设置 `CLOUDFLARE_WORKERS=1` 选用 Workers 支持的 DNS 解析；公共出网限制继续启用。
+站点按运营者要求公开访问；Pages 入口明确将 PASSWORD 置空并设置 REQUIRE_ACCESS_PASSWORD=0，因此无需登录。请勿新增根目录 wrangler.jsonc 接管后台环境配置。设置 `CLOUDFLARE_WORKERS=1` 选用 Workers 支持的 DNS 解析；公共出网限制继续启用。
 
 当前生产部署可在 Pages 历史中回滚，原始旧版代码保存在 `backup/pre-freedy-20261018`。恢复旧版构建时需同时恢复其空构建命令和根目录发布配置。
 
