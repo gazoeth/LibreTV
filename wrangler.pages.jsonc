@@ -1,7 +1,0 @@
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "libretv",
-  "pages_build_output_dir": ".pages-output",
-  "compatibility_date": "2026-10-18",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"]
-}

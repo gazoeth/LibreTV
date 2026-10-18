@@ -17,7 +17,7 @@
     "preview:cloudflare": "npm run build:cloudflare && opennextjs-cloudflare preview --config wrangler.worker.jsonc",
     "deploy:cloudflare": "npm run build:cloudflare && opennextjs-cloudflare deploy --config wrangler.worker.jsonc",
     "build:pages": "npm run build:cloudflare && node tools/package-cloudflare-pages.mjs",
-    "preview:pages": "wrangler pages dev .pages-output --config wrangler.pages.jsonc"
+    "preview:pages": "wrangler pages dev .pages-output --compatibility-date 2026-10-18 --compatibility-flags nodejs_compat global_fetch_strictly_public"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",

@@ -7,7 +7,7 @@
 - 构建命令：`npm run build:pages`
 - 输出目录：`.pages-output`
 - 根目录：仓库根目录
-- 生产运行配置：Cloudflare Pages 后台；`wrangler.pages.jsonc` 仅用于显式本地预览，不作为根目录自动配置
+- 生产运行配置：Cloudflare Pages 后台；本地预览通过命令参数指定兼容日期和标志，不新增会接管生产变量的根目录配置
 
 构建先通过 OpenNext 生成 Next.js 服务端，然后由 `tools/package-cloudflare-pages.mjs` 编译 Pages 高级模式 `_worker.js` 并复制静态资源。`cloudflare/pages-entry.js` 仅导出请求处理函数，静态 JS／图标走内建 ASSETS，其他页面及 API 交给 Next.js。原根目录旧 HTML 与 `/functions` 不参与此次输出。
 
