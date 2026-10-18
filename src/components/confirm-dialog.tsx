@@ -1,5 +1,7 @@
 'use client';
 
+import { useBodyScrollLock } from './use-body-scroll-lock';
+
 import { useEffect, useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -49,14 +51,7 @@ export function ConfirmDialog({
     return () => window.removeEventListener('keydown', handler);
   }, [open, danger, onCancel, onConfirm]);
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   if (!open) return null;
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { acquireBodyScrollLock } from '@/components/use-body-scroll-lock';
+
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -21,7 +23,7 @@ import { LiveChannelList, type LiveChannelItem } from '@/components/live-channel
 import { LiveEpgPanel } from '@/components/live-epg-panel';
 import { Spinner } from '@/components/states';
 import { useAuth } from '@/components/auth';
-import { allLiveSources, useAppStore } from '@/lib/store';
+import { allLiveSources, LIVE_PROBE_TTL_MS, useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { SmartImage } from '@/components/smart-image';
 import { RegionFlag } from '@/components/region-flag';
@@ -30,7 +32,7 @@ import { RegionFlag } from '@/components/region-flag';
  * 直播页：左侧播放器 + 频道信息 + 节目单；右侧频道侧栏。
  * 状态由 URL 驱动（?url=&name=&group=&tvgId=&epg=），支持频道深链与刷新保持。
  * 换台路径：侧栏点击、全局 ↑↓ 键盘、播放器控制条上一台/下一台（全屏可用）。
- * 移动端侧栏为底部抽屉（右下角 FAB 呼出，选中频道后自动收起）。
+ * 移动端保留播放器下方频道列表，并提供安全区上方的快捷抽屉。
  */
 export default function LivePage() {
   return (
@@ -43,6 +45,8 @@ export default function LivePage() {
 function LiveContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const currentUrl = searchParams.get('url') || '';
+  const currentProbe = useAppStore(s => s.liveProbeResults[currentUrl]);
   // 精确订阅所需字段：任何其他 store 变化（如测活写回）不应触发本组件重渲染
   const liveSelectedUrls = useAppStore((s) => s.liveSelectedUrls);
   const liveEnvSources = useAppStore((s) => s.liveEnvSources);
@@ -64,6 +68,23 @@ function LiveContent() {
   // 移动端频道抽屉开合
   const [listOpen, setListOpen] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const channelPanelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!listOpen || !window.matchMedia('(max-width: 899px)').matches) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const unlockScroll = acquireBodyScrollLock();
+    channelPanelRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setListOpen(false); }
+      if (event.key !== 'Tab') return;
+      const items = Array.from(channelPanelRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]):not([hidden]), input, select, a[href], [tabindex="0"]') || []).filter(item => item.getClientRects().length > 0);
+      if (!items.length) return;
+      if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
+      else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { unlockScroll(); window.removeEventListener('keydown', onKey); previousFocus?.focus(); };
+  }, [listOpen]);
   /** 侧栏上报的筛选排序结果（键盘换台沿此列表顺序）；ref 存储，不触发重渲染 */
   const filteredRef = useRef<LiveChannelItem[]>([]);
   /** 当前频道镜像：selectChannel 内读取最近一次播放的频道，用于记录"上一个频道" */
@@ -115,7 +136,6 @@ function LiveContent() {
   const channelsLoading = country ? regionQuery.isPending : playlistsQuery.isLoading;
 
   // 当前频道：优先取列表内完整对象（含台标），否则由 URL 参数重建
-  const currentUrl = searchParams.get('url') || '';
   const currentChannel = useMemo(() => {
     const found = channels.find((c) => c.url === currentUrl);
     if (found) return found;
@@ -231,6 +251,7 @@ function LiveContent() {
     );
   }
 
+  const probeIsFresh = currentProbe && Date.now() - currentProbe.timestamp < LIVE_PROBE_TTL_MS;
   const logo = currentChannel?.logo;
   const isFavorite = currentChannel ? liveFavorites.includes(currentChannel.url) : false;
 
@@ -239,7 +260,8 @@ function LiveContent() {
       <Header landing />
       <main className="fd-tv-watch-shell flex-1 w-full mx-auto">
         <div className="fd-tv-watch-heading"><div><Link href="/tv">全球电视 <span aria-hidden="true">/</span></Link><h1>{regionQuery.data ? <><RegionFlag code={regionQuery.data.region.code} emoji={regionQuery.data.region.flag} /> {regionQuery.data.region.name}</> : country ? '地区电视台' : '我的直播源'}</h1></div><div className="fd-tv-watch-tools"><p>{channelsLoading ? '正在加载频道…' : `${channels.length.toLocaleString()} 个频道`} <span>·</span> 收藏、测活、继续观看</p>{country && <select className="fd-tv-region-select" aria-label="切换国家或地区" value={country} onChange={e => router.push(`/live?country=${e.target.value}`)}>{regionOptions.data ? regionOptions.data.regions.map(r => <option value={r.code} key={r.code}>{r.name} · {r.count}</option>) : <option value={country}>{regionQuery.data?.region.name || country}</option>}</select>}</div></div>
-        <div className="grid grid-cols-1 min-[900px]:grid-cols-[minmax(0,1fr)_340px] gap-5">
+        {failedCount > 0 && <div className="fd-live-source-alert" role="alert"><span>{country ? '地区频道目录暂时不可用。' : `${failedCount} 个订阅加载失败，其余来源仍可浏览。`}</span><button onClick={() => void (country ? regionQuery.refetch() : playlistsQuery.refetch())}>重新加载</button></div>}
+        <div className="fd-live-layout grid grid-cols-1 min-[900px]:grid-cols-[minmax(0,1fr)_340px] gap-5">
           {/* 主栏：播放器 + 信息条 + 节目单 */}
           <div className="min-w-0">
             <div className="video-frame fd-tv-player bg-black rounded-xl overflow-hidden">
@@ -274,7 +296,7 @@ function LiveContent() {
             {!currentUrl && <div className="fd-tv-viewing-notes"><div><span>01 / DISCOVER</span><h3>找到熟悉的频道</h3><p>按名称搜索，按内容分组浏览。</p></div><div><span>02 / MAKE IT YOURS</span><h3>把喜欢的留下</h3><p>点击星标收藏，下次更快找到。</p></div><div><span>03 / STAY TUNED</span><h3>顺畅地看下去</h3><p>测活筛选频道，用 ↑ ↓ 快速换台。</p></div></div>}
             {/* 频道信息条 */}
             {currentChannel && (
-              <div className="bg-surface-raised border border-line rounded-lg p-3 mt-3 flex items-center gap-3">
+              <div className="fd-live-now bg-surface-raised border border-line rounded-lg p-3 mt-3 flex items-center gap-3">
                 <div className="w-10 h-10 shrink-0 rounded bg-chip flex items-center justify-center overflow-hidden">
                   {logo && !logoFailed ? (
                     <SmartImage
@@ -292,14 +314,14 @@ function LiveContent() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="live-dot shrink-0" />
-                    <h1 className="text-sm font-semibold text-content truncate">{currentChannel.name}</h1>
+                    <h2 className="text-sm font-semibold text-content truncate">{currentChannel.name}</h2>
                     {currentChannel.group && (
                       <span className="tag bg-chip text-faint shrink-0">{currentChannel.group}</span>
                     )}
                   </div>
-                  <p className="text-xs text-faint truncate mt-0.5">{currentChannel.url}</p>
+                  <p className="text-xs text-faint truncate mt-0.5">当前频道 · {regionQuery.data?.region.name || currentChannel.group || "网络直播"}</p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="fd-live-channel-actions flex items-center gap-1 shrink-0">
                   <button
                     className={cn(
                       'rounded-md p-2 transition-colors',
@@ -307,6 +329,7 @@ function LiveContent() {
                         ? 'text-muted hover:text-accent hover:bg-hover'
                         : 'text-faint/40 cursor-default'
                     )}
+                    disabled={!lastChannelRef.current}
                     aria-label="上一个频道"
                     title={lastChannelRef.current ? `上一个频道：${lastChannelRef.current.name}（Backspace）` : '暂无上一个频道'}
                     onClick={backToPrevChannel}
@@ -355,6 +378,7 @@ function LiveContent() {
                       'rounded-md p-2 transition-colors',
                       isFavorite ? 'text-warning' : 'text-muted hover:text-warning hover:bg-hover'
                     )}
+                    aria-pressed={isFavorite}
                     aria-label={isFavorite ? '取消收藏' : '收藏'}
                     title={isFavorite ? '取消收藏' : '收藏'}
                     onClick={() => useAppStore.getState().toggleLiveFavorite(currentChannel.url)}
@@ -402,6 +426,7 @@ function LiveContent() {
               </div>
             )}
 
+            {currentChannel && <div className="fd-live-health" role="status"><span className={probeIsFresh ? currentProbe.ok ? 'is-available' : 'is-unavailable' : ''}>{probeIsFresh ? currentProbe.ok ? currentProbe.level === 'segment' ? '分片检测通过' : '地址检测通过 · 仍需实际试播' : currentProbe.timedOut ? '最近检测超时，可重试或换台' : '最近检测未通过，可重试或换台' : '此频道尚未检测'}</span><button onClick={() => setListOpen(true)}>打开频道与线路检测 ↗</button><small>检测结果仅反映检测时的网络状况；地区限制与编码兼容性仍可能影响播放。</small></div>}
             {/* 节目单 */}
             {currentChannel && (
               <section className="bg-surface-raised border border-line rounded-lg p-3 mt-3">
@@ -420,13 +445,16 @@ function LiveContent() {
             />
           )}
 
-          {/* 侧栏：桌面常驻 sticky；移动端底部抽屉 */}
+          {/* 桌面固定侧栏；移动端内联列表与快捷抽屉共用实例。 */}
           <aside
             id="fd-channel-list"
+            ref={channelPanelRef}
+            role={currentUrl && listOpen ? "dialog" : undefined}
+            aria-modal={currentUrl && listOpen ? true : undefined}
+            aria-label="频道选择与线路检测"
             className={cn(
               'fd-tv-channel-panel bg-surface-raised border border-line flex-col overflow-hidden',
-              !currentUrl ? 'relative flex h-[580px] rounded-xl' : 'fixed inset-x-0 bottom-0 z-40 h-[75vh] rounded-t-2xl shadow-2xl',
-              currentUrl && (listOpen ? 'flex' : 'hidden'),
+              currentUrl && listOpen ? 'fd-live-drawer fixed flex inset-x-0 bottom-0 z-40 h-[75vh] rounded-t-2xl shadow-2xl' : 'relative flex h-[580px] rounded-xl',
               'min-[900px]:sticky min-[900px]:top-24 min-[900px]:flex min-[900px]:h-[calc(100vh-8rem)] min-[900px]:rounded-xl min-[900px]:shadow-none'
             )}
           >
@@ -475,7 +503,9 @@ function LiveContent() {
         {/* 移动端呼出频道列表的悬浮按钮 */}
         {currentUrl && !listOpen && channels.length > 0 && (
           <button
-            className="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm text-on-accent shadow-lg min-[900px]:hidden"
+            aria-controls="fd-channel-list"
+            aria-expanded={listOpen}
+            className="fd-live-channel-fab fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm text-on-accent shadow-lg min-[900px]:hidden"
             onClick={() => setListOpen(true)}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -486,7 +516,7 @@ function LiveContent() {
                 d="M4 6h16M4 12h16M4 18h16"
               />
             </svg>
-            频道
+            选台 / 测活
           </button>
         )}
       </main>

@@ -1,5 +1,7 @@
 'use client';
 
+import { useBodyScrollLock } from './use-body-scroll-lock';
+
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Icon } from './icon';
@@ -65,21 +67,14 @@ export function Drawer({
     setEntered(false);
     const timer = setTimeout(() => {
       setMounted(false);
-      restoreFocusRef.current?.focus?.();
+      if (!document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"]')) restoreFocusRef.current?.focus?.();
       restoreFocusRef.current = null;
     }, EXIT_MS);
     return () => clearTimeout(timer);
   }, [open]);
 
   // 打开期间锁定背景滚动（移动端可避免滚动穿透）
-  useEffect(() => {
-    if (!mounted) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mounted]);
+  useBodyScrollLock(mounted);
 
   // 打开后把焦点移入抽屉，保证键盘用户不从背景页开始
   useEffect(() => {
@@ -90,9 +85,9 @@ export function Drawer({
     (first ?? panel).focus();
   }, [mounted]);
 
-  // Esc 关闭 + Tab 循环（焦点不逃逸到背景页面）
+  // Esc 关闭 + Tab 循环；退出动画中的旧抽屉不再抢占焦点。
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // 抽屉内若有确认弹窗等上层对话框（role=alertdialog），Esc 交给它处理，避免一并关闭抽屉
@@ -127,7 +122,7 @@ export function Drawer({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [mounted, onClose]);
+  }, [mounted, open, onClose]);
 
   if (!mounted) return null;
 
@@ -144,6 +139,7 @@ export function Drawer({
       <div
         ref={panelRef}
         role="dialog"
+        data-state={open ? 'open' : 'closing'}
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}

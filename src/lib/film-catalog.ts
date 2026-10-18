@@ -1,7 +1,7 @@
 import { BUILTIN_VOD_SOURCES } from './builtin-vod-sources';
 import { cmsRequestHeaders, parseSearchList } from './cms-parser';
 import { fetchUpstream, getCache, setCache } from './fetch-utils';
-import type { FilmCategory, FilmCatalog, FilmType } from './film-types';
+import { FILM_TYPES, type FilmCategory, type FilmCatalog, type FilmType } from './film-types';
 import type { SourceConfig } from './types';
 
 export const FILM_SOURCES = BUILTIN_VOD_SOURCES.filter(s => s.enabledByDefault !== false && !s.isAdult);
@@ -45,16 +45,29 @@ export async function getFilmCatalog(type: FilmType, sourceKey: string | null, c
       const roots = classes.filter(c => matches[type].test(c.name));
       if (!roots.length) throw new Error('该来源暂未提供此分类');
       const ids = new Set(roots.map(c => c.id));
-      // 部分接口的父分类不会聚合子类，优先显示真实叶分类，避免空片库。
+      // 分类范围由此处统一解释，默认先读取父分类，显式子分类选择始终保留。
       const children = classes.filter(c => ids.has(c.parent));
-      const options = children.length ? children : roots;
-      const chosen = category ? options.find(c => c.id === category) : options[0];
+      const options = [...roots, ...children.filter(c => !ids.has(c.id))];
+      let chosen = category ? options.find(c => c.id === category) : roots[0];
       if (!chosen) throw new Error('该子分类不属于当前类型');
-      const cacheKey = `film-list:${source.key}:${chosen.id}:${page}`;
-      let data = getCache<Record<string, unknown>>(cacheKey);
-      if (!data) { data = await readJson(source, { ac: 'detail', t: chosen.id, pg: String(page) }, signal); setCache(cacheKey, data, 90_000); }
-      const list = parseSearchList(data, source).filter(item => item.vodId && item.name && !blocked.test(item.typeName || ''));
-      return { source: { key: source.key, name: source.name }, sources: FILM_SOURCES.map(s => ({ key: s.key, name: s.name })), categories: options.map(c => ({ id: c.id, name: c.name })), category: chosen.id, type,
+      async function readCategory(id: string, requestedPage = page) {
+        const cacheKey = `film-list:${source.key}:${id}:${requestedPage}`;
+        let result = getCache<Record<string, unknown>>(cacheKey);
+        if (!result) { result = await readJson(source, { ac: 'detail', t: id, pg: String(requestedPage) }, signal); setCache(cacheKey, result, 90_000); }
+        return result;
+      }
+      let data = await readCategory(chosen.id);
+      let list = parseSearchList(data, source).filter(item => item.vodId && item.name && !blocked.test(item.typeName || ''));
+      // 用父分类首页判断是否支持聚合，避免将后续页为空误判，也确保翻页范围一致。
+      const rootFirstPage = !category && page > 1 && children.length ? await readCategory(roots[0].id, 1) : null;
+      const rootIsEmpty = rootFirstPage ? !parseSearchList(rootFirstPage, source).some(item => item.vodId && item.name && !blocked.test(item.typeName || '')) : !list.length;
+      if (!category && rootIsEmpty && children.length) {
+        chosen = children[0];
+        data = await readCategory(chosen.id);
+        list = parseSearchList(data, source).filter(item => item.vodId && item.name && !blocked.test(item.typeName || ''));
+        warnings.push(`${source.name}：全部${FILM_TYPES.find(item => item.key === type)?.name || '分类'}未返回内容，当前仅显示「${chosen.name}」，不代表完整分类。`);
+      }
+      return { source: { key: source.key, name: source.name }, sources: FILM_SOURCES.map(s => ({ key: s.key, name: s.name })), categories: options.map(c => ({ id: c.id, name: ids.has(c.id) && children.length ? `全部${c.name}` : c.name })), category: chosen.id, type,
         page, pageCount: Math.max(1, Number(data.pagecount) || 1), total: Math.max(0, Number(data.total) || 0), list, ms: Date.now() - started, warnings };
     } catch (error) {
       if (signal?.aborted) throw error;

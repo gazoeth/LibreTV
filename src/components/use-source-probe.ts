@@ -28,11 +28,13 @@ export interface SourceProbeProgress {
 export function useSourceProbe() {
   const [progress, setProgress] = useState<SourceProbeProgress | null>(null);
   const runIdRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(
     () => () => {
       // 卸载时作废在途轮次，避免结果写回已卸载组件的状态
       runIdRef.current++;
+      controllerRef.current?.abort();
     },
     []
   );
@@ -40,11 +42,15 @@ export function useSourceProbe() {
   /** 中止在途测活：已完成的结果保留 */
   const cancel = useCallback(() => {
     runIdRef.current++;
+    controllerRef.current?.abort();
     setProgress(null);
   }, []);
 
   const probe = useCallback(async (sources: { key: string; url: string }[]) => {
     if (sources.length === 0) return;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     const runId = ++runIdRef.current;
     const total = sources.length;
     const startedAt = Date.now();
@@ -71,7 +77,7 @@ export function useSourceProbe() {
         const source = sources[index];
         let outcome: SourceSearchOutcome;
         try {
-          const r = await api.testSource(source.url);
+          const r = await api.testSource(source.url, controller.signal);
           outcome = { sourceKey: source.key, ok: r.ok, ms: r.ms, error: r.error, list: [] };
         } catch (err) {
           outcome = {

@@ -175,11 +175,12 @@ export const api = {
   },
 
   /** 点播源探活：以搜索 "test" 的耗时与结果量衡量可用性 */
-  testSource: (url: string) =>
+  testSource: (url: string, signal?: AbortSignal) =>
     request<{ ok: boolean; ms: number; count?: number; error?: string }>('/api/source/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
+      signal,
     }),
 
   /** 拉取远程数据源订阅（自动识别 LibreTV-SourceList JSON 与 TVBOX 配置 JSON） */

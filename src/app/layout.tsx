@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './tv.css';
+import './experience.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0b101a',
+  themeColor: '#0c0e0c',
   width: 'device-width',
   initialScale: 1,
 };

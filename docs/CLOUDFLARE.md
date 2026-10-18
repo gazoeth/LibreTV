@@ -7,15 +7,15 @@
 - 构建命令：`npm run build:pages`
 - 输出目录：`.pages-output`
 - 根目录：仓库根目录
-- 生产运行配置：Cloudflare Pages 后台；本地预览通过命令参数指定兼容日期和标志，不新增会接管生产变量的根目录配置
+- 生产运行配置：根目录 `wrangler.jsonc` 是 Pages 运行配置来源，声明兼容日期、Node 兼容标志及公开访问变量；本地预览通过命令参数指定相同兼容选项
 
-构建先通过 OpenNext 生成 Next.js 服务端，然后由 `tools/package-cloudflare-pages.mjs` 编译 Pages 高级模式 `_worker.js` 并复制静态资源。`cloudflare/pages-entry.js` 仅导出请求处理函数，静态 JS／图标走内建 ASSETS，其他页面及 API 交给 Next.js。原根目录旧 HTML 与 `/functions` 不参与此次输出。
+构建先通过 OpenNext 生成 Next.js 服务端，然后由 `tools/package-cloudflare-pages.mjs` 编译 Pages 高级模式 `_worker.js` 并复制静态资源。`cloudflare/pages-entry.js` 仅导出请求处理函数，构建生成的公共静态路径表及 Next.js 静态 JS 走内建 ASSETS，其他页面及 API 交给 Next.js。原根目录旧 HTML 与 `/functions` 不参与此次输出。
 
 这是项目自行实现的 Pages 打包适配，基于 Cloudflare 公开的高级模式协议；不宣称是 OpenNext 官方 Pages 适配器。当前无持久 ISR 缓存、Durable Objects、图片优化或服务自绑定需求；若新增这些能力，需重新验证 Pages 支持范围。
 
 ## 访问保护与回滚
 
-站点按运营者要求公开访问；Pages 入口明确将 PASSWORD 置空并设置 REQUIRE_ACCESS_PASSWORD=0，因此无需登录。请勿新增根目录 wrangler.jsonc 接管后台环境配置。设置 `CLOUDFLARE_WORKERS=1` 选用 Workers 支持的 DNS 解析；公共出网限制继续启用。
+站点按运营者要求公开访问；Pages 入口明确将 PASSWORD 置空并设置 REQUIRE_ACCESS_PASSWORD=0，因此无需登录。`wrangler.jsonc` 中的 vars 会接管同名生产变量，修改前应核对和保留实际所需变量；当前公开配置不含秘密或管理员密码。设置 `CLOUDFLARE_WORKERS=1` 选用 Workers 支持的 DNS 解析；公共出网限制继续启用。
 
 当前生产部署可在 Pages 历史中回滚，原始旧版代码保存在 `backup/pre-freedy-20261018`。恢复旧版构建时需同时恢复其空构建命令和根目录发布配置。
 
@@ -27,7 +27,7 @@ npm run build:pages
 npm run preview:pages
 ```
 
-本地 smoke 核验使用临时口令，正式口令不进入聊天或测试文件。页面、真实 JS 资源、登录、广播、电视和魔都电视剧目录已在 Pages 本地运行环境检查，接口返回 200，魔都目录返回 20 条。
+早期本地核验曾使用临时口令；当前公开发布配置已移除口令。当前本地 Pages 环境继续检查真实页面、静态资源、目录与来源流程。口令、凭据不得进入聊天、源码或验收文件。
 
 原 `npm run build`、Docker 和本地 Next.js 路径保持可用。另保留 `wrangler.worker.jsonc` 用于独立 Worker 打包，但原 Pages 项目发布不依赖 Workers Builds 或新建 Worker。
 

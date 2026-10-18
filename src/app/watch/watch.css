@@ -1,0 +1,52 @@
+/* 播放页局部布局：大屏让画面与选集并列，手机优先保留画面空间。 */
+.fd-watch { --watch-accent: rgb(var(--c-accent)); }
+.fd-watch-header { min-height: 72px; }
+.fd-watch-main { padding-top: 28px; padding-bottom: 64px; }
+.fd-watch-grid { gap: 24px; align-items: start; }
+.fd-watch .video-frame { border: 1px solid rgba(255,255,255,.08); border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,.24); }
+.fd-watch-episodes { padding: 20px; border: 1px solid rgba(158,178,133,.17); border-radius: 16px; background: rgb(var(--c-surface-raised)); }
+.fd-episode-grid { gap: 8px; padding-block: 4px; overscroll-behavior: contain; }
+.fd-episode-grid button { min-height: 44px; border: 1px solid rgba(158,178,133,.16); border-radius: 8px; transition: background-color .18s, border-color .18s; }
+.fd-episode-grid button:hover { border-color: var(--watch-accent); }
+.fd-episode-grid .episode-active { background: var(--watch-accent); color: rgb(var(--c-on-accent)); border-color: var(--watch-accent); }
+.fd-watch button:focus-visible { outline: 2px solid var(--watch-accent); outline-offset: 3px; }
+.fd-watch input[type=checkbox] { accent-color: var(--watch-accent); }
+.fd-source-panel { border: 1px solid rgba(172,194,146,.22); }
+@media (min-width: 1024px) { .fd-watch-episodes { position: sticky; top: 96px; } }
+@media (max-width: 639px) {
+ .fd-watch-header { min-height: 64px; gap: 4px; padding-inline: 12px; }
+ .fd-watch-header h1 { max-width: 40vw; }
+ .fd-watch-header .ml-auto { gap: 2px; }
+ .fd-watch-header .ml-auto button { padding: 8px; font-size: 11px; min-height: 44px; }
+ .fd-watch-main { padding: 12px 12px 36px; }
+ .fd-watch-grid { gap: 20px; }
+ .fd-watch .video-frame { border-radius: 10px; }
+ .fd-watch-episodes { padding: 16px; }
+ .fd-episode-grid { max-height: 42vh; }
+ .fd-source-overlay { padding: 20px 10px; align-items: end; }
+ .fd-source-panel { padding: 20px 16px; border-radius: 20px; max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; }
+}
+@media (prefers-reduced-motion: reduce) { .fd-watch *, .fd-source-panel { animation: none !important; transition: none !important; } }
+.fd-watch-favorite[aria-pressed=true] { color: var(--watch-accent); background: rgba(198,243,74,.08); }
+/* 常驻线路与剧集共用右栏；展开只改变呈现方式，不重建检测任务。 */
+.fd-watch-sidebar { display: grid; gap: 18px; min-width: 0; }
+.fd-watch-sidebar .fd-watch-episodes { position: static; }
+.fd-watch-sidebar .fd-episode-grid { max-height: 280px; }
+.fd-source-inline-panel { padding: 18px; border-radius: 16px; background: rgb(var(--c-surface-raised)); }
+.fd-source-inline-panel h2 { font-size: 15px; }
+.fd-source-inline-panel [aria-label="播放线路检测结果"] { max-height: 330px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.fd-source-inline-panel [aria-label="播放线路检测结果"] > button { padding: 12px; gap: 10px; }
+.fd-source-inline-panel [aria-label="播放线路检测结果"] > button > span:first-child { display: none; }
+.fd-source-inline-panel .tracking-\[\.18em\] { letter-spacing: .06em; font-size: 9px; }
+.fd-watch-info { margin-top: 40px; padding-top: 32px; border-top: 1px solid rgba(158,178,133,.19); max-width: 900px; }
+.fd-watch-eyebrow { color: rgb(var(--c-muted)); font-size: 10px; letter-spacing: .2em; }
+.fd-watch-info h2 { margin-top: 14px; font-size: clamp(24px,3vw,36px); line-height: 1.25; letter-spacing: -.03em; font-weight: 650; }
+.fd-watch-meta { margin-top: 12px; color: rgb(var(--c-muted)); font-size: 13px; }
+.fd-watch-credits { margin-top: 24px; display: grid; gap: 12px; color: rgb(var(--c-content)); font-size: 13px; line-height: 1.8; }
+.fd-watch-credits span { color: rgb(var(--c-faint)); display: inline-block; margin-right: 18px; }
+.fd-watch-description { margin-top: 24px; color: rgb(var(--c-muted)); font-size: 14px; line-height: 1.95; overflow-wrap: anywhere; }
+@media (max-width: 639px) { .fd-source-inline-panel { max-height: none; overflow: visible; padding: 16px; border-radius: 16px; } .fd-watch-info { margin-top: 28px; padding-top: 24px; } }
+
+.fd-watch .flex.flex-wrap.items-center.gap-2.mt-3 > button{min-height:44px}.fd-watch-header button,.fd-watch-header a{min-height:44px;display:inline-flex;align-items:center;justify-content:center}.fd-source-panel [aria-label="播放线路检测结果"] button{min-height:72px}
+/* 线路展开面板位于播放器内部加载层之上，避免加载图标穿透。 */
+.fd-source-overlay { z-index: 100000; }

@@ -556,8 +556,8 @@ export function PlayerShell({
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80">
           <p className="text-danger text-sm">{error}</p>
-          <button className="btn-ghost text-xs" onClick={() => location.reload()}>
-            重新加载
+          <button className="btn-ghost text-xs" onClick={() => loadEpisode(propsRef.current.url)}>
+            重试当前线路
           </button>
           {onRequestSwitchSource && <button className="btn-primary text-xs mt-1" onClick={() => onRequestSwitchSource('当前线路播放失败')}>检测其他线路</button>}
         </div>

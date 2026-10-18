@@ -4,13 +4,12 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
-import { DetailModal } from '@/components/detail-modal';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
 import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled } from '@/lib/store';
 import { api } from '@/lib/client-api';
-import type { SearchResultItem, SourceSearchOutcome } from '@/lib/types';
+import type { SourceSearchOutcome } from '@/lib/types';
 import { SearchHistoryDropdown, useSearchHistory } from '@/components/search-history';
-import { cn, formatDisableTtl, validateSourceUrl } from '@/lib/utils';
+import { buildWatchUrl, cn, formatDisableTtl, validateSourceUrl } from '@/lib/utils';
 import { useToast } from '@/components/toast';
 import { EmptyState } from '@/components/states';
 import { Icon } from '@/components/icon';
@@ -46,10 +45,15 @@ function HomeContent() {
   const sourceHealth = useAppStore((s) => s.sourceHealth);
   const subscriptions = useAppStore((s) => s.subscriptions);
   const [input, setInput] = useState(urlQuery);
-  const [detailItem, setDetailItem] = useState<SearchResultItem | null>(null);
   /** 流式搜索中已结算的源（data 就绪前用于增量渲染） */
   const [streamedOutcomes, setStreamedOutcomes] = useState<SourceSearchOutcome[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchParams.get('focus') !== 'search') return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [searchParams]);
 
   // URL 驱动搜索：?s= 变化时回填输入框
   useEffect(() => {
@@ -164,15 +168,15 @@ function HomeContent() {
   useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
 
   return (
-    <div className={cn('min-h-screen flex flex-col', !urlQuery && 'zip-home')}>
-      <Header landing={!urlQuery} />
+    <div className={cn('min-h-screen flex flex-col', 'zip-home', urlQuery && 'fd-search-page')}>
+      <Header landing />
 
       <main className={cn('relative flex-1 max-w-6xl w-full mx-auto px-4 py-6', !urlQuery && 'zip-main-shell')}>
         {urlQuery ? (
           <section className="mb-6">
-            <h1 className="sr-only">FreeDY 视频搜索</h1>
+            <p className="zip-eyebrow">FIND YOUR NEXT STORY</p><h1 className="fd-search-title">搜索结果</h1>
           {/* 定位容器比胶囊宽一圈：浮层按它的宽度对齐，接缝处不会与胶囊边框错位 1px */}
-          <div ref={searchHistory.containerRef} className="relative w-full max-w-2xl">
+          <div ref={searchHistory.containerRef} className="relative w-full fd-search-form">
             <form
               className="w-full"
               onSubmit={(e) => {
@@ -292,6 +296,17 @@ function HomeContent() {
               </h2>
             </div>
 
+            <details className="fd-search-health" open={isSearching ? true : undefined}>
+              <summary><strong>来源健康状态</strong><span>{isSearching ? `已响应 ${streamedOutcomes.length} / ${selectedSources.length}` : `${selectedSources.length - failures.length} 个来源响应 · ${failures.length} 个不可用`} <b aria-hidden="true">＋</b></span></summary>
+              <div className="fd-search-health-grid">{selectedSources.map(source => {
+                const outcome = streamedOutcomes.find(item => item.sourceKey === source.key);
+                const failure = failures.find(item => item.sourceKey === source.key);
+                const count = outcome?.list.length ?? list.filter(item => item.sourceKey === source.key).length;
+                const pending = isSearching && !outcome;
+                return <div key={source.key} className={pending ? 'is-pending' : failure ? 'is-error' : 'is-ok'}><i aria-hidden="true">{pending ? '○' : failure ? '×' : '✓'}</i><div><strong>{source.name}</strong><small>{pending ? '正在搜索' : failure ? (failure.timedOut ? '连接超时' : '暂时不可用') : `${count} 个结果`}</small></div><em>{outcome?.ms !== undefined ? `${(outcome.ms / 1000).toFixed(1)}s` : ''}</em></div>;
+              })}</div><p>此处显示搜索接口的响应，媒体是否可播会在播放页检测。</p>
+            </details>
+
             {failures.length > 0 && (
               <div className="mb-3 text-xs bg-chip rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-1">
                 <span className="text-faint">{isSearching ? '以下源暂时无响应：' : '部分点播源请求失败：'}</span>
@@ -322,12 +337,12 @@ function HomeContent() {
               <NoSourceGuide hasSources={customAPIs.length > 0 || envSources.length > 0} />
             ) : list.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+                <div className="fd-search-results-grid">
                   {visibleGroups.map((group) => (
                     <AggregatedCard
                       key={group.key}
                       group={group}
-                      onOpen={(item) => setDetailItem(item)}
+                      onOpen={(item) => router.push(buildWatchUrl({ sourceKey: item.sourceKey, vodId: item.vodId, sourceUrl: item.sourceUrl, title: item.name, index: 0 }))}
                     />
                   ))}
                 </div>
@@ -359,7 +374,6 @@ function HomeContent() {
 
       {urlQuery ? <SiteFooter /> : null}
 
-      <DetailModal item={detailItem} onClose={() => setDetailItem(null)} />
     </div>
   );
 }

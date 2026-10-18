@@ -1,5 +1,7 @@
 'use client';
 
+import { useBodyScrollLock } from './use-body-scroll-lock';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,41 +37,49 @@ export function SwitchSourceModal({
   currentVodId,
   currentIndex,
   onClose,
+  onRetryCurrent,
+  inline = false,
 }: {
   currentTitle: string;
   currentSourceKey: string;
   currentVodId: string;
   currentIndex: number;
   onClose: () => void;
+  onRetryCurrent?: () => void;
+  inline?: boolean;
 }) {
-  const store = useAppStore();
+  const selectedKeys = useAppStore(s => s.selectedKeys);
+  const customAPIs = useAppStore(s => s.customAPIs);
+  const envSources = useAppStore(s => s.envSources);
+  const yellowFilter = useAppStore(s => s.yellowFilter);
   const router = useRouter();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [phase, setPhase] = useState<'searching' | 'testing' | 'done'>('searching');
   const [searched, setSearched] = useState(0);
+  const [attempt, setAttempt] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // 打开时把焦点移入弹窗、Tab 圈闭在弹窗内、关闭后归还焦点
-  useFocusTrap(true, panelRef);
+  useFocusTrap(!inline, panelRef);
+  useBodyScrollLock(!inline);
 
   const sources = useMemo(() => {
     // selectedKeys 可能含历史残留的重复 key：按 key 去重，避免同源重复搜索/测速与 React key 撞车
     const seen = new Set<string>();
-    return store.selectedKeys
-      .map((key) => resolveSource(store, key))
+    return selectedKeys
+      .map((key) => resolveSource({ customAPIs, envSources }, key))
       .filter((s): s is SourceConfig => {
-        if (!s || seen.has(s.key) || (s.isAdult && store.yellowFilter)) return false;
+        if (!s || seen.has(s.key) || (s.isAdult && yellowFilter)) return false;
         seen.add(s.key);
         return true;
       });
-  }, [store]);
+  }, [selectedKeys, customAPIs, envSources, yellowFilter]);
 
   useEffect(() => {
     // 弹窗打开期间锁定背景滚动；Esc 关闭（与其它弹窗一致）
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (inline) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -78,10 +88,9 @@ export function SwitchSourceModal({
     };
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
       window.removeEventListener('keydown', onKey);
     };
-  }, [onClose]);
+  }, [onClose, inline]);
 
   useEffect(() => {
     // 关闭弹窗时中止在途请求：否则 N 个源的搜索 + N 个详情测速会继续占用网络与后端
@@ -152,7 +161,7 @@ export function SwitchSourceModal({
     if (currentSource && queryClient.getQueryData(detailQueryKey(currentVodId, currentSource))) {
       accept(currentSource.key, [{ vodId: currentVodId, name: currentTitle, sourceKey: currentSource.key, sourceName: currentSource.name, sourceUrl: currentSource.url }]);
     }
-    void api.search(currentTitle, sources, store.yellowFilter, {
+    void api.search(currentTitle, sources, yellowFilter, {
       signal: controller.signal,
       onSource: outcome => {
         if (cancelled) return;
@@ -176,24 +185,27 @@ export function SwitchSourceModal({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTitle, currentIndex, store.yellowFilter]);
+  }, [currentTitle, currentIndex, currentSourceKey, currentVodId, sources, yellowFilter, attempt]);
 
   const sorted = [...candidates].sort((a, b) => {
     const aCurrent = a.source.key === currentSourceKey && String(a.result.vodId) === String(currentVodId);
     const bCurrent = b.source.key === currentSourceKey && String(b.result.vodId) === String(currentVodId);
     if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
-    // 检测过程中保持位置稳定，避免用户点击时目标卡片移动。
-    if (phase !== 'done') return 0;
-    const rank = (c: Candidate) => c.probe?.ok && c.probe.level === 'segment' ? 0 : c.ok ? 1 : 2;
-    return rank(a) - rank(b) || (a.probe?.ms ?? 99_999) - (b.probe?.ms ?? 99_999);
+    // 始终保持首次到达顺序，检测完成时也不移动用户正在点击的线路。
+    return 0;
   });
 
   const switchTo = (c: Candidate) => {
+    if (c.source.key === currentSourceKey && String(c.result.vodId) === String(currentVodId) && onRetryCurrent) {
+      onClose();
+      onRetryCurrent();
+      return;
+    }
     if (!c.episodes) {
       toast('该源无可用播放资源', 'warning');
       return;
     }
-    const targetIndex = currentIndex < c.episodes ? currentIndex : 0;
+    const targetIndex = Math.min(currentIndex, c.episodes - 1);
     onClose(); // 先关闭面板，避免路由参数变化后弹窗残留旧数据
     router.push(
       buildWatchUrl({
@@ -209,23 +221,23 @@ export function SwitchSourceModal({
 
   return (
     <div
-      className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-black/80 py-10 px-4 animate-fade-in"
+      className={inline ? "fd-source-inline" : "fd-source-overlay fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-black/80 py-10 px-4 animate-fade-in"}
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!inline && e.target === e.currentTarget) onClose();
       }}
     >
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="bg-surface-raised rounded-xl w-full max-w-3xl shadow-2xl p-5 animate-slide-up outline-none"
-        role="dialog"
-        aria-modal="true"
+        className={inline ? "fd-source-panel fd-source-inline-panel outline-none" : "fd-source-panel bg-surface-raised rounded-xl w-full max-w-3xl shadow-2xl p-5 animate-slide-up outline-none"}
+        role={inline ? "region" : "dialog"}
+        aria-modal={inline ? undefined : true}
         aria-label={`换源：${currentTitle}`}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-content truncate" title={currentTitle}>
-              {currentTitle}
+              {inline ? '播放线路' : currentTitle}
             </h2>
             <p className="text-xs text-faint">
               {phase === 'searching'
@@ -235,31 +247,32 @@ export function SwitchSourceModal({
                   : `共 ${sorted.length} 个来源 · ${sorted.filter(c => c.probe?.ok && c.probe.level === 'segment').length} 个分片可达`}
             </p>
           </div>
-          <button className="p-1.5 rounded-md text-muted hover:text-content hover:bg-hover" onClick={onClose} aria-label="关闭">
+          {!inline && <button className="p-1.5 rounded-md text-muted hover:text-content hover:bg-hover" onClick={onClose} aria-label="关闭">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </button>}
         </div>
 
+        <div className="flex items-center justify-between gap-3 mb-4"><span className="text-[10px] tracking-[.18em] text-accent">SOURCE CHECK / 线路检测</span><button className="btn-ghost btn-sm" onClick={() => setAttempt(v => v + 1)}>重新检测</button></div>
         <p className="text-[11px] text-faint mb-4 leading-relaxed" aria-live="polite">结果到达即可选择。分片可达为当前网络探测结果，详情耗时不等于视频加载速度。</p>
         {candidates.length === 0 && phase !== 'done' ? (
           <LoadingState label={phase === 'searching' ? '搜索各资源中...' : '测速中...'} />
         ) : sorted.length === 0 ? (
           <EmptyState variant="plain" title="其他点播源未找到同名资源" />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="播放线路检测结果">
+          <div className={cn("grid grid-cols-1 gap-3", !inline && "sm:grid-cols-2")} aria-label="播放线路检测结果">
             {sorted.map(c => {
               const isCurrent = c.source.key === currentSourceKey && String(c.result.vodId) === String(currentVodId);
               const verified = c.probe?.ok && c.probe.level === 'segment';
               const label = c.stage === 'loading' ? '获取剧集中…' : c.stage === 'probing' ? '检测媒体分片…' : verified ? `分片可达 · ${c.probe?.ms ?? 0}ms` : c.probe?.ok ? '清单可达 · 未验证分片' : c.ok ? '检测未通过 · 可手动尝试' : c.error || '未找到剧集';
-              return <button key={`${c.source.key}_${c.result.vodId}`} onClick={() => switchTo(c)} disabled={isCurrent || !c.episodes}
+              return <button key={`${c.source.key}_${c.result.vodId}`} onClick={() => switchTo(c)} disabled={!c.episodes}
                 className={cn('flex items-center gap-3 text-left border rounded-xl p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', isCurrent ? 'border-accent/50 bg-accent/5' : 'border-line bg-card hover:border-accent/60', !c.episodes && 'opacity-60 cursor-wait')}>
                 <span className="shrink-0 rounded-lg p-2.5 bg-chip text-accent"><Icon name="link" className="w-5 h-5" /></span>
                 <span className="flex-1 min-w-0"><strong className="block text-sm font-medium truncate">{c.source.name}{isCurrent ? ' · 当前' : ''}</strong>
                   <span className={cn('block text-[11px] mt-1', verified ? 'text-success' : c.stage === 'probing' || c.stage === 'loading' ? 'text-accent' : 'text-muted')}>{label}</span>
                   <span className="block text-[10px] text-faint mt-1">{c.episodes ? `${c.episodes} 集 · 详情 ${c.ms ?? 0}ms` : '正在获取可选剧集'}</span>
-                </span><span className="text-muted text-sm" aria-hidden="true">{isCurrent ? '✓' : '↗'}</span>
+                </span><span className="text-muted text-sm" aria-hidden="true">{isCurrent ? '重试' : '播放'}</span>
               </button>;
             })}
           </div>

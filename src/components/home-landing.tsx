@@ -7,6 +7,9 @@ import { RecommendSection } from '@/components/douban-section';
 import { SearchHistoryDropdown, useSearchHistory } from '@/components/search-history';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/lib/store';
+import { ContinueWatching, RecentLibrary } from './home-library';
+import { HistoryPanel } from './history-panel';
+import { useState } from 'react';
 
 type SearchHistoryState = ReturnType<typeof useSearchHistory>;
 
@@ -26,6 +29,7 @@ export function HomeLanding({
   searchHistory: SearchHistoryState;
   onSearch: (query: string) => void;
 }) {
+  const [historyOpen, setHistoryOpen] = useState(false);
   const envSources = useAppStore((state) => state.envSources);
   const selectedKeys = useAppStore((state) => state.selectedKeys);
   const builtinSources = envSources.filter((source) => source.key.startsWith('builtin_'));
@@ -133,11 +137,11 @@ export function HomeLanding({
               <span className="zip-panel-link">浏览影片推荐 <Icon name="arrowRight" /></span>
               <span className="zip-panel-orbit" aria-hidden="true" />
             </a>
-            <a className="zip-history-promo" href="#top">
+            <button className="zip-history-promo" type="button" onClick={() => setHistoryOpen(true)}>
               <span className="zip-history-icon"><Icon name="clock" /></span>
               <span><strong>本机观看历史</strong><small>通过顶部历史入口续播</small></span>
               <Icon name="arrowRight" className="zip-history-arrow" />
-            </a>
+            </button>
           </aside>
         </div>
         <div className="zip-width zip-hero-footnote">
@@ -145,14 +149,18 @@ export function HomeLanding({
         </div>
       </section>
 
+      <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <div className="zip-main">
+        <ContinueWatching />
         <section className="zip-section zip-width" id="recommendations">
           <div className="zip-section-heading">
-            <div><p className="zip-eyebrow">FEATURED FOR YOU</p><h2>精选与近期推荐</h2><p className="zip-section-subtitle">使用推荐标签切换榜单与内容分类</p></div>
+            <div><p className="zip-eyebrow">FEATURED FOR YOU</p><h2>精选推荐</h2><p className="zip-section-subtitle">使用推荐标签切换榜单与内容分类</p></div>
             <a className="zip-text-link" href="#how-it-works">了解搜索方式 <Icon name="arrowRight" /></a>
           </div>
           <RecommendSection onPick={pickSearch} />
         </section>
+
+        <RecentLibrary />
 
         <section className="zip-section zip-width zip-entry-section" id="watching-now">
           <div className="zip-section-heading">

@@ -1,5 +1,7 @@
 'use client';
 
+import { useBodyScrollLock } from './use-body-scroll-lock';
+
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -45,14 +47,7 @@ export function DetailModal({ item, onClose }: { item: SearchResultItem | null; 
   useEffect(() => setPosterFailed(false), [item?.pic, store.imageProxyMode, store.customImageProxy]);
 
   // 弹窗打开期间锁定背景滚动
-  useEffect(() => {
-    if (!item) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [item]);
+  useBodyScrollLock(Boolean(item));
 
   useEffect(() => { if (item) router.prefetch('/watch'); }, [item, router]);
 
