@@ -28,3 +28,9 @@
 - https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/
 - https://opennext.js.org/cloudflare/get-started
 - https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/
+
+## 本次适配验证
+
+提交 `20d8eb4`：OpenNext 生产构建及类型／lint 检查完成；Wrangler 打包约 8,643 KiB，gzip 约 1,816 KiB。workerd 本地运行首页、关于、影视及广播目录返回 200，魔都电视剧目录返回 20 条。验证内容接口时仅在本地命令覆盖 `REQUIRE_ACCESS_PASSWORD=0`；正式配置保持 `REQUIRE_ACCESS_PASSWORD=1`，未设置 `PASSWORD` 时目录接口返回 503，状态返回 `verified=false`。
+
+旧 Pages 项目配置了 PASSWORD。正式 Worker 必须先由运营者配置 PASSWORD 密钥再切换域名；不要把密码发到聊天、构建脚本或公开仓库。构建表单会自动创建包含多类账户资源编辑权限的 API 令牌，创建此令牌前须明确确认权限范围；不将代码推送或本地构建成功当作已经上线。
