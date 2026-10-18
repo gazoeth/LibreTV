@@ -15,6 +15,7 @@ export type IconName =
   | 'chevronDown'
   | 'plus'
   | 'search'
+  | 'arrowRight'
   | 'clock'
   | 'check'
   | 'arrowDown'
@@ -70,6 +71,7 @@ const PATHS: Record<IconName, ReactNode> = {
       d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
     />
   ),
+  arrowRight: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12h15m0 0-6.75-6.75M19.5 12l-6.75 6.75" />,
   clock: (
     <path
       strokeLinecap="round"

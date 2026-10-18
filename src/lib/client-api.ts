@@ -1,6 +1,7 @@
 'use client';
 
 import type { SearchResponse, SearchStreamEvent, SourceSearchOutcome, VideoDetail, DoubanResponse, BangumiCalendarResponse, AuthStatusResponse, SourceConfig, SearchResultItem, LivePlaylistResponse, LiveEpgResponse, SourceListPayload } from './types';
+import type { TvDirectoryResponse, TvRegionResponse } from './tv-types';
 
 /**
  * 客户端 API 封装。401 时触发全局事件打开登录框，
@@ -106,6 +107,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  tvDirectory: () => request<TvDirectoryResponse>('/api/tv'),
+  tvRegion: (country: string) => request<TvRegionResponse>(`/api/tv?country=${encodeURIComponent(country)}`),
   status: () => request<AuthStatusResponse>('/api/status'),
 
   login: (password: string) =>

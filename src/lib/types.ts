@@ -1,6 +1,6 @@
 // 采集站（Apple CMS 资源站）描述
 export interface SourceConfig {
-  /** 唯一标识，如 "custom_0"；内置源直接用短名 */
+  /** 唯一标识，如 "custom_0" 或 "builtin_xxx" */
   key: string;
   name: string;
   /** API 根地址，如 https://example.com/api.php/provide/vod */
@@ -8,6 +8,8 @@ export interface SourceConfig {
   /** 可选：详情页根地址（部分源需要爬详情页提取 m3u8） */
   detail?: string;
   isAdult?: boolean;
+  /** 预置源首次下发时是否自动勾选；省略时默认勾选 */
+  enabledByDefault?: boolean;
 }
 
 export interface SearchResultItem {
@@ -96,9 +98,9 @@ export interface AuthStatusResponse {
   /** 当前会话是否已验证 */
   verified: boolean;
   version: string;
-  /** 部署者通过 DEFAULT_SOURCES 环境变量预置的采集站（未配置时为空数组） */
+  /** 项目内置点播源及 DEFAULT_SOURCES 环境变量追加的采集站 */
   defaultSources: SourceConfig[];
-  /** 部署者通过 DEFAULT_LIVE_SOURCES 环境变量预置的直播源（未配置时为空数组） */
+  /** 服务端下发的内置与部署者预置直播源 */
   defaultLiveSources: LiveSourceConfig[];
   /** 部署者通过 DEFAULT_SUBSCRIPTIONS 环境变量预置的 SourceList 订阅链接（未配置时为空数组） */
   defaultSubscriptions: { url: string; name?: string }[];
@@ -114,7 +116,7 @@ export interface AuthStatusResponse {
 export interface LiveSourceConfig {
   key: string;
   name: string;
-  /** M3U 订阅地址 */
+  /** M3U 地址；内置频道使用站内相对路径 */
   url: string;
   /** 可选：XMLTV 节目单地址 */
   epg?: string;

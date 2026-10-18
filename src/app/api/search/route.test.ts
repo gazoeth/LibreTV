@@ -35,10 +35,11 @@ function mockUpstream(): void {
   vi.stubGlobal('fetch', fn);
 }
 
-function makeRequest(body: unknown, stream = false): Request {
+function makeRequest(body: unknown, stream = false, signal?: AbortSignal): Request {
   const { token } = signSession();
   return new Request(`https://local.test/api/search${stream ? '?stream=1' : ''}`, {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       cookie: `${SESSION_COOKIE}=${token}`,
@@ -121,6 +122,58 @@ describe('POST /api/search', () => {
     expect(sources.map((l) => l.sourceKey).sort()).toEqual(['a', 'b']);
     expect(done).toHaveLength(1);
     expect(lines[lines.length - 1].type).toBe('done');
+  });
+
+  it.each([
+    { mode: '请求 signal 中止', stream: false },
+    { mode: 'NDJSON 消费者取消', stream: true },
+  ])('$mode 会取消上游，且不会缓存取消产生的失败结果', async ({ stream }) => {
+    const wd = stream ? '消费者取消回归关键词' : '请求中止回归关键词';
+    const requestController = new AbortController();
+    let upstreamSignal: AbortSignal | null = null;
+    let announceStarted!: () => void;
+    let announceAborted!: () => void;
+    const started = new Promise<void>((resolve) => { announceStarted = resolve; });
+    const aborted = new Promise<void>((resolve) => { announceAborted = resolve; });
+    const fetchSpy = vi.fn()
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => {
+        upstreamSignal = init?.signal ?? null;
+        announceStarted();
+        return new Promise<Response>((_resolve, reject) => {
+          const onAbort = () => {
+            announceAborted();
+            reject(upstreamSignal?.reason ?? new DOMException('已中止', 'AbortError'));
+          };
+          if (upstreamSignal?.aborted) onAbort();
+          else upstreamSignal?.addEventListener('abort', onAbort, { once: true });
+        });
+      })
+      .mockResolvedValueOnce(new Response(cmsList([{ vod_id: 801, vod_name: wd, type_name: '国产剧' }]), {
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    vi.stubGlobal('fetch', fetchSpy);
+    const body = { wd, sources: [SOURCES[0]], filterAdult: true };
+    const firstResponse = POST(makeRequest(body, stream, requestController.signal));
+    await started;
+
+    if (stream) {
+      const response = await firstResponse;
+      expect(response.headers.get('Content-Type')).toContain('application/x-ndjson');
+      await response.body!.cancel();
+    } else {
+      requestController.abort();
+      await firstResponse;
+    }
+    await aborted;
+    expect(upstreamSignal).not.toBeNull();
+    expect(upstreamSignal).toHaveProperty('aborted', true);
+
+    // 同一关键词和来源再次请求必须访问上游，不能命中取消时的空结果缓存。
+    const nextResponse = await POST(makeRequest(body));
+    const next = await nextResponse.json() as { list: Array<{ vodId: string; name: string }>; failures: unknown[] };
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(next.list).toEqual([expect.objectContaining({ vodId: '801', name: wd })]);
+    expect(next.failures).toEqual([]);
   });
 
   it('未配置密码时允许访问；配置访问密码后要求有效会话', async () => {

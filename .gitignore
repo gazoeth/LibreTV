@@ -23,3 +23,18 @@ coverage
 *.sln
 *.sw?
 .env
+
+# Next.js 构建与本机缓存
+.next/
+out/
+*.tsbuildinfo
+
+# 环境配置与密钥，仅保留配置示例
+.env.*
+!.env.example
+*.pem
+*.key
+
+# 本地截图、核验产物及修改前备份
+artifacts/
+outputs/

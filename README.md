@@ -50,7 +50,7 @@ services:
     environment:
       # - PASSWORD=your-password   # 可选：设置后启用访问验证；省略即免密码
       # - PROXY_SECRET=your-secret          # 会话/代理签名密钥，多实例部署建议设置
-      # - DEFAULT_SOURCES=[{"name":"示例源","url":"https://example.com/api.php/provide/vod"}]
+      # - DEFAULT_SOURCES=[{"name":"额外示例源","url":"https://example.com/api.php/provide/vod"}]  # 在内置源基础上追加
       # - DEFAULT_LIVE_SOURCES=[{"name":"示例直播源","url":"https://example.com/list.m3u"}]
       # - DEFAULT_SUBSCRIPTIONS=["https://example.com/sources.json"]  # 预置订阅，自动导入点播源+直播源
       # - DEFAULT_RECOMMEND_SOURCE=douban  # 首页推荐数据源默认值（douban/bangumi/hot-list），仅对未主动选择过的用户生效
@@ -86,7 +86,7 @@ npm start   # 监听 8080；默认免密码
 | --- | --- | --- |
 | `PASSWORD` | 否 | 访问密码；留空或省略时无需登录 |
 | `PROXY_SECRET` | 否 | 代理签名密钥；启用密码验证的多实例部署建议显式设置 |
-| `DEFAULT_SOURCES` | 否 | 预置采集站（JSON 数组），用户端自动出现且默认勾选，详见[配置文档](https://libretv.is-an.org/wiki/Configuration.html) |
+| `DEFAULT_SOURCES` | 否 | 追加预置采集站（JSON 数组），与项目内置点播源一起出现在用户端并默认勾选，详见[配置文档](https://libretv.is-an.org/wiki/Configuration.html) |
 | `REQUEST_TIMEOUT` | 否 | 代理上游请求超时（毫秒），默认 8000 |
 | `MAX_RETRIES` | 否 | 代理请求重试次数，默认 1 |
 | `SEARCH_MAX_PAGES` | 否 | 每个搜索源最多抓取的页数（1-50，默认 5）。第一页会读取源站 `pagecount`，实际页数 = min(源站总页数，该值)；页间并行请求，单页失败只丢该页 |
@@ -102,13 +102,15 @@ npm start   # 监听 8080；默认免密码
 
 ## 使用说明
 
-1. **添加点播源**：设置 → 源管理 → 点播源 → 添加 API，填入 Apple CMS 采集站地址（如 `https://example.com/api.php/provide/vod`），可选填详情页地址（部分源需要爬详情页提取播放地址）。
+1. **点播源**：项目内置 22 个 Apple CMS API，其中 18 个默认启用、4 个默认关闭；已补齐参考站十条来源对应的电影天堂与魔都，接口可用性会随网络与时间变化；可在设置 → 源管理中管理，也可添加自定义 API。
 2. **搜索**：勾选点播源后输入片名；搜索通过服务端聚合，个别源失败不影响整体结果。
 3. **播放**：详情弹窗选择剧集进入 `/watch`；支持快捷键（空格/←→/↑↓/F/Alt+←→）、移动端长按 3 倍速、自动连播、换源测速。观看/暂停时后续分片自动缓存到本地（设置可关），播放页可「下载本集」（TS/MP4）离线观看。
 4. **进度与历史**：自动保存在本设备 IndexedDB，仅定位信息入库，播放时自动同步最新剧集。
 5. **配置迁移**：设置 → 数据 → 配置导入导出（兼容旧版 LibreTV-Settings JSON 的历史记录迁移）。
 
 ## 直播 / IPTV
+
+顶部「看电视」进入 `/tv` 全球电视大厅，按国家／地区搜索和浏览频道，再进入地区观看页。原 `/live` 继续提供自定义直播订阅；手机首次进入观看页直接显示频道列表。全球目录来自 iptv-org 的公开数据快照，收录不代表逐台实时可播。使用 `node tools/update-tv-directory.mjs` 更新快照，失败时保留旧目录。
 
 1. **添加直播源**：设置 → 源管理 → 直播源 → 填入 M3U/M3U8 地址（可选填 XMLTV 节目单地址），添加后自动探活并显示频道数量；也可在「源管理 → 数据源订阅」中与点播源一起订阅导入；部署者还可用 `DEFAULT_LIVE_SOURCES` 环境变量预置。
 2. **观看**：进入「直播」页，按分组标签筛选或搜索频道，点击即播；支持 HLS（m3u8）与 HTTP-FLV 两种直播流，直连失败自动走代理通道重试。
@@ -117,7 +119,7 @@ npm start   # 监听 8080；默认免密码
 
 完整说明见 [直播 / IPTV 文档](https://libretv.is-an.org/wiki/Live-IPTV.html)。
 
-> ⚠️ 项目不内置任何频道源，也不存储、不制作任何直播内容，仅提供第三方公开播放列表的解析与播放能力，内容的合法性由对应数据源负责。内网自建源默认被 SSRF 防护拦截，自部署者可显式设置 `LIVE_ALLOW_PRIVATE=1` 放行。
+> ⚠️ 项目内置部分第三方点播 API 与国际公开频道，但不存储、不制作视频内容；播放源的可用性和内容授权由对应服务方负责。内网自建直播源默认被 SSRF 防护拦截，自部署者可显式设置 `LIVE_ALLOW_PRIVATE=1` 放行。
 
 ## 数据源订阅 / 分享
 
@@ -241,3 +243,13 @@ CI 校验通过后自动构建并推送 `ghcr.io/librespark/libretv:<版本>`（
 本项目不存储、不制作任何视频内容，仅提供第三方公开接口的聚合与播放能力，内容的合法性由对应数据源负责。
 
 ☕ 觉得有用的话，可以到 [AFDIAN](https://afdian.com/a/veehub) 请我喝杯咖啡。
+
+## FreeDY 内容入口
+
+- `/films?type=movie`：七类影视片库、真实来源分类、分页、封面直接播放及选集详情。
+- `/tv`：全球电视地区目录；`/live`：频道播放和检测。
+- `/radio`：全球广播、地区与电台搜索、本机收藏及最近收听。
+- 影视切换资源逐条显示候选及清单／分片探测结果；详情耗时不代表播放速度。
+- 更新公开目录：`node tools/update-tv-directory.mjs`、`node tools/update-radio-directory.mjs`。
+
+详细实现及验证边界见 [ZIP0 整合记录](docs/ZIP0-INTEGRATION.md)。

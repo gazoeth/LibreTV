@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 683" role="img" aria-label="FreeDY 自由观影，畅想精彩">
+  <defs>
+    <linearGradient id="brand-gradient" x1="286" y1="0" x2="742" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#16C6EF" />
+      <stop offset="0.58" stop-color="#9284B8" />
+      <stop offset="1" stop-color="#F02D82" />
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="683" fill="#000" />
+  <g fill="none" stroke="url(#brand-gradient)" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <rect x="286" y="348" width="52" height="52" rx="8" />
+    <path d="m344 361 25-15c5-3 11 1 11 7v42c0 6-6 10-11 7l-25-15z" />
+  </g>
+  <text x="572" y="414" fill="url(#brand-gradient)" font-family="Arial, Helvetica, sans-serif" font-size="100" font-weight="700" text-anchor="middle">FreeDY</text>
+  <text x="512" y="487" fill="#999" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" text-anchor="middle">自由观影，畅想精彩</text>
+</svg>

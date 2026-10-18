@@ -175,7 +175,7 @@ export interface SourceHealthEntry {
 }
 
 interface AppState extends AppSettings {
-  /** 部署者通过 DEFAULT_SOURCES 环境变量预置的源（服务端下发，不持久化） */
+  /** 服务端下发的内置点播源与 DEFAULT_SOURCES 追加源（不持久化） */
   envSources: SourceConfig[];
   /** 已向用户展示过并自动勾选过的预置源 key（持久化：用户取消勾选后不再反复勾上） */
   envKeysSeen: string[];
@@ -358,13 +358,13 @@ export const useAppStore = create<AppState>()(
       setSelectedKeys: (keys) => set({ selectedKeys: keys }),
 
       setEnvSources: (list) => {
-        // 预置源首次出现时自动勾选（开箱即搜）；用户此后取消勾选不会被反复勾回
+        // 新预置源首次出现时按 enabledByDefault 自动勾选；用户取消勾选后不会被反复勾回
         const seen = new Set(get().envKeysSeen);
         const freshKeys = list.map((s) => s.key).filter((k) => !seen.has(k));
         // 成人内容过滤开启时，成人预置源不自动勾选
         const toSelect = freshKeys.filter((k) => {
           const src = list.find((s) => s.key === k);
-          return !src?.isAdult || !get().yellowFilter;
+          return src?.enabledByDefault !== false && (!src?.isAdult || !get().yellowFilter);
         });
         set({
           envSources: list,

@@ -5,8 +5,7 @@ import { buildSegmentCacheKey, readCachedSegment, touchMeta } from './video-cach
 /**
  * hls.js loader 工厂：在同一个 loader 里组合「广告过滤」与「片段缓存命中」。
  *
- * - manifest / level：走基类网络加载；blockAd 开启时在 onSuccess 里剔除
- *   片头插入的广告段（整段移除，保留 DISCONTINUITY 时间轴标记）；
+ * - manifest / level：走基类网络加载；blockAd 开启时按共享过滤规则处理广告分片组；
  * - fragment：cache-first——本地缓存命中直接合成响应（不回源），未命中走基类。
  *   BYTERANGE 分片（原文件切片）不缓存、直接回源。
  *

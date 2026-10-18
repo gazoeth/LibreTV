@@ -5,6 +5,7 @@ import type { SearchResultItem } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { SmartImage } from './smart-image';
+import { useDetailPrefetch } from './use-detail-prefetch';
 
 // —— 跨源同名聚合 ——
 
@@ -75,6 +76,7 @@ export function AggregatedCard({
   const customImageProxy = useAppStore((s) => s.customImageProxy);
   const [imgFailed, setImgFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const warmup = useDetailPrefetch(group.items[0]);
   const showImg = !!group.pic && !imgFailed;
 
   const multi = group.items.length > 1;
@@ -94,6 +96,7 @@ export function AggregatedCard({
         tabIndex={0}
         aria-expanded={multi ? expanded : undefined}
         onClick={activate}
+        {...warmup}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -202,6 +205,7 @@ export function AggregatedCard({
 
 /** 影片卡片：封面加载失败时逐级降级到占位图（未聚合的单一结果使用） */
 export function VideoCard({ item, onClick }: { item: SearchResultItem; onClick: () => void }) {
+  const warmup = useDetailPrefetch(item);
   const imageProxyMode = useAppStore((s) => s.imageProxyMode);
   const customImageProxy = useAppStore((s) => s.customImageProxy);
   const [imgFailed, setImgFailed] = useState(false);
@@ -213,6 +217,7 @@ export function VideoCard({ item, onClick }: { item: SearchResultItem; onClick: 
       role="button"
       tabIndex={0}
       onClick={onClick}
+      {...warmup}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           // 阻止空格触发页面滚动（AggregatedCard 已是此写法，此处对齐）

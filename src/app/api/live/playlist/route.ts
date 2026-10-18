@@ -4,6 +4,7 @@ import { checkLiveUrlAllowed } from '@/lib/ssrf';
 import { fetchUpstream } from '@/lib/fetch-utils';
 import { getLiveCache, setLiveCache } from '@/lib/live-cache';
 import { parseM3u } from '@/lib/m3u-parser';
+import { BUILTIN_LIVE_PLAYLIST, BUILTIN_LIVE_SOURCE_URL } from '@/lib/builtin-live';
 import type { LivePlaylistResponse } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -57,33 +58,42 @@ export async function GET(req: Request) {
   const format = sp.get('format') || 'json';
   const force = sp.get('force') === '1';
 
-  // 直播专用校验：默认拒绝内网，部署者可设 LIVE_ALLOW_PRIVATE=1 放行自建 IPTV
-  const verdict = await checkLiveUrlAllowed(url);
-  if (!verdict.ok) return jsonError(verdict.reason, 403);
-
   // 直播专用缓存：数千频道的播放列表 JSON 不与豆瓣等热点数据共池（通用缓存超限会整体 clear）
-  let playlist: LivePlaylistResponse | undefined = force ? undefined : getLiveCache<LivePlaylistResponse>(cacheKey(url));
-  if (!playlist) {
-    let text: string;
-    try {
-      // allowPrivate：与直播流代理同一把尺子，LIVE_ALLOW_PRIVATE=1 时自建内网 IPTV 订阅才能拉通。
-      // 此前漏传该参数，fetchUpstream 的逐跳校验会回落到点播侧 checkUpstreamAllowed，
-      // 内网订阅源在第一跳即被判为「目标地址不在允许范围内」，导致直播源无法添加/启用。
-      const res = await fetchUpstream(url, { timeoutMs: 15000, retries: 1, allowPrivate: true });
-      if (!res.ok) {
-        return jsonError(`订阅地址请求失败: ${res.status}`, 502);
-      }
-      text = await res.text();
-    } catch (err) {
-      return jsonError(`订阅地址请求失败: ${err instanceof Error ? err.message : '未知错误'}`, 502);
-    }
-
-    const channels = parseM3u(text, url);
+  let playlist: LivePlaylistResponse | undefined;
+  if (url === BUILTIN_LIVE_SOURCE_URL) {
+    const channels = parseM3u(BUILTIN_LIVE_PLAYLIST);
     const groups = [...new Set(channels.map((c) => c.group).filter((g): g is string => Boolean(g)))].sort(
       (a, b) => a.localeCompare(b, 'zh')
     );
-    playlist = { name: extractPlaylistName(text), channels, groups };
-    setLiveCache(cacheKey(url), playlist, CACHE_TTL_MS, text.length);
+    playlist = { name: 'FreeDY 国际公开频道', channels, groups };
+  } else {
+    // 直播专用校验：默认拒绝内网，部署者可设 LIVE_ALLOW_PRIVATE=1 放行自建 IPTV
+    const verdict = await checkLiveUrlAllowed(url);
+    if (!verdict.ok) return jsonError(verdict.reason, 403);
+
+    playlist = force ? undefined : getLiveCache<LivePlaylistResponse>(cacheKey(url));
+    if (!playlist) {
+      let text: string;
+      try {
+        // allowPrivate：与直播流代理同一把尺子，LIVE_ALLOW_PRIVATE=1 时自建内网 IPTV 订阅才能拉通。
+        // 此前漏传该参数，fetchUpstream 的逐跳校验会回落到点播侧 checkUpstreamAllowed，
+        // 内网订阅源在第一跳即被判为「目标地址不在允许范围内」，导致直播源无法添加/启用。
+        const res = await fetchUpstream(url, { timeoutMs: 15000, retries: 1, allowPrivate: true });
+        if (!res.ok) {
+          return jsonError(`订阅地址请求失败: ${res.status}`, 502);
+        }
+        text = await res.text();
+      } catch (err) {
+        return jsonError(`订阅地址请求失败: ${err instanceof Error ? err.message : '未知错误'}`, 502);
+      }
+
+      const channels = parseM3u(text, url);
+      const groups = [...new Set(channels.map((c) => c.group).filter((g): g is string => Boolean(g)))].sort(
+        (a, b) => a.localeCompare(b, 'zh')
+      );
+      playlist = { name: extractPlaylistName(text), channels, groups };
+      setLiveCache(cacheKey(url), playlist, CACHE_TTL_MS, text.length);
+    }
   }
 
   if (format === 'm3u') {

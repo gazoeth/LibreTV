@@ -12,7 +12,7 @@ jobs:
   sync_latest_from_upstream:
     name: Sync latest commits from upstream repo
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.fork }}
+    if: ${{ github.repository == 'LibreSpark/LibreTV' }} # FreeDY 派生仓库不自动同步上游
 
     steps:
       # Step 1: run a standard checkout action

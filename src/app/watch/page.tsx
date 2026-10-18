@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/client-api';
+import { DETAIL_STALE_TIME, detailQueryKey } from '@/lib/detail-query';
 // 播放器（artplayer + hls.js）按需加载：拆出独立 chunk，不占首屏 First Load JS
 const PlayerShell = dynamic(() => import('@/components/player-shell').then((m) => m.PlayerShell), {
   ssr: false,
@@ -66,10 +67,10 @@ function WatchContent() {
 
   // 详情查询：无 id（纯直连链接分享）时跳过
   const detailQuery = useQuery({
-    queryKey: ['detail', sourceKey, vodId, source?.url],
+    queryKey: detailQueryKey(vodId, source),
     queryFn: ({ signal }) => api.detail(vodId, source!, signal),
     enabled: Boolean(source && vodId && verified),
-    staleTime: 5 * 60_000,
+    staleTime: DETAIL_STALE_TIME,
   });
 
   const episodes = useMemo(() => detailQuery.data?.episodes ?? [], [detailQuery.data]);
@@ -195,7 +196,7 @@ function WatchContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="zip-home min-h-screen flex flex-col">
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
           <BackButton />
@@ -249,6 +250,7 @@ function WatchContent() {
                     onTimeUpdate={handleProgress}
                     onPause={handleProgress}
                     onEnded={handleEnded}
+                    onRequestSwitchSource={() => setSwitchOpen(true)}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">

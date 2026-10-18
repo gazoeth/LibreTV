@@ -56,7 +56,7 @@ function isTimeoutError(err: unknown): boolean {
  * 整源受 SEARCH_SOURCE_TIMEOUT_MS 总死线约束。
  * 旧版在浏览器里打满 N 个请求（暴露用户 IP、无法缓存、超时失控），现全部上移。
  */
-async function searchSource(source: SourceConfig, wd: string): Promise<SourceSearchOutcome> {
+async function searchSource(source: SourceConfig, wd: string, signal?: AbortSignal): Promise<SourceSearchOutcome> {
   const start = Date.now();
   const finish = (outcome: Omit<SourceSearchOutcome, 'ms'>): SourceSearchOutcome => ({
     ...outcome,
@@ -96,7 +96,7 @@ async function searchSource(source: SourceConfig, wd: string): Promise<SourceSea
     const res = await fetchUpstream(api, {
       timeoutMs: 8000,
       headers: cmsRequestHeaders(),
-      signal: controller.signal,
+      signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -224,13 +224,15 @@ export async function POST(req: Request) {
 
   const isStream = new URL(req.url).searchParams.get('stream') === '1';
   if (!isStream) {
-    const outcomes = await Promise.all(sources.map((source) => searchSource(source, wd)));
+    const outcomes = await Promise.all(sources.map((source) => searchSource(source, wd, req.signal)));
     const payload = aggregateOutcomes(outcomes, wd, filterAdult);
-    setCache(cacheKey, payload, SEARCH_CACHE_TTL);
+    if (!req.signal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
     return NextResponse.json(payload);
   }
 
   const encoder = new TextEncoder();
+  const consumer = new AbortController();
+  const workSignal = AbortSignal.any([req.signal, consumer.signal]);
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
@@ -240,6 +242,7 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
         } catch {
           closed = true; // 客户端已断开
+          consumer.abort();
         }
       };
 
@@ -247,20 +250,21 @@ export async function POST(req: Request) {
       const outcomes: SourceSearchOutcome[] = new Array(sources.length);
       await Promise.all(
         sources.map(async (source, i) => {
-          const outcome = await searchSource(source, wd);
+          const outcome = await searchSource(source, wd, workSignal);
           outcomes[i] = outcome;
           send({ type: 'source', ...outcome });
         })
       );
 
       const payload = aggregateOutcomes(outcomes, wd, filterAdult);
-      setCache(cacheKey, payload, SEARCH_CACHE_TTL);
+      if (!workSignal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
       send({ type: 'done', list: payload.list, failures: payload.failures });
       closed = true;
       try {
         controller.close();
       } catch { /* 已断开 */ }
     },
+    cancel() { consumer.abort(); },
   });
 
   return new Response(stream, {

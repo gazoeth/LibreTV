@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeToggle } from './theme';
 import { SourceManagerDrawer } from './source-manager';
@@ -10,9 +10,10 @@ import { requestShowDownloadManager } from './download-manager';
 import { Icon } from './icon';
 import { SearchHistoryDropdown, useSearchHistory } from './search-history';
 import { cn } from '@/lib/utils';
+import { FILM_TYPES } from '@/lib/film-types';
 
 /** 顶部导航：Logo、搜索框（首页外）、历史、设置 */
-export function Header({ showSearch = false }: { showSearch?: boolean }) {
+export function Header({ showSearch = false, landing = false }: { showSearch?: boolean; landing?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -37,11 +38,12 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" aria-label="LibreTV 首页" className="flex items-center shrink-0">
+      <header className={cn('sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line', landing && 'zip-header')}>
+        <div className={cn('max-w-6xl mx-auto px-4 h-14 flex items-center gap-3', landing && 'zip-nav-shell')}>
+          <Link href="/" aria-label="FreeDY 首页" className={cn('flex items-center shrink-0', landing && 'zip-header-brand')}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="LibreTV" className="w-7 h-7 rounded-lg" />
+            <img src="/icons/freedy-mark.svg?v=2" alt="FreeDY D 标志" className={cn('w-7 h-7', landing && 'zip-header-logo')} />
+            {landing && <span className="zip-wordmark">Free<span>DY</span></span>}
           </Link>
 
           {showSearch && (
@@ -96,11 +98,14 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
 
           <div className="flex-1 sm:hidden" />
 
-          <nav className="flex items-center gap-1 ml-auto">
-            <HeaderLink href="/live" active={pathname === '/live'}>
-              直播
+          <nav className={cn('flex items-center gap-1 ml-auto', landing && 'zip-header-nav')}>
+            {landing && <HeaderLink href={pathname === '/' ? '#top' : '/#top'} active={pathname === '/'} landing>首页</HeaderLink>}
+            <FilmMenu active={pathname === '/films'} landing={landing} />
+            <HeaderLink href="/tv" active={pathname === '/live' || pathname === '/tv'} landing={landing}>
+              看电视
             </HeaderLink>
-            <HeaderLink href="/about" active={pathname === '/about'}>
+            <HeaderLink href="/radio" active={pathname === '/radio'} landing={landing}>听广播</HeaderLink>
+            <HeaderLink href="/about" active={pathname === '/about'} landing={landing}>
               关于
             </HeaderLink>
             <ThemeToggle />
@@ -123,13 +128,34 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
   );
 }
 
-function HeaderLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function FilmMenu({ active, landing }: { active: boolean; landing: boolean }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  return <div className="fd-film-nav" ref={root}>
+    <button ref={trigger} className={cn('fd-film-trigger', landing && 'zip-header-link', active && 'is-active')} aria-expanded={open} aria-controls={id} onClick={() => setOpen(v => !v)}>影视 <svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg></button>
+    {open && <div className="fd-film-menu" id={id}><p>EXPLORE CINEMA</p><nav aria-label="影视分类导航">{FILM_TYPES.map(type => <Link key={type.key} href={`/films?type=${type.key}`} onClick={() => setOpen(false)}>{type.name}<span aria-hidden="true">↗</span></Link>)}</nav><small>找到下一部想看的好故事。</small></div>}
+  </div>;
+}
+
+function HeaderLink({ href, active, landing = false, children }: { href: string; active: boolean; landing?: boolean; children: React.ReactNode }) {
   return (
     <Link
       href={href}
       className={cn(
         'px-2.5 py-1.5 rounded-md text-sm transition-colors',
-        active ? 'text-content bg-hover' : 'text-muted hover:text-content'
+        active ? 'text-content bg-hover' : 'text-muted hover:text-content',
+        landing && 'zip-header-link',
+        landing && active && 'is-active'
       )}
     >
       {children}

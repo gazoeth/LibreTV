@@ -8,6 +8,10 @@
 
 /** 点播代理地址（查询串形式，路径形式会被 EdgeOne 等网关的 URL 归一化破坏，见 proxy-handlers.ts） */
 export const PROXY_BASE = '/api/proxy?url=';
+/** 点播代理地址，并将用户的广告过滤偏好传递到后续分片和子清单请求。 */
+export function proxyBaseForAdFilter(enabled: boolean): string {
+  return `/api/proxy?adFilter=${enabled ? '1' : '0'}&url=`;
+}
 /** 直播流代理地址（查询串形式） */
 export const LIVE_STREAM_BASE = '/api/live/stream?url=';
 
@@ -383,13 +387,19 @@ function stripLeadingDisc(content: string): string {
 }
 
 /**
- * 广告过滤总入口（播放 loader 与下载解析共用），按可靠度依次：
- * 1. URL 特征中插段（adjump 等，任意位置）；
- * 2. 长正片段之间的超短插入段（纯时长型中插广告）；
- * 3. 片头无特征插入段（dytt 式，位置+短小启发式）；
+ * 广告过滤总入口（播放 loader 与下载解析共用）：优先采用 GitHub 主仓库规则
+ *（URL 特征 → 长片间超短中插 → 片头短组），本地重复分片组签名作为补充；
  * 最后统一清掉首分片前失去语义的 DISCONTINUITY。
  */
 export function stripAdGroups(m3u8Content: string): string {
   if (!m3u8Content) return '';
-  return stripLeadingDisc(stripLeadAdGroup(stripInterstitialAdGroups(stripRepeatedInterstitialAdGroups(stripMarkedAdGroups(m3u8Content)))));
+  return stripLeadingDisc(
+    stripRepeatedInterstitialAdGroups(
+      stripLeadAdGroup(
+        stripInterstitialAdGroups(
+          stripMarkedAdGroups(m3u8Content)
+        )
+      )
+    )
+  );
 }

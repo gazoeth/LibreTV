@@ -2,18 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/client-api';
-import type { SourceConfig, SearchResultItem } from '@/lib/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { DETAIL_STALE_TIME, detailQueryKey } from '@/lib/detail-query';
+import { api, type LiveProbeResult } from '@/lib/client-api';
+import type { SourceConfig, SearchResultItem, VideoDetail } from '@/lib/types';
 import { buildWatchUrl, cn } from '@/lib/utils';
 import { useAppStore, resolveSource } from '@/lib/store';
 import { useToast } from './toast';
 import { Icon } from './icon';
-import { SmartImage } from './smart-image';
 import { EmptyState, LoadingState } from './states';
 import { useFocusTrap } from './use-focus-trap';
 
 /**
- * 换源面板：跨源按标题搜索 → 匹配同名/同前缀资源 → 并发测速（详情接口耗时）→ 按速度排序展示。
+ * 换源面板：逐源搜索 → 逐条展示剧集 → 有界并发探测媒体分片；健康源不等待慢源。
  * 切换时保留当前集数索引（旧版 switchToResource 逻辑的去 DOM 化重写）。
  */
 
@@ -23,6 +24,9 @@ interface Candidate {
   ms?: number;
   ok?: boolean;
   episodes?: number;
+  stage: 'loading' | 'probing' | 'done' | 'error';
+  probe?: LiveProbeResult;
+  error?: string;
 }
 
 export function SwitchSourceModal({
@@ -40,11 +44,11 @@ export function SwitchSourceModal({
 }) {
   const store = useAppStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [phase, setPhase] = useState<'searching' | 'testing' | 'done'>('searching');
-  /** 封面加载失败记录（按卡片 key）；失败后降级为占位图标，避免破图 */
-  const [imgFailed, setImgFailed] = useState<Record<string, boolean>>({});
+  const [searched, setSearched] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // 打开时把焦点移入弹窗、Tab 圈闭在弹窗内、关闭后归还焦点
@@ -56,7 +60,7 @@ export function SwitchSourceModal({
     return store.selectedKeys
       .map((key) => resolveSource(store, key))
       .filter((s): s is SourceConfig => {
-        if (!s || seen.has(s.key)) return false;
+        if (!s || seen.has(s.key) || (s.isAdult && store.yellowFilter)) return false;
         seen.add(s.key);
         return true;
       });
@@ -84,64 +88,104 @@ export function SwitchSourceModal({
     const controller = new AbortController();
     let cancelled = false;
 
-    (async () => {
-      // 1) 并行搜索所有选中源
-      setPhase('searching');
+    let active = 0;
+    let searchFinished = false;
+    const queue: Candidate[] = [];
+    const accepted = new Set<string>();
+    const settled = new Set<string>();
+    setCandidates([]);
+    setSearched(0);
+    setPhase('searching');
+    const update = (c: Candidate, patch: Partial<Candidate>) => {
+      if (cancelled) return;
+      setCandidates(prev => prev.map(row => row.source.key === c.source.key ? { ...row, ...patch } : row));
+    };
+    const check = async (c: Candidate) => {
       try {
-        const { list } = await api.search(currentTitle, sources, store.yellowFilter, { signal: controller.signal });
-        if (cancelled) return;
-
-        // 匹配口径：优先完全同名，其次名称以标题开头（兼容「小偷 HD」「小偷[电影解说]」这类修饰名）。
-        // 都没有则不展示该源——不再兜底取搜索第一条，避免把搜到的其他影片（如搜「小偷」
-        // 命中的《宝贝 小偷与大盗》）误当成换源目标。
-        const title = currentTitle.trim();
-        const matched: Candidate[] = [];
-        for (const s of sources) {
-          const hits = list.filter((r) => r.sourceKey === s.key);
-          const exact =
-            hits.find((r) => (r.name || '').trim() === title) ??
-            hits.find((r) => (r.name || '').trim().startsWith(title));
-          if (exact) matched.push({ source: s, result: exact });
+        const start = performance.now();
+        const key = detailQueryKey(c.result.vodId, c.source);
+        const state = queryClient.getQueryState(key);
+        let detail = state && Date.now() - state.dataUpdatedAt < DETAIL_STALE_TIME
+          ? queryClient.getQueryData<VideoDetail>(key) : undefined;
+        if (!detail) {
+          detail = await api.detail(c.result.vodId, c.source, controller.signal);
+          if (cancelled) return;
+          queryClient.setQueryData(key, detail);
         }
-
-        // 2) 并发测速（详情接口耗时）并获取集数
-        setPhase('testing');
-        await Promise.all(
-          matched.map(async (c) => {
-            const r = await api.detailSpeed(c.result.vodId, c.source, controller.signal);
-            if (cancelled) return;
-            c.ok = r.ok;
-            c.ms = r.ms;
-            c.episodes = r.detail?.episodes.length ?? 0;
-          })
-        );
-        if (cancelled) return;
-        setCandidates(matched);
-        setPhase('done');
+        if (!detail.episodes.length) throw new Error('未找到剧集');
+        const target = detail.episodes[Math.min(currentIndex, detail.episodes.length - 1)];
+        update(c, { ok: true, episodes: detail.episodes.length, ms: Math.round(performance.now() - start), stage: 'probing' });
+        // 使用已有的分片探测协议；详情接口快不代表媒体可以播放。
+        const result = await api.liveProbe([target], controller.signal);
+        update(c, { probe: result.results[0], stage: 'done' });
       } catch (err) {
-        // 主动中止不算失败，不提示
-        const aborted = err instanceof DOMException && err.name === 'AbortError';
-        if (!cancelled && !aborted) {
-          toast(err instanceof Error ? err.message : '换源搜索失败', 'error');
-          setPhase('done');
-        }
+        if (!controller.signal.aborted) update(c, { stage: 'error', error: err instanceof Error ? err.message : '检测失败' });
       }
-    })();
+    };
+    const pump = () => {
+      if (cancelled) return;
+      while (active < 4 && queue.length) {
+        const c = queue.shift()!;
+        active++;
+        void check(c).finally(() => { active--; pump(); });
+      }
+      if (searchFinished && active === 0 && queue.length === 0) setPhase('done');
+    };
+    const accept = (sourceKey: string, list: SearchResultItem[]) => {
+      if (cancelled || accepted.has(sourceKey)) return;
+      const source = sources.find(s => s.key === sourceKey);
+      if (!source) return;
+      const title = currentTitle.trim();
+      const match = list.find(r => r.name.trim() === title) || list.find(r => {
+        const name = r.name.trim();
+        if (!name.startsWith(title)) return false;
+        return /^(?:\s|[\[(（【])*(?:HD|BD|4K|1080P|720P|国语|粤语|中字|高清|完整版)(?:[\])）】\s]*)$/i.test(name.slice(title.length));
+      });
+      if (!match) return;
+      accepted.add(sourceKey);
+      const candidate: Candidate = { source, result: match, stage: 'loading' };
+      setCandidates(prev => [...prev, candidate]);
+      queue.push(candidate);
+      pump();
+    };
+    const currentSource = sources.find(s => s.key === currentSourceKey);
+    if (currentSource && queryClient.getQueryData(detailQueryKey(currentVodId, currentSource))) {
+      accept(currentSource.key, [{ vodId: currentVodId, name: currentTitle, sourceKey: currentSource.key, sourceName: currentSource.name, sourceUrl: currentSource.url }]);
+    }
+    void api.search(currentTitle, sources, store.yellowFilter, {
+      signal: controller.signal,
+      onSource: outcome => {
+        if (cancelled) return;
+        settled.add(outcome.sourceKey);
+        setSearched(settled.size);
+        accept(outcome.sourceKey, outcome.list);
+      },
+    }).then(result => {
+      if (cancelled) return;
+      for (const source of sources) accept(source.key, result.list.filter(r => r.sourceKey === source.key));
+      setSearched(sources.length);
+    }).catch(err => {
+      if (!cancelled && !controller.signal.aborted) toast(err instanceof Error ? err.message : '换源搜索失败', 'error');
+    }).finally(() => {
+      searchFinished = true;
+      if (!cancelled) { setPhase('testing'); pump(); }
+    });
 
     return () => {
       cancelled = true;
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTitle, store.yellowFilter]);
+  }, [currentTitle, currentIndex, store.yellowFilter]);
 
   const sorted = [...candidates].sort((a, b) => {
     const aCurrent = a.source.key === currentSourceKey && String(a.result.vodId) === String(currentVodId);
     const bCurrent = b.source.key === currentSourceKey && String(b.result.vodId) === String(currentVodId);
     if (aCurrent !== bCurrent) return aCurrent ? -1 : 1;
-    const msA = a.ok ? a.ms ?? 99_999 : 99_999;
-    const msB = b.ok ? b.ms ?? 99_999 : 99_999;
-    return msA - msB;
+    // 检测过程中保持位置稳定，避免用户点击时目标卡片移动。
+    if (phase !== 'done') return 0;
+    const rank = (c: Candidate) => c.probe?.ok && c.probe.level === 'segment' ? 0 : c.ok ? 1 : 2;
+    return rank(a) - rank(b) || (a.probe?.ms ?? 99_999) - (b.probe?.ms ?? 99_999);
   });
 
   const switchTo = (c: Candidate) => {
@@ -185,10 +229,10 @@ export function SwitchSourceModal({
             </h2>
             <p className="text-xs text-faint">
               {phase === 'searching'
-                ? '正在搜索各资源...'
+                ? `已搜索 ${searched}/${sources.length} 个来源，结果实时显示`
                 : phase === 'testing'
-                  ? '正在测试各资源速率...'
-                  : `共 ${sorted.length} 个来源 · ${sorted.filter((c) => c.ok).length} 个可用`}
+                  ? `已搜索 ${searched}/${sources.length} 个来源，正在检测媒体线路…`
+                  : `共 ${sorted.length} 个来源 · ${sorted.filter(c => c.probe?.ok && c.probe.level === 'segment').length} 个分片可达`}
             </p>
           </div>
           <button className="p-1.5 rounded-md text-muted hover:text-content hover:bg-hover" onClick={onClose} aria-label="关闭">
@@ -198,59 +242,25 @@ export function SwitchSourceModal({
           </button>
         </div>
 
-        {phase !== 'done' ? (
+        <p className="text-[11px] text-faint mb-4 leading-relaxed" aria-live="polite">结果到达即可选择。分片可达为当前网络探测结果，详情耗时不等于视频加载速度。</p>
+        {candidates.length === 0 && phase !== 'done' ? (
           <LoadingState label={phase === 'searching' ? '搜索各资源中...' : '测速中...'} />
         ) : sorted.length === 0 ? (
           <EmptyState variant="plain" title="其他点播源未找到同名资源" />
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {sorted.map((c) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="播放线路检测结果">
+            {sorted.map(c => {
               const isCurrent = c.source.key === currentSourceKey && String(c.result.vodId) === String(currentVodId);
-              const cardKey = `${c.source.key}_${c.result.vodId}`;
-              const img = c.result.pic;
-              const coverFailed = imgFailed[cardKey] ?? false;
-              return (
-                <button
-                  key={`${c.source.key}_${c.result.vodId}`}
-                  className={cn('text-left group relative rounded-lg overflow-hidden bg-card transition-transform', !isCurrent && 'hover:scale-[1.03] cursor-pointer', isCurrent && 'cursor-default')}
-                  onClick={() => !isCurrent && switchTo(c)}
-                  disabled={isCurrent}
-                >
-                  <div className="poster-frame bg-chip">
-                    {img && !coverFailed ? (
-                      <SmartImage
-                        url={c.result.pic}
-                        mode={store.imageProxyMode}
-                        customProxy={store.customImageProxy}
-                        alt={c.result.name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        onExhausted={() => setImgFailed((prev) => ({ ...prev, [cardKey]: true }))}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-faint">
-                        <Icon name="link" className="w-6 h-6" />
-                      </div>
-                    )}
-                    <span
-                      className={cn(
-                        'absolute top-1.5 right-1.5 tag',
-                        !c.ok ? 'bg-danger-solid/85 text-white' : c.ms! > 2000 ? 'bg-warning-solid/85 text-white' : 'bg-success-solid/85 text-white'
-                      )}
-                    >
-                      {!c.ok ? '失败' : `${c.ms}ms`}
-                    </span>
-                    {isCurrent && (
-                      <span className="absolute inset-x-0 bottom-0 bg-accent/90 text-on-accent text-xs text-center py-1">当前播放</span>
-                    )}
-                  </div>
-                  <div className="p-2">
-                    <div className="text-xs font-medium text-content truncate" title={c.source.name}>
-                      {c.source.name}
-                    </div>
-                    <div className="text-xs text-faint mt-0.5">{c.episodes ? `${c.episodes} 集` : '无资源'}</div>
-                  </div>
-                </button>
-              );
+              const verified = c.probe?.ok && c.probe.level === 'segment';
+              const label = c.stage === 'loading' ? '获取剧集中…' : c.stage === 'probing' ? '检测媒体分片…' : verified ? `分片可达 · ${c.probe?.ms ?? 0}ms` : c.probe?.ok ? '清单可达 · 未验证分片' : c.ok ? '检测未通过 · 可手动尝试' : c.error || '未找到剧集';
+              return <button key={`${c.source.key}_${c.result.vodId}`} onClick={() => switchTo(c)} disabled={isCurrent || !c.episodes}
+                className={cn('flex items-center gap-3 text-left border rounded-xl p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', isCurrent ? 'border-accent/50 bg-accent/5' : 'border-line bg-card hover:border-accent/60', !c.episodes && 'opacity-60 cursor-wait')}>
+                <span className="shrink-0 rounded-lg p-2.5 bg-chip text-accent"><Icon name="link" className="w-5 h-5" /></span>
+                <span className="flex-1 min-w-0"><strong className="block text-sm font-medium truncate">{c.source.name}{isCurrent ? ' · 当前' : ''}</strong>
+                  <span className={cn('block text-[11px] mt-1', verified ? 'text-success' : c.stage === 'probing' || c.stage === 'loading' ? 'text-accent' : 'text-muted')}>{label}</span>
+                  <span className="block text-[10px] text-faint mt-1">{c.episodes ? `${c.episodes} 集 · 详情 ${c.ms ?? 0}ms` : '正在获取可选剧集'}</span>
+                </span><span className="text-muted text-sm" aria-hidden="true">{isCurrent ? '✓' : '↗'}</span>
+              </button>;
             })}
           </div>
         )}

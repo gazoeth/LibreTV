@@ -9,7 +9,8 @@ export const runtime = 'nodejs';
  * 全平台行为一致；旧路径形式 /api/proxy/<encoded> 仍由 [url] 路由兼容。
  */
 export async function GET(req: Request) {
-  const targetUrl = new URL(req.url).searchParams.get('url');
+  const searchParams = new URL(req.url).searchParams;
+  const targetUrl = searchParams.get('url');
   if (!targetUrl) return new NextResponse('缺少 url 参数', { status: 400 });
-  return handleProxyRequest(req, targetUrl);
+  return handleProxyRequest(req, targetUrl, searchParams.get('adFilter') === '1');
 }

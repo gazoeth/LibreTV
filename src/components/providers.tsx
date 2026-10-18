@@ -30,12 +30,12 @@ export function Providers({ children }: { children: ReactNode }) {
         // 测活缓存从 IndexedDB 恢复（并顺带搬迁旧 localStorage 快照里的存量），
         // 与下方 /api/status 拉取互不依赖，失败静默
         void hydrateLiveProbeResults();
-        // 拉取部署者通过 DEFAULT_SOURCES / DEFAULT_LIVE_SOURCES 预置的源（失败时静默忽略）
+        // 拉取内置点播源与 DEFAULT_SOURCES / DEFAULT_LIVE_SOURCES 配置的预置源（失败时静默忽略）
         // 与 AuthProvider 共用同一 query key，/api/status 全站只发一次
         return queryClient.fetchQuery({ queryKey: STATUS_QUERY_KEY, queryFn: () => api.status() });
       })
       .then((d) => {
-        // 预置数据（DEFAULT_SOURCES / DEFAULT_LIVE_SOURCES / DEFAULT_SUBSCRIPTIONS）
+        // 预置数据（内置点播源、DEFAULT_SOURCES / DEFAULT_LIVE_SOURCES / DEFAULT_SUBSCRIPTIONS）
         // 预置订阅要经鉴权接口拉取，首屏这次可能发生在登录之前而 401 静默失败；
         // 登录成功后由 AuthProvider 再调一次 applyEnvPresets 补齐（函数幂等）
         if (d) return applyEnvPresets(d);

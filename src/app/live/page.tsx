@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/client-api';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -23,6 +24,7 @@ import { useAuth } from '@/components/auth';
 import { allLiveSources, useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { SmartImage } from '@/components/smart-image';
+import { RegionFlag } from '@/components/region-flag';
 
 /**
  * 直播页：左侧播放器 + 频道信息 + 节目单；右侧频道侧栏。
@@ -49,6 +51,15 @@ function LiveContent() {
   const imageProxyMode = useAppStore((s) => s.imageProxyMode);
   const customImageProxy = useAppStore((s) => s.customImageProxy);
   const { verified } = useAuth();
+  const country = searchParams.get('country') || '';
+  const regionQuery = useQuery({
+    queryKey: ['tv-region', country], queryFn: () => api.tvRegion(country),
+    enabled: verified && Boolean(country), staleTime: 300_000,
+  });
+  const regionOptions = useQuery({
+    queryKey: ['tv-directory'], queryFn: api.tvDirectory,
+    enabled: verified && Boolean(country), staleTime: 300_000,
+  });
   const [copied, setCopied] = useState(false);
   // 移动端频道抽屉开合
   const [listOpen, setListOpen] = useState(false);
@@ -73,11 +84,15 @@ function LiveContent() {
       const results = await Promise.allSettled(sources.map((s) => api.livePlaylist(s.url)));
       return sources.map((source, i) => ({ source, result: results[i] }));
     },
-    enabled: verified && sources.length > 0,
+    enabled: verified && sources.length > 0 && !country,
     staleTime: 10 * 60_000,
   });
 
   const { channels, groups, failedCount } = useMemo(() => {
+    if (country) {
+      const channels: LiveChannelItem[] = regionQuery.data?.channels || [];
+      return { channels, groups: [...new Set(channels.map(c => c.group).filter((g): g is string => Boolean(g)))], failedCount: regionQuery.isError ? 1 : 0 };
+    }
     const list: LiveChannelItem[] = [];
     const seen = new Set<string>();
     let failed = 0;
@@ -96,7 +111,8 @@ function LiveContent() {
       (a, b) => a.localeCompare(b, 'zh')
     );
     return { channels: list, groups, failedCount: failed };
-  }, [playlistsQuery.data]);
+  }, [playlistsQuery.data, country, regionQuery.data, regionQuery.isError]);
+  const channelsLoading = country ? regionQuery.isPending : playlistsQuery.isLoading;
 
   // 当前频道：优先取列表内完整对象（含台标），否则由 URL 参数重建
   const currentUrl = searchParams.get('url') || '';
@@ -126,6 +142,7 @@ function LiveContent() {
       const cur = currentChannelRef.current;
       if (cur && cur.url !== c.url) lastChannelRef.current = cur;
       const sp = new URLSearchParams({ url: c.url, name: c.name });
+      if (country) sp.set('country', country);
       if (c.group) sp.set('group', c.group);
       if (c.tvgId) sp.set('tvgId', c.tvgId);
       if (c.epg) sp.set('epg', c.epg);
@@ -140,7 +157,7 @@ function LiveContent() {
         sourceUrl: c.sourceUrl,
       });
     },
-    [router]
+    [router, country]
   );
 
   const handleFilteredChange = useCallback((list: LiveChannelItem[]) => {
@@ -218,13 +235,14 @@ function LiveContent() {
   const isFavorite = currentChannel ? liveFavorites.includes(currentChannel.url) : false;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header showSearch />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+    <div className="zip-home fd-tv-watch min-h-screen flex flex-col">
+      <Header landing />
+      <main className="fd-tv-watch-shell flex-1 w-full mx-auto">
+        <div className="fd-tv-watch-heading"><div><Link href="/tv">全球电视 <span aria-hidden="true">/</span></Link><h1>{regionQuery.data ? <><RegionFlag code={regionQuery.data.region.code} emoji={regionQuery.data.region.flag} /> {regionQuery.data.region.name}</> : country ? '地区电视台' : '我的直播源'}</h1></div><div className="fd-tv-watch-tools"><p>{channelsLoading ? '正在加载频道…' : `${channels.length.toLocaleString()} 个频道`} <span>·</span> 收藏、测活、继续观看</p>{country && <select className="fd-tv-region-select" aria-label="切换国家或地区" value={country} onChange={e => router.push(`/live?country=${e.target.value}`)}>{regionOptions.data ? regionOptions.data.regions.map(r => <option value={r.code} key={r.code}>{r.name} · {r.count}</option>) : <option value={country}>{regionQuery.data?.region.name || country}</option>}</select>}</div></div>
+        <div className="grid grid-cols-1 min-[900px]:grid-cols-[minmax(0,1fr)_340px] gap-5">
           {/* 主栏：播放器 + 信息条 + 节目单 */}
           <div className="min-w-0">
-            <div className="video-frame bg-black rounded-lg overflow-hidden">
+            <div className="video-frame fd-tv-player bg-black rounded-xl overflow-hidden">
               <div className="absolute inset-0">
                 {currentUrl ? (
                   <LivePlayer
@@ -234,22 +252,26 @@ function LiveContent() {
                     onNextChannel={goNextChannel}
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black">
-                    <span className="live-dot" />
-                    <p className="text-white/60 text-sm">
-                      {sources.length === 0
+                  <div className="fd-tv-idle w-full h-full flex flex-col items-center justify-center">
+                    <span className="fd-tv-idle-mark" aria-hidden="true">D</span>
+                    <p className="zip-eyebrow">READY WHEN YOU ARE</p>
+                    <h2>选择一个频道，<br />让世界开始播放。</h2>
+                    <p className="fd-tv-idle-note">
+                      {country ? regionQuery.isError ? '频道目录加载失败，请重试' : channelsLoading ? '地区频道加载中…' : '搜索频道，或从频道列表中选择。' : sources.length === 0
                         ? liveEnvSources.length + liveSubscriptions.length > 0
                           ? '所有直播源均已停用，请在设置中勾选启用'
                           : '请先在设置中添加直播源（M3U 订阅）'
-                        : playlistsQuery.isLoading
+                        : channelsLoading
                           ? '频道列表加载中...'
-                          : '从右侧选择一个频道开始观看'}
+                          : '从频道列表中选择，开启你的观看时刻。'}
                     </p>
+                    {regionQuery.isError ? <button className="fd-tv-idle-action" onClick={() => void regionQuery.refetch()}>重新加载</button> : <a className="fd-tv-idle-action" href="#fd-channel-list">浏览频道 <span aria-hidden="true">↘</span></a>}
                   </div>
                 )}
               </div>
             </div>
 
+            {!currentUrl && <div className="fd-tv-viewing-notes"><div><span>01 / DISCOVER</span><h3>找到熟悉的频道</h3><p>按名称搜索，按内容分组浏览。</p></div><div><span>02 / MAKE IT YOURS</span><h3>把喜欢的留下</h3><p>点击星标收藏，下次更快找到。</p></div><div><span>03 / STAY TUNED</span><h3>顺畅地看下去</h3><p>测活筛选频道，用 ↑ ↓ 快速换台。</p></div></div>}
             {/* 频道信息条 */}
             {currentChannel && (
               <div className="bg-surface-raised border border-line rounded-lg p-3 mt-3 flex items-center gap-3">
@@ -353,10 +375,10 @@ function LiveContent() {
                   </button>
                   <button
                     className="rounded-md p-2 text-muted hover:text-accent hover:bg-hover transition-colors"
-                    aria-label="复制播放地址"
-                    title="复制播放地址"
+                    aria-label="分享频道"
+                    title="复制当前频道页面链接"
                     onClick={async () => {
-                      const ok = await copyToClipboard(currentChannel.url);
+                      const ok = await copyToClipboard(window.location.href);
                       if (ok) {
                         setCopied(true);
                         setTimeout(() => setCopied(false), 1500);
@@ -392,7 +414,7 @@ function LiveContent() {
           {/* 移动端抽屉遮罩 */}
           {listOpen && (
             <div
-              className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+              className="fixed inset-0 z-30 bg-black/50 min-[900px]:hidden"
               aria-hidden="true"
               onClick={() => setListOpen(false)}
             />
@@ -400,17 +422,19 @@ function LiveContent() {
 
           {/* 侧栏：桌面常驻 sticky；移动端底部抽屉 */}
           <aside
+            id="fd-channel-list"
             className={cn(
-              'bg-surface-raised border border-line flex-col overflow-hidden',
-              'fixed inset-x-0 bottom-0 z-40 h-[75vh] rounded-t-2xl shadow-2xl',
-              listOpen ? 'flex' : 'hidden',
-              'lg:sticky lg:top-20 lg:flex lg:h-[calc(100vh-6.5rem)] lg:rounded-xl lg:shadow-none'
+              'fd-tv-channel-panel bg-surface-raised border border-line flex-col overflow-hidden',
+              !currentUrl ? 'relative flex h-[580px] rounded-xl' : 'fixed inset-x-0 bottom-0 z-40 h-[75vh] rounded-t-2xl shadow-2xl',
+              currentUrl && (listOpen ? 'flex' : 'hidden'),
+              'min-[900px]:sticky min-[900px]:top-24 min-[900px]:flex min-[900px]:h-[calc(100vh-8rem)] min-[900px]:rounded-xl min-[900px]:shadow-none'
             )}
           >
             {/* 抽屉把手栏（仅移动端） */}
-            <div className="flex items-center justify-between px-3 pt-3 pb-1 shrink-0 lg:hidden">
-              <span className="text-sm font-semibold text-content">频道列表</span>
-              <button
+            <div className="fd-tv-list-heading flex items-center justify-between px-3 pt-3 pb-2 shrink-0">
+              <span className="text-sm font-semibold text-content">频道列表 <span className="text-faint font-normal">/ {channels.length}</span></span>
+              {currentUrl && <button
+                hidden={!listOpen}
                 className="rounded-md p-1.5 text-muted hover:text-content hover:bg-hover transition-colors"
                 aria-label="关闭频道列表"
                 onClick={() => setListOpen(false)}
@@ -418,15 +442,16 @@ function LiveContent() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </button>
+              </button>}
             </div>
             <div className="flex-1 min-h-0 flex flex-col">
-              {playlistsQuery.isLoading && channels.length === 0 ? (
+              {channelsLoading && channels.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
                   <Spinner size="lg" />
                 </div>
               ) : (
                 <LiveChannelList
+                  key={country || 'subscriptions'}
                   channels={channels}
                   groups={groups}
                   currentUrl={currentUrl}
@@ -434,7 +459,7 @@ function LiveContent() {
                   onFilteredChange={handleFilteredChange}
                 />
               )}
-              {(failedCount > 0 || sources.length === 0) && (
+              {!country && (failedCount > 0 || sources.length === 0) && (
                 <p className="text-[10px] text-faint px-3 py-1.5 border-t border-line shrink-0">
                   {sources.length === 0
                     ? liveEnvSources.length + liveSubscriptions.length > 0
@@ -448,9 +473,9 @@ function LiveContent() {
         </div>
 
         {/* 移动端呼出频道列表的悬浮按钮 */}
-        {!listOpen && channels.length > 0 && (
+        {currentUrl && !listOpen && channels.length > 0 && (
           <button
-            className="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm text-on-accent shadow-lg lg:hidden"
+            className="fixed bottom-4 right-4 z-30 flex items-center gap-1.5 rounded-full bg-accent px-4 py-2.5 text-sm text-on-accent shadow-lg min-[900px]:hidden"
             onClick={() => setListOpen(true)}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

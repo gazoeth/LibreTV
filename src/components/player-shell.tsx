@@ -13,6 +13,7 @@ import {
 import { loadCacheSettings } from '@/lib/video-cache';
 import { formatTime } from '@/lib/utils';
 import { getHlsPlaybackEngine } from '@/lib/player-compat';
+import { proxyBaseForAdFilter } from '@/lib/m3u8';
 
 /**
  * 播放器外壳：ArtPlayer + hls.js（旧版 player.js 的 React 化）。
@@ -62,6 +63,8 @@ export function PlayerShell({
   const artRef = useRef<any>(null);
   const hlsRef = useRef<Hls | null>(null);
   const nativeHlsRef = useRef(false);
+  const nativeCleanupRef = useRef<(() => void) | null>(null);
+  const startupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState('');
   const [hint, setHint] = useState('');
   // 起播前的品牌占位图（沿用旧版 nomedia 素材），实际开始播放后隐藏
@@ -156,22 +159,33 @@ export function PlayerShell({
    * 注意：不销毁 ArtPlayer，只销毁并重建 hls，从而保留网页全屏等播放器状态。
    */
   const setupHls = (video: HTMLVideoElement, mediaUrl: string, allowProxyFallback: boolean) => {
+    nativeCleanupRef.current?.();
+    nativeCleanupRef.current = null;
+    if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+    startupTimerRef.current = setTimeout(() => {
+      if (currentMediaUrlRef.current === mediaUrl && !playbackStartedRef.current && video.readyState < 2) setError('这条线路连接超时，请检测或选择其他线路');
+    }, 16000);
     hlsRef.current?.destroy();
     currentMediaUrlRef.current = mediaUrl;
     const nativeMimeSupport = video.canPlayType('application/vnd.apple.mpegurl') ||
       video.canPlayType('application/x-mpegURL');
     const engine = getHlsPlaybackEngine(Hls.isSupported(), nativeMimeSupport);
     if (engine === 'native') {
+      if (propsRef.current.adFilter && allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
+        setupHls(video, `${proxyBaseForAdFilter(true)}${encodeURIComponent(mediaUrl)}`, false);
+        return;
+      }
       nativeHlsRef.current = true;
       const fallbackToProxy = () => {
         if (allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
           showHint('直连失败，改用代理重试...');
-          setupHls(video, `/api/proxy?url=${encodeURIComponent(mediaUrl)}`, false);
+          setupHls(video, `${proxyBaseForAdFilter(propsRef.current.adFilter)}${encodeURIComponent(mediaUrl)}`, false);
         } else {
           setError('视频播放失败，请尝试其他视频源');
         }
       };
       video.addEventListener('error', fallbackToProxy, { once: true });
+      nativeCleanupRef.current = () => video.removeEventListener('error', fallbackToProxy);
       video.src = mediaUrl;
       video.load();
       const playResult = video.play();
@@ -237,7 +251,8 @@ export function PlayerShell({
             (decision.attempt >= 2 || data.details === 'manifestLoadError')
           ) {
             showHint('直连失败，改用代理重试...');
-            setupHls(video, `/api/proxy?url=${encodeURIComponent(mediaUrl)}`, false);
+            const proxyUrl = `${proxyBaseForAdFilter(propsRef.current.adFilter)}${encodeURIComponent(mediaUrl)}`;
+            setupHls(video, proxyUrl, false);
             return;
           }
           showHint(`${decision.reason}（第 ${decision.attempt} 次）...`);
@@ -274,6 +289,7 @@ export function PlayerShell({
     videoErrorRetryUsedRef.current = false;
     restoredRef.current = false;
     lastPrefetchEnsureRef.current = 0;
+    recoveryRef.current?.dispose();
     recoveryRef.current = new PlaybackRecovery();
     // 换集时清掉上一集的预取窗口，避免带宽被旧集占用
     getVideoPrefetcher().stop();
@@ -338,6 +354,7 @@ export function PlayerShell({
     });
 
     art.on('video:playing', () => {
+      if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
       playbackStartedRef.current = true;
       setShowPoster(false);
       // 仅在媒体真正恢复（有分片进入 buffer）后清错误遮罩：
@@ -492,6 +509,8 @@ export function PlayerShell({
       el?.removeEventListener('contextmenu', onContextMenu);
       hlsRef.current?.destroy();
       hlsRef.current = null;
+      nativeCleanupRef.current?.();
+      if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
       recoveryRef.current?.dispose();
       getVideoPrefetcher().stop();
       art.destroy();
@@ -527,7 +546,7 @@ export function PlayerShell({
         <div
           className="absolute inset-0 bg-black pointer-events-none"
           style={{
-            backgroundImage: 'url(/player-poster.png)',
+            backgroundImage: 'url(/player-poster.svg)',
             backgroundSize: 'contain',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -540,6 +559,7 @@ export function PlayerShell({
           <button className="btn-ghost text-xs" onClick={() => location.reload()}>
             重新加载
           </button>
+          {onRequestSwitchSource && <button className="btn-primary text-xs mt-1" onClick={() => onRequestSwitchSource('当前线路播放失败')}>检测其他线路</button>}
         </div>
       )}
       {hint && (

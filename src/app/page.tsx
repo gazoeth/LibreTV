@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
-import { RecommendSection } from '@/components/douban-section';
 import { DetailModal } from '@/components/detail-modal';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
 import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled } from '@/lib/store';
@@ -16,6 +15,7 @@ import { useToast } from '@/components/toast';
 import { EmptyState } from '@/components/states';
 import { Icon } from '@/components/icon';
 import { SiteFooter } from '@/components/site-footer';
+import { HomeLanding } from '@/components/home-landing';
 
 /**
  * 首页：搜索（URL ?s= 驱动，可后退/分享）+ 豆瓣推荐。
@@ -164,30 +164,13 @@ function HomeContent() {
   useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
+    <div className={cn('min-h-screen flex flex-col', !urlQuery && 'zip-home')}>
+      <Header landing={!urlQuery} />
 
-      <main className="relative flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-        {/* 首屏氛围渐变 */}
-        {!urlQuery && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10"
-            style={{
-              background:
-                'radial-gradient(60% 60% at 50% 0%, rgba(35,173,229,0.10) 0%, rgba(35,173,229,0.03) 45%, transparent 75%)',
-            }}
-          />
-        )}
-
-        {/* 搜索区 */}
-        <section className={cn('flex flex-col items-center', urlQuery ? 'mb-6' : 'mt-8 mb-8')}>
-          {!urlQuery && (
-            <header className="text-center mb-6">
-              <h1 className="text-4xl sm:text-5xl font-bold brand-gradient">LibreTV</h1>
-            </header>
-          )}
-          {urlQuery && <h1 className="sr-only">LibreTV 视频搜索</h1>}
+      <main className={cn('relative flex-1 max-w-6xl w-full mx-auto px-4 py-6', !urlQuery && 'zip-main-shell')}>
+        {urlQuery ? (
+          <section className="mb-6">
+            <h1 className="sr-only">FreeDY 视频搜索</h1>
           {/* 定位容器比胶囊宽一圈：浮层按它的宽度对齐，接缝处不会与胶囊边框错位 1px */}
           <div ref={searchHistory.containerRef} className="relative w-full max-w-2xl">
             <form
@@ -278,7 +261,16 @@ function HomeContent() {
               />
             )}
           </div>
-        </section>
+          </section>
+        ) : (
+          <HomeLanding
+            input={input}
+            onInputChange={setInput}
+            inputRef={inputRef}
+            searchHistory={searchHistory}
+            onSearch={runSearch}
+          />
+        )}
 
         {/* 搜索结果 */}
         {urlQuery && (
@@ -363,18 +355,9 @@ function HomeContent() {
           </section>
         )}
 
-        {/* 首页推荐（有搜索时隐藏） */}
-        {!urlQuery && (
-          <RecommendSection
-            onPick={(title) => {
-              setInput(title);
-              runSearch(title);
-            }}
-          />
-        )}
       </main>
 
-      <SiteFooter />
+      {urlQuery ? <SiteFooter /> : null}
 
       <DetailModal item={detailItem} onClose={() => setDetailItem(null)} />
     </div>
@@ -403,15 +386,14 @@ function ResultsSkeleton() {
 function NoSourceGuide({ hasSources = false }: { hasSources?: boolean }) {
   return (
     <div className="border border-dashed border-line rounded-xl p-10 text-center max-w-lg mx-auto">
-      <h3 className="text-content font-medium mb-2">{hasSources ? '尚未勾选点播源' : '先添加一个点播源'}</h3>
+      <h3 className="text-content font-medium mb-2">{hasSources ? '尚未勾选点播源' : '暂无可用的点播源'}</h3>
       <p className="text-sm text-muted leading-relaxed">
         {hasSources ? (
           <>点击右上角「设置」，勾选要参与搜索的点播源后重新搜索。</>
         ) : (
           <>
-            LibreTV 不内置任何采集站。点击右上角「设置 → 添加 API」，填入一个
-            Apple CMS 采集站地址（如 <code className="text-accent text-xs">https://example.com/api.php/provide/vod</code>），
-            勾选后即可开始搜索。
+            FreeDY 已预置多个点播源。点击右上角「设置 → 源管理」查看并启用来源，
+            也可以添加自定义 Apple CMS API。
           </>
         )}
       </p>
