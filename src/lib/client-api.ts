@@ -2,6 +2,7 @@
 
 import type { SearchResponse, SearchStreamEvent, SourceSearchOutcome, VideoDetail, DoubanResponse, BangumiCalendarResponse, AuthStatusResponse, SourceConfig, SearchResultItem, LivePlaylistResponse, LiveEpgResponse, SourceListPayload } from './types';
 import type { TvDirectoryResponse, TvRegionResponse } from './tv-types';
+import { normalizeTitle } from './cms-parser';
 
 /**
  * 客户端 API 封装。401 时触发全局事件打开登录框，
@@ -120,28 +121,14 @@ export const api = {
 
   logout: () => request<{ success: boolean }>('/api/auth', { method: 'DELETE' }),
 
-  /**
-   * 聚合搜索。传入 onSource 时走 /api/search?stream=1 的 NDJSON 流：
-   * 每个源结算立即回调（健康源结果不再等坏源超时），最终以聚合结果 resolve。
-   * 未传 onSource 或流不可用时回退为一次性 JSON 请求。
-   */
+  /** 每个来源独立发起请求，浏览器限制并发，避免单个 Worker 承担全部来源。 */
   search: async (
     wd: string,
     sources: SourceConfig[],
     filterAdult: boolean,
     opts?: { signal?: AbortSignal; onSource?: (outcome: SourceSearchOutcome) => void }
   ): Promise<SearchResponse> => {
-    const signal = opts?.signal;
-    const onSource = opts?.onSource;
-    if (!onSource) {
-      return request<SearchResponse>('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wd, sources, filterAdult }),
-        signal,
-      });
-    }
-    return searchStream(wd, sources, filterAdult, onSource, signal);
+    return searchAcrossSources(wd, sources, filterAdult, opts);
   },
 
   detail: (id: string, source: SourceConfig, signal?: AbortSignal) => {
@@ -268,39 +255,158 @@ export const api = {
   },
 };
 
-export interface SearchFailure {
-  sourceKey: string;
-  error: string;
-  timedOut?: boolean;
+const SEARCH_SOURCE_CONCURRENCY = 4;
+const SEARCH_SOURCE_REQUEST_TIMEOUT_MS = 20_000;
+
+function searchEventLine(line: string): SearchStreamEvent | undefined {
+  const text = line.trim();
+  if (!text) return undefined;
+  try {
+    const value: unknown = JSON.parse(text);
+    if (!value || typeof value !== 'object' || !('type' in value)) return undefined;
+    const event = value as SearchStreamEvent;
+    return event.type === 'source' || event.type === 'done' ? event : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-/** 聚合搜索流式消费：逐源回调 + 最终聚合结果（NDJSON 行协议，同 liveProbeStream） */
-async function searchStream(
-  wd: string,
-  sources: SourceConfig[],
-  filterAdult: boolean,
-  onSource: (outcome: SourceSearchOutcome) => void,
-  signal?: AbortSignal
-): Promise<SearchResponse> {
-  const res = await fetch('/api/search?stream=1', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ wd, sources, filterAdult }),
-    signal,
-  });
-    throwForAuthStatus(res);
-    if (!res.ok || !res.body) throw new ApiError(`请求失败 (${res.status})`, res.status);
+function interruptOutcome(source: SourceConfig, previous?: SourceSearchOutcome, timedOut = false): SourceSearchOutcome {
+  const hasResults = (previous?.list.length || 0) > 0;
+  return {
+    sourceKey: source.key,
+    ok: hasResults,
+    list: previous?.list || [],
+    ms: previous?.ms,
+    partial: true,
+    timedOut,
+    failureKind: 'platform',
+    error: hasResults ? '搜索流中断，已保留先到结果' : timedOut ? '搜索连接超时，请重试' : '搜索连接中断，请重试',
+  };
+}
 
-    // done 事件缺失（流被截断）时退化为空结果，不让整次搜索报错
-    let final: SearchResponse = { list: [], failures: [] };
-    await consumeNdjson<SearchStreamEvent>(res, (event) => {
-      if (event.type === 'source') {
-        onSource(event);
-      } else if (event.type === 'done') {
-        final = { list: event.list, failures: event.failures };
-      }
+/** 单源流消费。连接中断时保留已收到结果，并把故障归到请求平台。 */
+async function searchOneSource(
+  wd: string,
+  source: SourceConfig,
+  filterAdult: boolean,
+  onSource: ((outcome: SourceSearchOutcome) => void) | undefined,
+  parentSignal?: AbortSignal
+): Promise<SourceSearchOutcome> {
+  const started = performance.now();
+  const timeout = AbortSignal.timeout(SEARCH_SOURCE_REQUEST_TIMEOUT_MS);
+  const signal = parentSignal ? AbortSignal.any([parentSignal, timeout]) : timeout;
+  let previous: SourceSearchOutcome | undefined;
+  let doneSeen = false;
+  const publish = (outcome: SourceSearchOutcome) => {
+    previous = outcome;
+    if (!parentSignal?.aborted) onSource?.(outcome);
+  };
+
+  try {
+    const res = await fetch('/api/search?stream=1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wd, sources: [source], filterAdult }),
+      signal,
     });
-    return final;
+    throwForAuthStatus(res);
+    if (!res.ok || !res.body) {
+      let message = `搜索请求失败 (${res.status})`;
+      try {
+        const data = await res.json() as { error?: string };
+        if (data.error) message = data.error;
+      } catch { /* 响应体可能不是 JSON。 */ }
+      const failed: SourceSearchOutcome = {
+        sourceKey: source.key, ok: false, list: [], error: message,
+        failureKind: 'platform', ms: Math.round(performance.now() - started),
+      };
+      publish(failed);
+      return failed;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const consume = (line: string) => {
+      const event = searchEventLine(line);
+      if (!event) return;
+      if (event.type === 'source' && event.sourceKey === source.key) publish(event);
+      if (event.type === 'done') doneSeen = true;
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newline: number;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        consume(buffer.slice(0, newline));
+        buffer = buffer.slice(newline + 1);
+      }
+    }
+    buffer += decoder.decode();
+    consume(buffer);
+    if (doneSeen && previous) return previous;
+    const interrupted = interruptOutcome(source, previous, timeout.aborted && !parentSignal?.aborted);
+    interrupted.ms = Math.round(performance.now() - started);
+    publish(interrupted);
+    return interrupted;
+  } catch (error) {
+    if (parentSignal?.aborted) throw error;
+    if (error instanceof ApiError && (error.status === 401 || error.status === 503)) throw error;
+    const interrupted = interruptOutcome(source, previous, timeout.aborted);
+    interrupted.ms = Math.round(performance.now() - started);
+    if (!previous || interrupted.error !== previous.error) publish(interrupted);
+    return interrupted;
   }
+}
+
+/** 有界并发跨来源搜索；一个线路的超时或故障不会阻塞其余线路。 */
+async function searchAcrossSources(
+  wd: string,
+  sourceList: SourceConfig[],
+  filterAdult: boolean,
+  opts?: { signal?: AbortSignal; onSource?: (outcome: SourceSearchOutcome) => void }
+): Promise<SearchResponse> {
+  const sources = [...new Map(sourceList.map(source => [source.key, source])).values()];
+  const outcomes = new Map<string, SourceSearchOutcome>();
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < sources.length && !opts?.signal?.aborted) {
+      const source = sources[nextIndex++];
+      const outcome = await searchOneSource(wd, source, filterAdult, value => {
+        outcomes.set(value.sourceKey, value);
+        opts?.onSource?.(value);
+      }, opts?.signal);
+      if (opts?.signal?.aborted) return;
+      outcomes.set(source.key, outcome);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(SEARCH_SOURCE_CONCURRENCY, sources.length) }, worker));
+  if (opts?.signal?.aborted) throw opts.signal.reason || new DOMException('搜索已取消', 'AbortError');
+
+  const ordered = sources.map(source => outcomes.get(source.key)).filter((item): item is SourceSearchOutcome => !!item);
+  const seen = new Set<string>();
+  const list = ordered.flatMap(outcome => outcome.list).filter(item => {
+    const key = `${item.sourceKey}\u0000${item.vodId}`;
+    if (!item.vodId || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const exactTitle = normalizeTitle(wd);
+  list.sort((a, b) => Number(normalizeTitle(b.name) === exactTitle) - Number(normalizeTitle(a.name) === exactTitle)
+    || a.name.localeCompare(b.name, 'zh-CN')
+    || a.sourceName.localeCompare(b.sourceName, 'zh-CN'));
+  return {
+    list,
+    outcomes: ordered,
+    failures: ordered.filter(outcome => !outcome.ok).map(outcome => ({
+      sourceKey: outcome.sourceKey,
+      error: outcome.error || '请求失败',
+      timedOut: outcome.timedOut,
+      failureKind: outcome.failureKind,
+    })),
+  };
+}
 
 export type { SearchResponse, SearchResultItem };

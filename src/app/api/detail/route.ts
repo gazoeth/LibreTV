@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { guardRequest } from '@/lib/api-guard';
 import { cmsRequestHeaders, parseDetail, parseDetailPageHtml } from '@/lib/cms-parser';
 import { fetchUpstream, getCache, setCache } from '@/lib/fetch-utils';
-import { checkUpstreamAllowed } from '@/lib/ssrf';
+import { buildCmsUrl } from '@/lib/cms-request';
 import type { SourceConfig, VideoDetail } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -21,10 +21,7 @@ function parseSource(raw: string | null): SourceConfig | null {
   }
 }
 
-/**
- * 视频详情：优先走列表接口 ?ac=videolist&ids=，
- * 拿不到播放地址时（部分源需要爬详情页）降级到 detail 页 HTML 提取。
- */
+/** 视频详情：标准详情协议优先，仅在协议不兼容时尝试旧协议。 */
 export async function GET(req: Request) {
   const guarded = guardRequest(req);
   if (guarded) return guarded;
@@ -50,37 +47,35 @@ export async function GET(req: Request) {
       return NextResponse.json(cached);
     }
 
-    // 用户可控地址发起服务端请求，先过 SSRF 校验（协议白名单 + 内网/保留地址）
-    const listVerdict = await checkUpstreamAllowed(source.url);
-    if (!listVerdict.ok) {
-      return NextResponse.json({ error: listVerdict.reason }, { status: 400 });
-    }
-
     let resolved: VideoDetail | null = null;
+    const failures: { stage: string; reason: string; status?: number }[] = [];
+    const assertActive = () => req.signal.throwIfAborted();
 
-    // 1) 标准列表接口
-    const api = `${source.url.replace(/\/+$/, '')}?ac=videolist&ids=${encodeURIComponent(id)}`;
-    const res = await fetchUpstream(api, { timeoutMs: 10000, signal: req.signal, headers: cmsRequestHeaders() });
-    if (res.ok) {
-      const data = await res.json();
+    // 安全请求工具拥有首跳及逐跳校验，避免重复 DNS 查询占用子请求预算。
+    for (const action of ['detail', 'videolist']) {
+      assertActive();
+      const api = buildCmsUrl(source.url, { ac: action, ids: id });
+      const res = await fetchUpstream(api, { timeoutMs: 10000, signal: req.signal, headers: cmsRequestHeaders() });
+      if (!res.ok) {
+        failures.push({ stage: action, reason: `上游返回 HTTP ${res.status}`, status: res.status });
+        // 鉴权、限流及服务器故障不属于协议不兼容，重复请求只会加重故障。
+        if (![400, 404, 405, 422].includes(res.status)) break;
+        continue;
+      }
       try {
-        const detail = parseDetail(data, source);
-        if (detail.episodes.length > 0) {
-          resolved = detail;
-        }
-        // 有详情但无播放地址 → 继续尝试详情页
-      } catch {
-        // 列表接口无内容 → 继续尝试详情页
+        const detail = parseDetail(await res.json(), source);
+        assertActive();
+        if (detail.episodes.length > 0) { resolved = detail; break; }
+        failures.push({ stage: action, reason: '详情没有可播放剧集' });
+      } catch (err) {
+        assertActive();
+        failures.push({ stage: action, reason: err instanceof Error ? err.message : '详情格式无效' });
       }
     }
 
     // 2) 详情页 HTML 提取（detail 地址优先，否则用 API 地址推导）
     const detailRoot = (source.detail || baseUrl || '').replace(/\/+$/, '');
     if (!resolved && detailRoot && /^https?:\/\//.test(detailRoot)) {
-      const detailVerdict = await checkUpstreamAllowed(detailRoot);
-      if (!detailVerdict.ok) {
-        return NextResponse.json({ error: detailVerdict.reason }, { status: 400 });
-      }
       const detailUrl = `${detailRoot}/index.php/vod/detail/id/${id}.html`;
       const detailRes = await fetchUpstream(detailUrl, {
         timeoutMs: 10000,
@@ -89,16 +84,19 @@ export async function GET(req: Request) {
       });
       if (detailRes.ok) {
         const html = await detailRes.text();
+        assertActive();
         resolved = parseDetailPageHtml(html, source);
-      }
+      } else failures.push({ stage: 'html', reason: `详情页返回 HTTP ${detailRes.status}`, status: detailRes.status });
     }
 
     if (!resolved || resolved.episodes.length === 0) {
-      return NextResponse.json({ error: '未找到播放资源' }, { status: 404 });
+      return NextResponse.json({ error: failures.at(-1)?.reason || '未找到播放资源', attempts: failures }, { status: 404 });
     }
+    assertActive();
     setCache(cacheKey, resolved, DETAIL_CACHE_TTL);
     return NextResponse.json(resolved);
   } catch (err) {
+    if (req.signal.aborted) return NextResponse.json({ error: '请求已取消' }, { status: 499 });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : '获取详情失败' },
       { status: 502 }

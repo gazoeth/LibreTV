@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
-import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled } from '@/lib/store';
+import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled, shouldRecheckSourceHealth } from '@/lib/store';
 import { api } from '@/lib/client-api';
 import type { SourceSearchOutcome } from '@/lib/types';
 import { SearchHistoryDropdown, useSearchHistory } from '@/components/search-history';
@@ -46,7 +46,8 @@ function HomeContent() {
   const subscriptions = useAppStore((s) => s.subscriptions);
   const [input, setInput] = useState(urlQuery);
   /** 流式搜索中已结算的源（data 就绪前用于增量渲染） */
-  const [streamedOutcomes, setStreamedOutcomes] = useState<SourceSearchOutcome[]>([]);
+  const [streamState, setStreamState] = useState<{ key: string; outcomes: SourceSearchOutcome[] }>({ key: '', outcomes: [] });
+  const [searchAttempt, setSearchAttempt] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,7 +67,7 @@ function HomeContent() {
     envSources.find((a) => a.key === key)?.name ??
     key;
 
-  const selectedSources = useMemo(() => {
+  const configuredSources = useMemo(() => {
     // selectedKeys 可能含历史残留的重复 key：按 key 去重，避免同源重复搜索
     const seen = new Set<string>();
     return selectedKeys
@@ -76,11 +77,9 @@ function HomeContent() {
         seen.add(s.key);
         return true;
       })
-      // 自动停用期内的源不参与搜索（到期自动恢复）
-      .filter((s) => !isSourceDisabled({ sourceHealth }, s.key))
       // 所属订阅被整体停用的源同样跳过（无损：各源勾选状态保留，重新启用即恢复）
       .filter((s) => !isInDisabledSubscription({ subscriptions }, s.key));
-  }, [customAPIs, envSources, selectedKeys, sourceHealth, subscriptions]);
+  }, [customAPIs, envSources, selectedKeys, subscriptions]);
   const disabledSources = useMemo(
     () => selectedKeys.filter((key) => isSourceDisabled({ sourceHealth }, key)),
     [selectedKeys, sourceHealth]
@@ -94,31 +93,67 @@ function HomeContent() {
     [selectedKeys, sourceHealth, subscriptions]
   );
 
+  // 本轮来源在开始时固定；健康记录更新不能改变正在展示的搜索分母。
+  const sourceSnapshotKey = JSON.stringify([urlQuery, yellowFilter, searchAttempt]);
+  const selectedSources = useMemo(() => {
+    // 用搜索条件作为快照版本：同一轮中健康反馈的变化不会缩小来源分母。
+    void sourceSnapshotKey;
+    const health = useAppStore.getState();
+    return configuredSources.filter((source) => !isSourceDisabled(health, source.key));
+  }, [configuredSources, sourceSnapshotKey]);
+  // 旧版本把 Worker 子请求耗尽误记为私网地址，清除旧暂停后由新逐跳校验重新判断。
+  // 这只恢复参与搜索的资格，不放行任何地址；内网仍会在请求边界被拦截。
+  // 删除条目本身保证幂等，不触碰勾选、订阅、观看历史或收藏。
+  useEffect(() => {
+    const affected = configuredSources.filter(source => {
+      const entry = sourceHealth[source.key];
+      return entry && shouldRecheckSourceHealth(entry);
+    });
+    if (affected.length === 0) return;
+    for (const source of affected) useAppStore.getState().clearSourceHealth(source.key);
+    if (selectedSources.length === 0) setSearchAttempt(attempt => attempt + 1);
+  }, [configuredSources, sourceHealth, selectedSources.length]);
+  const searchKey = JSON.stringify([urlQuery.slice(0, 100), selectedSources, yellowFilter, searchAttempt]);
+  const activeSearchKey = useRef(searchKey);
+  activeSearchKey.current = searchKey;
+  const streamedOutcomes = useMemo(
+    () => streamState.key === searchKey ? streamState.outcomes : [],
+    [streamState, searchKey]
+  );
   const searchQuery = useQuery({
-    queryKey: ['search', urlQuery, selectedKeys, yellowFilter],
-    // 与 runSearch 的截断规则保持一致：顶栏搜索 / 手动构造长链接不会绕过上限
-    queryFn: ({ signal }) => {
-      setStreamedOutcomes([]);
-      return api.search(urlQuery.slice(0, 100), selectedSources, yellowFilter, {
+    queryKey: ['search', searchKey],
+    queryFn: async ({ signal }) => {
+      const outcomes = new Map<string, SourceSearchOutcome>();
+      setStreamState({ key: searchKey, outcomes: [] });
+      const response = await api.search(urlQuery.slice(0, 100), selectedSources, yellowFilter, {
         signal,
-        // 逐源结算即更新：结果边搜边渲染，同时滚动健康度
         onSource: (outcome) => {
-          setStreamedOutcomes((prev) => [...prev, outcome]);
-          for (const ev of useAppStore.getState().recordSourceHealth([outcome])) {
-            toast(
-              ev.permanent
-                ? `「${sourceName(ev.key)}」多次失败，已停止参与搜索，可在设置中恢复`
-                : `「${sourceName(ev.key)}」连续超时/失败，已停用 ${formatDisableTtl(ev.ttlMs ?? 0)}`,
-              'warning'
-            );
-          }
+          if (signal.aborted || activeSearchKey.current !== searchKey || !selectedSources.some(source => source.key === outcome.sourceKey)) return;
+          outcomes.set(outcome.sourceKey, outcome);
+          setStreamState({ key: searchKey, outcomes: [...outcomes.values()] });
         },
       });
+      // 只结算完整且仍有效的请求，取消/旧流不会累积故障次数。
+      if (!signal.aborted && activeSearchKey.current === searchKey) {
+        for (const ev of useAppStore.getState().recordSourceHealth([...outcomes.values()])) {
+          toast(
+            ev.permanent
+              ? `「${sourceName(ev.key)}」多次失败，后续搜索已暂停，可点击恢复并重试`
+              : `「${sourceName(ev.key)}」连续超时/失败，后续搜索暂停 ${formatDisableTtl(ev.ttlMs ?? 0)}`,
+            'warning'
+          );
+        }
+      }
+      return { ...response, outcomes: [...outcomes.values()] };
     },
     enabled: Boolean(urlQuery) && selectedSources.length > 0,
-    // 5 分钟内从播放页返回时直接使用缓存，不重新搜索（服务端另有 60s 结果缓存兜底）
     staleTime: 300_000,
+    retry: false,
   });
+  const retrySearch = () => {
+    for (const source of configuredSources) useAppStore.getState().clearSourceHealth(source.key);
+    setSearchAttempt(attempt => attempt + 1);
+  };
 
   // 最近搜索改为搜索框下拉（聚焦展开、按输入过滤），不再常驻首屏
   const searchHistory = useSearchHistory(input);
@@ -131,9 +166,14 @@ function HomeContent() {
       return;
     }
     if (selectedSources.length === 0) {
-      toast('请先在设置中添加并勾选点播源', 'warning');
-      return;
+      if (configuredSources.length > 0) {
+        retrySearch();
+      } else {
+        toast('请先在设置中勾选点播源，或启用所属订阅', 'warning');
+        return;
+      }
     }
+    if (query === urlQuery && selectedSources.length > 0) retrySearch();
     router.push(`/?s=${encodeURIComponent(query)}`, { scroll: false });
     searchHistory.record(query);
   };
@@ -154,11 +194,14 @@ function HomeContent() {
     () => searchQuery.data?.list ?? (isSearching ? streamedList : []),
     [searchQuery.data, isSearching, streamedList]
   );
-  const failures =
-    searchQuery.data?.failures ??
-    streamedOutcomes
-      .filter((o) => !o.ok)
-      .map((o) => ({ sourceKey: o.sourceKey, error: o.error || '请求失败', timedOut: o.timedOut }));
+  const outcomes = searchQuery.data?.outcomes ?? streamedOutcomes;
+  const failures = [...new Map((searchQuery.data?.failures ?? outcomes
+    .filter(outcome => !outcome.ok)
+    .map(outcome => ({ sourceKey: outcome.sourceKey, error: outcome.error || '请求失败', timedOut: outcome.timedOut })))
+    .filter(failure => selectedSources.some(source => source.key === failure.sourceKey))
+    .map(failure => [failure.sourceKey, failure])).values()];
+  const respondedCount = Math.min(selectedSources.length, new Set(outcomes.map(outcome => outcome.sourceKey)).size);
+  const successfulCount = Math.max(0, Math.min(selectedSources.length, new Set(outcomes.filter(outcome => outcome.ok).map(outcome => outcome.sourceKey)).size));
   // 跨源同名聚合：同名影片合并为一张卡片，展开后可选择具体来源
   const groups = useMemo(() => aggregateResults(list), [list]);
 
@@ -284,7 +327,7 @@ function HomeContent() {
                 “<span className="text-content">{urlQuery}</span>” 的搜索结果
                 {isSearching ? (
                   <span className="text-faint">
-                    （已就绪 {streamedOutcomes.length}/{selectedSources.length} 个源…）
+                    （已就绪 {respondedCount}/{selectedSources.length} 个源…）
                   </span>
                 ) : (
                   searchQuery.data && (
@@ -297,13 +340,14 @@ function HomeContent() {
             </div>
 
             <details className="fd-search-health" open={isSearching ? true : undefined}>
-              <summary><strong>来源健康状态</strong><span>{isSearching ? `已响应 ${streamedOutcomes.length} / ${selectedSources.length}` : `${selectedSources.length - failures.length} 个来源响应 · ${failures.length} 个不可用`} <b aria-hidden="true">＋</b></span></summary>
+              <summary><strong>来源健康状态</strong><span>{isSearching ? `已响应 ${respondedCount} / ${selectedSources.length}` : `${successfulCount} 个来源正常 · ${searchQuery.isError ? Math.max(failures.length, selectedSources.length - successfulCount) : failures.length} 个不可用`} <b aria-hidden="true">＋</b></span></summary>
               <div className="fd-search-health-grid">{selectedSources.map(source => {
-                const outcome = streamedOutcomes.find(item => item.sourceKey === source.key);
+                const outcome = outcomes.find(item => item.sourceKey === source.key);
                 const failure = failures.find(item => item.sourceKey === source.key);
                 const count = outcome?.list.length ?? list.filter(item => item.sourceKey === source.key).length;
                 const pending = isSearching && !outcome;
-                return <div key={source.key} className={pending ? 'is-pending' : failure ? 'is-error' : 'is-ok'}><i aria-hidden="true">{pending ? '○' : failure ? '×' : '✓'}</i><div><strong>{source.name}</strong><small>{pending ? '正在搜索' : failure ? (failure.timedOut ? '连接超时' : '暂时不可用') : `${count} 个结果`}</small></div><em>{outcome?.ms !== undefined ? `${(outcome.ms / 1000).toFixed(1)}s` : ''}</em></div>;
+                const unresponsive = !pending && !outcome && searchQuery.isError;
+                return <div key={source.key} className={pending ? 'is-pending' : failure || unresponsive ? 'is-error' : 'is-ok'}><i aria-hidden="true">{pending ? '○' : failure || unresponsive ? '×' : '✓'}</i><div><strong>{source.name}</strong><small>{pending ? '正在搜索' : failure ? (failure.timedOut ? '连接超时' : '暂时不可用') : unresponsive ? '搜索连接失败' : `${count} 个结果`}</small></div><em>{outcome?.ms !== undefined ? `${(outcome.ms / 1000).toFixed(1)}s` : ''}</em></div>;
               })}</div><p>此处显示搜索接口的响应，媒体是否可播会在播放页检测。</p>
             </details>
 
@@ -322,7 +366,8 @@ function HomeContent() {
             {disabledSources.length > 0 && (
               <div className="mb-3 text-xs text-faint bg-chip rounded-lg px-3 py-2">
                 {disabledSources.length} 个源因连续超时/失败已暂停参与搜索（临时停用的到期自动恢复，
-                长期停用的需在设置中手动恢复）：{disabledSources.map((key) => sourceName(key)).join('、')}
+                长期停用的也可立即恢复）：{disabledSources.map((key) => sourceName(key)).join('、')}
+                <button className="btn-ghost btn-sm mt-2" onClick={retrySearch}>恢复已选来源并重试</button>
               </div>
             )}
 
@@ -333,7 +378,15 @@ function HomeContent() {
               </div>
             )}
 
-            {selectedSources.length === 0 ? (
+            {(failures.length > 0 || searchQuery.isError) && (
+              <div className="mb-4 text-sm text-muted">
+                {searchQuery.isError ? '搜索连接失败，请重试。' : '来源故障不代表没有这部影片。'}
+                <button className="btn-ghost btn-sm ml-2" disabled={isSearching} onClick={retrySearch}>恢复并重新搜索</button>
+              </div>
+            )}
+            {selectedSources.length === 0 && configuredSources.length > 0 ? (
+              <EmptyState icon="search" title="已选来源暂时暂停" description="来源曾连续失败，请点击上方恢复按钮重新搜索。" className="!py-16" />
+            ) : selectedSources.length === 0 ? (
               <NoSourceGuide hasSources={customAPIs.length > 0 || envSources.length > 0} />
             ) : list.length > 0 ? (
               <>
@@ -362,7 +415,7 @@ function HomeContent() {
             ) : (
               <EmptyState
                 icon="search"
-                title="没有找到匹配的结果"
+                title={searchQuery.isError || failures.length === selectedSources.length ? "暂时无法连接点播源" : "没有找到匹配的结果"}
                 description="请尝试其他关键词或更换点播源"
                 className="!py-16"
               />

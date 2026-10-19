@@ -52,43 +52,47 @@ export function isValidProxyUrl(urlString: string): boolean {
   }
 }
 
-/** DNS 解析后校验目标主机名是否解析到内网/保留地址 */
-export async function isBlockedByDNS(urlString: string): Promise<boolean> {
+export type UpstreamVerdict = { ok: true } | { ok: false; reason: string; failureKind?: 'invalid' | 'dns' | 'platform' };
+
+/** 解析失败与私网结果分别表达，均保持拒绝出网。 */
+async function checkDnsTarget(urlString: string): Promise<UpstreamVerdict> {
+  const denied = { ok: false as const, reason: '目标地址解析到私有/保留网络', failureKind: 'invalid' as const };
   try {
     const hostname = stripBrackets(new URL(urlString).hostname);
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':')) {
-      return isPrivateIP(hostname);
-    }
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':')) return isPrivateIP(hostname) ? denied : { ok: true };
+    let addresses: string[];
     if (process.env.CLOUDFLARE_WORKERS === '1') {
-      // Workers 不实现 lookup；分别解析两种地址，避免迁移后跳过 DNS 安全校验。
       const answers = await Promise.allSettled([dns.resolve4(hostname), dns.resolve6(hostname)]);
-      const addresses = answers.flatMap(result => result.status === 'fulfilled' ? result.value : []);
-      if (!addresses.length) return true;
-      return addresses.some(isPrivateIP);
+      addresses = answers.flatMap(result => result.status === 'fulfilled' ? result.value : []);
+      // 无 AAAA 等正常空记录不应误报私网；预算、网络等解析故障必须保留原因。
+      const failures = answers.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+      const platformError = failures.find(error => /too many subrequests|worker.*(?:limit|resource)/i.test(String(error?.message || error)));
+      if (platformError) return { ok: false, reason: '平台子请求配额不足，DNS 校验未完成', failureKind: 'platform' };
+      const unexpected = failures.find(error => !['ENODATA', 'ENOTFOUND', 'DNS_ENODATA', 'DNS_ENOTFOUND'].includes(String(error?.code || '')));
+      if (unexpected || !addresses.length) return { ok: false, reason: 'DNS 解析暂时失败，尚未获得有效公网地址', failureKind: 'dns' };
+    } else {
+      addresses = (await dns.lookup(hostname, { all: true })).map(result => result.address);
     }
-    const result = await dns.lookup(hostname, { all: true });
-    return result.some((r) => isPrivateIP(r.address));
-  } catch {
-    return false; // 解析失败不阻断，交给后续请求处理
+    if (!addresses.length) return { ok: false, reason: 'DNS 未返回有效地址', failureKind: 'dns' };
+    return addresses.some(isPrivateIP) ? denied : { ok: true };
+  } catch (error) {
+    return { ok: false, reason: /too many subrequests/i.test(String(error)) ? '平台子请求配额不足，DNS 校验未完成' : 'DNS 解析暂时失败，尚未获得有效公网地址', failureKind: /too many subrequests/i.test(String(error)) ? 'platform' : 'dns' };
   }
 }
 
-export type UpstreamVerdict = { ok: true } | { ok: false; reason: string };
+/** 兼容旧代理消费者；未知 DNS 结果仍按禁止访问处理。 */
+export async function isBlockedByDNS(urlString: string): Promise<boolean> {
+  return !(await checkDnsTarget(urlString)).ok;
+}
 
-/**
- * 出网请求的统一校验入口：字面量校验 + DNS 解析校验。
- *
- * 任何由用户输入驱动的服务端请求（采集站搜索/详情、代理转发）都必须先过这一关，
- * 否则服务器会变成内网探测跳板（/api/search 曾直接用用户传的 source.url 发请求）。
- */
+export class UpstreamAccessError extends Error {
+  constructor(message: string, readonly failureKind: 'invalid' | 'dns' | 'platform') { super(message); this.name = 'UpstreamAccessError'; }
+}
+
+/** 出网校验由这里解释，所有重定向仍逐跳调用，未添加域名豁免。 */
 export async function checkUpstreamAllowed(urlString: string): Promise<UpstreamVerdict> {
-  if (!isValidProxyUrl(urlString)) {
-    return { ok: false, reason: '目标地址不在允许范围内（仅支持公网 http/https）' };
-  }
-  if (await isBlockedByDNS(urlString)) {
-    return { ok: false, reason: '目标地址解析到私有/保留网络' };
-  }
-  return { ok: true };
+  if (!isValidProxyUrl(urlString)) return { ok: false, reason: '目标地址不在允许范围内（仅支持公网 http/https）', failureKind: 'invalid' };
+  return checkDnsTarget(urlString);
 }
 
 /** 直播场景是否放行内网地址（自建 IPTV）；由部署者显式开启 */

@@ -1,6 +1,6 @@
 /** 服务端上游请求工具：超时、重试、安全跳转、JSON 解析 */
 
-import { checkLiveUrlAllowed, checkUpstreamAllowed } from './ssrf';
+import { checkLiveUrlAllowed, checkUpstreamAllowed, UpstreamAccessError } from './ssrf';
 
 export interface FetchOptions extends RequestInit {
   timeoutMs?: number;
@@ -64,7 +64,7 @@ export async function fetchWithSafeRedirects(
       ? await checkLiveUrlAllowed(current)
       : await checkUpstreamAllowed(current);
     if (!verdict.ok) {
-      throw new Error(`跳转目标被拒绝: ${verdict.reason}`);
+      throw new UpstreamAccessError(`跳转目标被拒绝: ${verdict.reason}`, verdict.failureKind || 'invalid');
     }
     const timer = headerTimeoutMs ? setTimeout(() => controller.abort(), headerTimeoutMs) : null;
     let res: Response;

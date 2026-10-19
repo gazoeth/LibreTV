@@ -55,13 +55,19 @@ export interface DoubanItem {
   isTv?: boolean;
 }
 
+/** 故障所属边界；平台限额和请求中断不应归咎于点播源。 */
+export type SourceFailureKind = 'upstream' | 'platform' | 'dns' | 'invalid' | 'interrupted';
+
 export interface SourceSearchOutcome {
   sourceKey: string;
   ok: boolean;
   list: SearchResultItem[];
   error?: string;
+  failureKind?: SourceFailureKind;
   /** 因超时失败：源可能只是慢，前端以琥珀色区分于真正的失败 */
   timedOut?: boolean;
+  /** 已保留部分结果，后续分页或传输未完成。 */
+  partial?: boolean;
   /** 该源搜索总耗时（ms），用于健康徽章 */
   ms?: number;
 }
@@ -70,7 +76,9 @@ export interface SourceSearchOutcome {
 
 export interface SearchResponse {
   list: SearchResultItem[];
-  failures: { sourceKey: string; error: string; timedOut?: boolean }[];
+  failures: { sourceKey: string; error: string; timedOut?: boolean; failureKind?: SourceFailureKind }[];
+  /** 缓存逐源状态，返回搜索页时保持本轮健康信息。 */
+  outcomes?: SourceSearchOutcome[];
 }
 
 /** /api/search?stream=1 的 NDJSON 事件：逐源推送 + 最终聚合 */

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { DETAIL_STALE_TIME, detailQueryKey } from '@/lib/detail-query';
+import { normalizeTitle } from '@/lib/cms-parser';
 import { api, type LiveProbeResult } from '@/lib/client-api';
 import type { SourceConfig, SearchResultItem, VideoDetail } from '@/lib/types';
 import { buildWatchUrl, cn } from '@/lib/utils';
@@ -109,6 +110,10 @@ export function SwitchSourceModal({
       if (cancelled) return;
       setCandidates(prev => prev.map(row => row.source.key === c.source.key ? { ...row, ...patch } : row));
     };
+    const currentSource = sources.find(s => s.key === currentSourceKey);
+    const currentDetail = currentSource ? queryClient.getQueryData<VideoDetail>(detailQueryKey(currentVodId, currentSource)) : undefined;
+    const currentYear = currentDetail?.videoInfo.year?.trim();
+    const sameYear = (year?: string) => !currentYear || !year?.trim() || year.trim() === currentYear;
     const check = async (c: Candidate) => {
       try {
         const start = performance.now();
@@ -121,6 +126,7 @@ export function SwitchSourceModal({
           if (cancelled) return;
           queryClient.setQueryData(key, detail);
         }
+        if (!sameYear(detail.videoInfo.year)) throw new Error('同名影片年份不符，请手动搜索确认');
         if (!detail.episodes.length) throw new Error('未找到剧集');
         const target = detail.episodes[Math.min(currentIndex, detail.episodes.length - 1)];
         update(c, { ok: true, episodes: detail.episodes.length, ms: Math.round(performance.now() - start), stage: 'probing' });
@@ -145,7 +151,8 @@ export function SwitchSourceModal({
       const source = sources.find(s => s.key === sourceKey);
       if (!source) return;
       const title = currentTitle.trim();
-      const match = list.find(r => r.name.trim() === title) || list.find(r => {
+      const matchingYear = list.filter(r => sameYear(r.year));
+      const match = matchingYear.find(r => normalizeTitle(r.name) === normalizeTitle(title)) || matchingYear.find(r => {
         const name = r.name.trim();
         if (!name.startsWith(title)) return false;
         return /^(?:\s|[\[(（【])*(?:HD|BD|4K|1080P|720P|国语|粤语|中字|高清|完整版)(?:[\])）】\s]*)$/i.test(name.slice(title.length));
@@ -157,7 +164,6 @@ export function SwitchSourceModal({
       queue.push(candidate);
       pump();
     };
-    const currentSource = sources.find(s => s.key === currentSourceKey);
     if (currentSource && queryClient.getQueryData(detailQueryKey(currentVodId, currentSource))) {
       accept(currentSource.key, [{ vodId: currentVodId, name: currentTitle, sourceKey: currentSource.key, sourceName: currentSource.name, sourceUrl: currentSource.url }]);
     }
@@ -267,11 +273,11 @@ export function SwitchSourceModal({
               const verified = c.probe?.ok && c.probe.level === 'segment';
               const label = c.stage === 'loading' ? '获取剧集中…' : c.stage === 'probing' ? '检测媒体分片…' : verified ? `分片可达 · ${c.probe?.ms ?? 0}ms` : c.probe?.ok ? '清单可达 · 未验证分片' : c.ok ? '检测未通过 · 可手动尝试' : c.error || '未找到剧集';
               return <button key={`${c.source.key}_${c.result.vodId}`} onClick={() => switchTo(c)} disabled={!c.episodes}
-                className={cn('flex items-center gap-3 text-left border rounded-xl p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', isCurrent ? 'border-accent/50 bg-accent/5' : 'border-line bg-card hover:border-accent/60', !c.episodes && 'opacity-60 cursor-wait')}>
+                className={cn('flex items-center gap-3 text-left border rounded-xl p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent', isCurrent ? 'border-accent/50 bg-accent/5' : 'border-line bg-card hover:border-accent/60', !c.episodes && (c.stage === 'error' ? 'opacity-60 cursor-not-allowed' : 'opacity-60 cursor-wait'))}>
                 <span className="shrink-0 rounded-lg p-2.5 bg-chip text-accent"><Icon name="link" className="w-5 h-5" /></span>
                 <span className="flex-1 min-w-0"><strong className="block text-sm font-medium truncate">{c.source.name}{isCurrent ? ' · 当前' : ''}</strong>
                   <span className={cn('block text-[11px] mt-1', verified ? 'text-success' : c.stage === 'probing' || c.stage === 'loading' ? 'text-accent' : 'text-muted')}>{label}</span>
-                  <span className="block text-[10px] text-faint mt-1">{c.episodes ? `${c.episodes} 集 · 详情 ${c.ms ?? 0}ms` : '正在获取可选剧集'}</span>
+                  <span className="block text-[10px] text-faint mt-1">{c.episodes ? `${c.episodes} 集 · 详情 ${c.ms ?? 0}ms` : c.stage === 'error' ? '剧集获取失败，可重新检测' : '正在获取可选剧集'}</span>
                 </span><span className="text-muted text-sm" aria-hidden="true">{isCurrent ? '重试' : '播放'}</span>
               </button>;
             })}

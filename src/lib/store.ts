@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { SourceConfig, LiveSourceConfig, SourceSearchOutcome } from './types';
+import type { SourceConfig, LiveSourceConfig, SourceSearchOutcome, SourceFailureKind } from './types';
 import { clearLiveProbeResultsDb, loadLiveProbeResults, saveLiveProbeResults } from './db';
 import { PERSIST_KEY, createThrottledStorage } from './persist-storage';
 
@@ -138,20 +138,15 @@ export function keyBelongsToSubscription(key: string, prefix: string): boolean {
 
 /** 点播源自动停用阈值：连续失败/超时达到该次数即暂停该源参与搜索 */
 export const SOURCE_DISABLE_THRESHOLD = 2;
-/**
- * 自动停用阶梯（毫秒），按「第几次被自动停用」逐级加重：
- * 固定时长的问题是，彻底挂掉的源会每隔 30 分钟被重新试一次、每次都要白等一轮超时；
- * 而偶发的网络抖动又不该被长期惩罚，所以第 1 级保持得很轻。
- * 下标 i 对应第 i+1 次停用；超出数组长度则进入长期停用（permanent）。
- */
-export const SOURCE_DISABLE_LADDER = [30 * 60 * 1000, 24 * 60 * 60 * 1000];
+/** 短时退避阶梯（毫秒），最后一级封顶；网络抖动不得导致自动永久停用。 */
+export const SOURCE_DISABLE_LADDER = [30_000, 2 * 60_000, 5 * 60_000];
 
 /** 一次「源被自动停用」的事件，供调用方按级别提示 */
 export interface SourceDisableEvent {
   key: string;
   /** 本次是第几次被自动停用（从 1 起） */
   level: number;
-  /** 是否已进入长期停用（阶梯用尽，需手动恢复） */
+  /** 兼容旧记录；新自动退避事件始终为 false。 */
   permanent: boolean;
   /** 本次停用时长（毫秒）；长期停用时为 undefined */
   ttlMs?: number;
@@ -163,13 +158,14 @@ export interface SourceHealthEntry {
   ms?: number;
   error?: string;
   timedOut?: boolean;
+  failureKind?: SourceFailureKind;
   /** 连续失败/超时次数；成功时归零 */
   failStreak: number;
   /** 命中阈值后的停用截止时间（epoch ms）；恢复成功后清除 */
   disabledUntil?: number;
   /** 累计的自动停用等级（决定惩罚时长）；每成功一次降一级 */
   disableCount?: number;
-  /** 阶梯用尽后的长期停用：不设到期时间，只能由用户手动恢复 */
+  /** 兼容旧版长期停用记录；新退避不产生永久停用，可由用户手动恢复。 */
   permanent?: boolean;
   timestamp: number;
 }
@@ -650,13 +646,14 @@ export const useAppStore = create<AppState>()(
           if (now - e.timestamp < 7 * 24 * 60 * 60 * 1000) health[key] = e;
         }
         const events: SourceDisableEvent[] = [];
-        for (const o of outcomes) {
+        // 一次搜索同源只结算一次；重复流事件不能放大惩罚。
+        for (const o of new Map(outcomes.map(outcome => [outcome.sourceKey, outcome])).values()) {
+          if (!o.ok && shouldRecheckSourceHealth(o)) continue;
           const prev = health[o.sourceKey];
           // 停用期已过 → 上一次的连续失败已被「停用 + 恢复」打断，重新从 1 开始累计
           const interrupted = !!prev?.disabledUntil && prev.disabledUntil <= now;
           const failStreak = o.ok ? 0 : interrupted ? 1 : (prev?.failStreak ?? 0) + 1;
-          // 成功一次即降一级（而非清零）：偶发抽风的源会自己降回来，
-          // 从未成功过的死源才会一路升到长期停用
+          // 成功一次即降一级；失败退避的最高等级固定，不自动永久停用。
           const disableCount = o.ok
             ? Math.max(0, (prev?.disableCount ?? 0) - 1)
             : (prev?.disableCount ?? 0);
@@ -666,6 +663,7 @@ export const useAppStore = create<AppState>()(
             ms: o.ms,
             error: o.error,
             timedOut: o.timedOut,
+            failureKind: o.failureKind,
             failStreak,
             disableCount,
             timestamp: now,
@@ -678,16 +676,11 @@ export const useAppStore = create<AppState>()(
               entry.disabledUntil = prev?.disabledUntil;
               entry.permanent = prev?.permanent;
             } else {
-              // 第 N 次被停用 → 取阶梯第 N 级；阶梯用尽则进入长期停用
-              const nextLevel = disableCount + 1;
-              const ttlMs: number | undefined = SOURCE_DISABLE_LADDER[nextLevel - 1];
+              const nextLevel = Math.min(disableCount + 1, SOURCE_DISABLE_LADDER.length);
+              const ttlMs = SOURCE_DISABLE_LADDER[nextLevel - 1];
               entry.disableCount = nextLevel;
-              if (ttlMs === undefined) {
-                entry.permanent = true;
-              } else {
-                entry.disabledUntil = now + ttlMs;
-              }
-              events.push({ key: o.sourceKey, level: nextLevel, permanent: ttlMs === undefined, ttlMs });
+              entry.disabledUntil = now + ttlMs;
+              events.push({ key: o.sourceKey, level: nextLevel, permanent: false, ttlMs });
             }
           }
           health[o.sourceKey] = entry;
@@ -842,10 +835,17 @@ export function resolveSource(
   return undefined;
 }
 
+/** 旧版无法区分 DNS 子请求耗尽与私网地址，迁移时清除暂停状态并用新校验重试。 */
+export function shouldRecheckSourceHealth(entry: Pick<SourceHealthEntry, 'failureKind' | 'error'>): boolean {
+  if (entry.failureKind) return entry.failureKind === 'platform' || entry.failureKind === 'interrupted';
+  return /too many subrequests(?: by (?:a )?single worker invocation)?/i.test(entry.error ?? '') ||
+    /目标地址解析到私有\/保留网络/.test(entry.error ?? '');
+}
+
 /**
  * 源当前是否处于自动停用期（连续超时/失败触发）。
  * 临时停用到期后此判断自然翻转为 false，即「到期自动恢复参与搜索」的懒实现；
- * 长期停用（阶梯用尽）没有到期时间，只有手动恢复（clearSourceHealth）才能解除。
+ * 旧版永久停用记录仍可由用户一键恢复；新故障只产生最多 5 分钟的短时退避。
  */
 export function isSourceDisabled(
   state: Pick<AppState, 'sourceHealth'>,
@@ -853,7 +853,7 @@ export function isSourceDisabled(
   now = Date.now()
 ): boolean {
   const e = state.sourceHealth[key];
-  if (!e) return false;
+  if (!e || shouldRecheckSourceHealth(e)) return false;
   return e.permanent === true || (!!e.disabledUntil && e.disabledUntil > now);
 }
 
