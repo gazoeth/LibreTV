@@ -39,6 +39,8 @@ export interface SafeRedirectOptions {
    * 超时触发即整链失败（内部 controller 已 abort，对齐直播路由原行为）。
    */
   headerTimeoutMs?: number;
+  /** 单次上游 HTTP 请求超时；从安全校验完成、准备发出该跳请求时开始计时。 */
+  timeoutMs?: number;
 }
 
 /**
@@ -51,7 +53,7 @@ export async function fetchWithSafeRedirects(
   init: Omit<RequestInit, 'redirect'> = {},
   options: SafeRedirectOptions = {}
 ): Promise<FetchResult> {
-  const { allowPrivate = false, headerTimeoutMs } = options;
+  const { allowPrivate = false, headerTimeoutMs, timeoutMs } = options;
   let current = url;
   // headerTimeout 超时即 abort 内部 controller；外部 signal（调用方死线/客户端断开）链入同一 controller
   const controller = new AbortController();
@@ -67,9 +69,12 @@ export async function fetchWithSafeRedirects(
       throw new UpstreamAccessError(`跳转目标被拒绝: ${verdict.reason}`, verdict.failureKind || 'invalid');
     }
     const timer = headerTimeoutMs ? setTimeout(() => controller.abort(), headerTimeoutMs) : null;
+    const requestSignal = timeoutMs
+      ? AbortSignal.any([controller.signal, AbortSignal.timeout(timeoutMs)])
+      : controller.signal;
     let res: Response;
     try {
-      res = await fetch(current, { ...init, signal: controller.signal, redirect: 'manual' });
+      res = await fetch(current, { ...init, signal: requestSignal, redirect: 'manual' });
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -88,15 +93,13 @@ export async function fetchUpstream(url: string, options: FetchOptions = {}): Pr
 /** 同 fetchUpstream，额外返回重定向后的最终 URL */
 export async function fetchUpstreamWithMeta(url: string, options: FetchOptions = {}): Promise<FetchResult> {
   const { timeoutMs = 8000, retries = 0, safeRedirects = true, allowPrivate = false, ...init } = options;
-  // 外部 signal（调用方的总死线中断）与单次超时合并：任一触发即中断请求
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  const signal = init.signal
-    ? AbortSignal.any([init.signal, timeoutSignal])
-    : timeoutSignal;
   let lastError: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       if (!safeRedirects) {
+        // 无安全预检的直连路径：计时器覆盖这次 HTTP 请求。
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
+        const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal;
         const res = await fetch(url, {
           ...init,
           signal,
@@ -104,8 +107,8 @@ export async function fetchUpstreamWithMeta(url: string, options: FetchOptions =
         });
         return { res, finalUrl: res.url || url };
       }
-      // 手动逐跳跟随，每一跳重新过 SSRF 校验
-      return await fetchWithSafeRedirects(url, { ...init, signal }, { allowPrivate });
+      // 不要在 DNS 安全校验期间提前启动 HTTP 超时；搜索调用方另有源级总死线。
+      return await fetchWithSafeRedirects(url, init, { allowPrivate, timeoutMs });
     } catch (err) {
       lastError = err;
     }
