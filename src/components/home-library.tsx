@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { buildWatchUrl } from '@/lib/utils';
-import type { FilmCatalog, FilmType } from '@/lib/film-types';
+import type { FilmCatalog, FilmType, HomeCatalog, HomeCatalogKind } from '@/lib/film-types';
 import type { SearchResultItem } from '@/lib/types';
 import { SmartImage } from './smart-image';
 import { useAppStore } from '@/lib/store';
@@ -37,27 +37,36 @@ function Poster({ item }: { item: SearchResultItem }) {
   </Link>;
 }
 
-function RecentRow({ type, title, english }: { type: FilmType; title: string; english: string }) {
+function RecentRow({ type, title, english, homeFeed }: { type: FilmType; title: string; english: string; homeFeed?: HomeCatalogKind }) {
   const { ref, nearby } = useNearby();
-  const query = useQuery({
-    queryKey: ['home-catalog', type],
+  const query = useQuery<FilmCatalog | HomeCatalog>({
+    queryKey: ['home-catalog', homeFeed || type],
     queryFn: async ({ signal }) => {
-      const response = await fetch(`/api/catalog?type=${type}`, { signal });
+      const url = homeFeed ? `/api/home-catalog?kind=${homeFeed}` : `/api/catalog?type=${type}`;
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error('暂时无法读取近期更新');
-      return response.json() as Promise<FilmCatalog>;
+      return response.json() as Promise<FilmCatalog | HomeCatalog>;
     },
     enabled: nearby, staleTime: 120_000, retry: false,
   });
   return <section ref={ref} className="fd-recent-row" aria-label={`近期${title}`}>
-    <div className="fd-row-heading"><div><p className="zip-eyebrow">{english}</p><h3>{title}</h3></div><Link href={`/films?type=${type}`}>查看全部 <span aria-hidden="true">↗</span></Link></div>
-    {query.isError ? <div className="fd-row-message"><p>这个分类暂时没有响应。</p><button onClick={() => void query.refetch()}>重新加载</button><Link href={`/films?type=${type}`}>选择其他来源 ↗</Link></div> : query.data ? <><div className="fd-home-poster-grid">{query.data.list.slice(0, 12).map(item => <Poster key={`${item.sourceKey}:${item.vodId}`} item={item} />)}</div><p className="fd-row-provenance">来自{query.data.source.name} · 按该来源返回顺序展示{query.data.list.length === 0 && ' · 暂无内容'}</p></> : <div className="fd-home-poster-grid" aria-label="正在载入目录" aria-busy="true">{Array.from({ length: 6 }, (_, i) => <div key={i} className="fd-poster-skeleton"><div /><span /></div>)}</div>}
+    <div className="fd-row-heading"><div><p className="zip-eyebrow">{english}</p><h3>{title}</h3></div><Link href={`/films?type=${type}`}>{homeFeed ? '进入全片库' : '查看全部'} <span aria-hidden="true">↗</span></Link></div>
+    {query.isError ? <div className="fd-row-message"><p>这个分类暂时没有响应。</p><button onClick={() => void query.refetch()}>重新加载</button><Link href={`/films?type=${type}`}>进入全片库 ↗</Link></div> : query.data ? <>
+      {query.data.list.length ? <div className="fd-home-poster-grid">{query.data.list.slice(0, 12).map(item => <Poster key={`${item.sourceKey}:${item.vodId}`} item={item} />)}</div> : <div className="fd-row-message"><p>暂时没有符合地区和年份条件的内容。</p><Link href={`/films?type=${type}`}>浏览完整分类 ↗</Link></div>}
+      <p className="fd-row-provenance">{homeFeed ? `来自${query.data.sources.map(source => source.name).join('、') || '已配置来源'} · 按地区与年份信息筛选` : `来自${(query.data as FilmCatalog).source.name} · 按该来源返回顺序展示`}</p>
+    </> : <div className="fd-home-poster-grid" aria-label="正在载入目录" aria-busy="true">{Array.from({ length: 6 }, (_, i) => <div key={i} className="fd-poster-skeleton"><div /><span /></div>)}</div>}
   </section>;
 }
 
 export function RecentLibrary() {
-  return <section className="zip-width fd-recent-library" id="recent-updates"><div className="zip-section-heading"><div><p className="zip-eyebrow">LATEST UPDATES</p><h2>近期更新</h2><p className="zip-section-subtitle">从片库直接出发，选中封面即可播放。</p></div><Link className="zip-text-link" href="/films">进入影视片库 ↗</Link></div>{([
-    ['movie', '电影', 'RECENT MOVIES'], ['tv', '电视剧', 'RECENT SERIES'], ['short', '短剧', 'RECENT SHORTS'], ['variety', '综艺', 'RECENT SHOWS'], ['anime', '动漫', 'RECENT ANIME'],
-  ] as const).map(([type, title, english]) => <RecentRow key={type} type={type} title={title} english={english} />)}</section>;
+  const rows: { type: FilmType; title: string; english: string; homeFeed?: HomeCatalogKind }[] = [
+    { type: 'movie', title: '欧美电影', english: 'WESTERN FILMS', homeFeed: 'western-movies' },
+    { type: 'tv', title: '日韩剧', english: 'JAPANESE & KOREAN SERIES', homeFeed: 'east-asian-series' },
+    { type: 'short', title: '短剧', english: 'RECENT SHORTS' },
+    { type: 'variety', title: '2026日韩综艺', english: '2026 JAPANESE & KOREAN SHOWS', homeFeed: 'variety-2026-jpkr' },
+    { type: 'anime', title: '日漫', english: 'JAPANESE ANIME', homeFeed: 'japanese-anime' },
+  ];
+  return <section className="zip-width fd-recent-library" id="recent-updates"><div className="zip-section-heading"><div><p className="zip-eyebrow">LATEST UPDATES</p><h2>近期更新</h2><p className="zip-section-subtitle">从片库直接出发，选中封面即可播放。</p></div><Link className="zip-text-link" href="/films">进入影视片库 ↗</Link></div>{rows.map(row => <RecentRow key={row.type} {...row} />)}</section>;
 }
 
 export function ContinueWatching() {

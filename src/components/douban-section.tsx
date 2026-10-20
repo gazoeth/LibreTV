@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/client-api';
 import { useAppStore } from '@/lib/store';
-import { cn } from '@/lib/utils';
-import type { DoubanItem } from '@/lib/types';
+import { buildWatchUrl, cn } from '@/lib/utils';
+import type { DoubanItem, SearchResultItem } from '@/lib/types';
+import type { HomeCatalog } from '@/lib/film-types';
 import { DoubanCard } from './video-card';
+import { SmartImage } from './smart-image';
+import { useDetailPrefetch } from './use-detail-prefetch';
 
 const MOVIE_TAGS = ['热门', '最新', '经典', '豆瓣高分', '冷门佳片', '华语', '欧美', '韩国', '日本', '动画'];
 const TV_TAGS = ['热门', '美剧', '英剧', '韩剧', '日剧', '国产剧', '港剧', '日本动画', '综艺', '纪录片'];
@@ -138,6 +142,7 @@ function BangumiView({ onPick }: { onPick: (title: string) => void }) {
 }
 
 const HOT_LISTS = [
+  { id: 'home_western_series', label: '欧美剧' },
   { id: 'douban_movie_weekly', label: '电影周榜' },
   { id: 'douban_tv_chinese', label: '国产剧周榜' },
   { id: 'douban_tv_global', label: '海外剧周榜' },
@@ -146,16 +151,31 @@ const HOT_LISTS = [
   { id: 'baidu_teleplay', label: '百度热播剧' },
 ];
 
-/** 影视热榜（60s API）：豆瓣五个周榜 + 百度热播剧，chips 切换 */
+/** 首页榜单切换：欧美剧使用可播放片库，其余榜单由 60s API 提供。 */
 function HotListView({ onPick }: { onPick: (title: string) => void }) {
   const [listId, setListId] = useState(HOT_LISTS[0].id);
+  const westernSeries = listId === 'home_western_series';
 
   const query = useQuery({
     queryKey: ['hot-list', listId],
     queryFn: ({ signal }) => api.hotList(listId, signal),
+    enabled: !westernSeries,
+  });
+  const westernQuery = useQuery<HomeCatalog>({
+    queryKey: ['home-catalog', 'western-series'],
+    queryFn: async ({ signal }) => {
+      const response = await fetch('/api/home-catalog?kind=western-series', { signal });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '欧美剧推荐读取失败');
+      return data as HomeCatalog;
+    },
+    enabled: westernSeries, staleTime: 120_000, retry: false,
   });
 
   const items = query.data?.items ?? [];
+  const catalogItems = westernQuery.data?.list ?? [];
+  const isError = westernSeries ? westernQuery.isError : query.isError;
+  const isLoading = westernSeries ? westernQuery.isLoading : query.isLoading;
 
   return (
     <section aria-label="影视榜单推荐">
@@ -167,10 +187,14 @@ function HotListView({ onPick }: { onPick: (title: string) => void }) {
         ))}
       </div>
 
-      {query.isError ? (
-        <p className="text-center text-sm text-faint py-8">推荐内容加载失败，可稍后重试或在设置中关闭</p>
-      ) : query.isLoading ? (
+      {isError ? (
+        <div className="flex flex-wrap items-center justify-center gap-3 py-8 text-sm text-faint"><p>推荐内容加载失败。</p><button className="text-accent underline underline-offset-4" onClick={() => void (westernSeries ? westernQuery.refetch() : query.refetch())}>重新加载</button></div>
+      ) : isLoading ? (
         <GridSkeleton />
+      ) : westernSeries ? (
+        catalogItems.length ? <div className="zip-recommend-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+          {catalogItems.map(item => <CatalogRecommendCard key={`${item.sourceKey}:${item.vodId}`} item={item} />)}
+        </div> : <p className="text-center text-sm text-faint py-8">暂时没有可展示的欧美剧</p>
       ) : (
         <div className="zip-recommend-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
           {items.map((item) => (
@@ -180,6 +204,28 @@ function HotListView({ onPick }: { onPick: (title: string) => void }) {
       )}
     </section>
   );
+}
+
+function CatalogRecommendCard({ item }: { item: SearchResultItem }) {
+  const imageProxyMode = useAppStore(s => s.imageProxyMode);
+  const customImageProxy = useAppStore(s => s.customImageProxy);
+  const warmup = useDetailPrefetch(item);
+  return <Link
+    className="card cursor-pointer hover:scale-[1.03] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+    href={buildWatchUrl({ sourceKey: item.sourceKey, sourceUrl: item.sourceUrl, vodId: item.vodId, title: item.name, index: 0 })}
+    aria-label={`播放 ${item.name}`}
+    {...warmup}
+  >
+    <div className="poster-frame bg-chip">
+      <span className="absolute inset-0 flex items-center justify-center text-faint font-bold" aria-hidden="true">Free<span className="text-accent">DY</span></span>
+      <SmartImage url={item.pic} mode={imageProxyMode} customProxy={customImageProxy} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
+      {item.remarks && <span className="absolute right-1.5 bottom-1.5 tag bg-black/70 text-white">{item.remarks}</span>}
+    </div>
+    <div className="p-2">
+      <div className="text-xs font-medium text-content truncate" title={item.name}>{item.name}</div>
+      <small className="mt-1 block truncate text-faint">{[item.year, item.typeName].filter(Boolean).join(' · ')}</small>
+    </div>
+  </Link>;
 }
 
 function GridSkeleton() {
@@ -202,6 +248,7 @@ function ChipButton({ active, onClick, children }: { active: boolean; onClick: (
         'px-2.5 py-1 rounded-full text-xs transition-colors',
         active ? 'bg-accent text-on-accent' : 'bg-chip text-muted hover:text-content hover:bg-hover'
       )}
+      aria-pressed={active}
       onClick={onClick}
     >
       {children}

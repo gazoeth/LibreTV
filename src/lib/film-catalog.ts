@@ -1,8 +1,8 @@
 import { BUILTIN_VOD_SOURCES } from './builtin-vod-sources';
 import { cmsRequestHeaders, parseSearchList } from './cms-parser';
 import { fetchUpstream, getCache, setCache } from './fetch-utils';
-import { FILM_TYPES, type FilmCategory, type FilmCatalog, type FilmType } from './film-types';
-import type { SourceConfig } from './types';
+import { FILM_TYPES, type FilmCategory, type FilmCatalog, type FilmType, type HomeCatalog, type HomeCatalogKind } from './film-types';
+import type { SearchResultItem, SourceConfig } from './types';
 
 export const FILM_SOURCES = BUILTIN_VOD_SOURCES.filter(s => s.enabledByDefault !== false && !s.isAdult);
 const matches: Record<FilmType, RegExp> = {
@@ -10,6 +10,15 @@ const matches: Record<FilmType, RegExp> = {
   documentary: /纪录|记录/, anime: /^动漫片?$/, sports: /体育/,
 };
 const blocked = /伦理|三级|两性|写真|擦边/;
+const WESTERN_AREAS = /美国|加拿大|英国|爱尔兰|法国|德国|意大利|西班牙|葡萄牙|瑞典|挪威|丹麦|芬兰|荷兰|比利时|瑞士|奥地利|澳大利亚|澳洲|新西兰|波兰|捷克|希腊|冰岛|卢森堡|united states|\busa\b|\buk\b|united kingdom|canada|france|germany|italy|spain|portugal|sweden|norway|denmark|finland|netherlands|belgium|switzerland|austria|australia|new zealand/i;
+
+function getCategoryTree(classes: FilmCategory[], type: FilmType) {
+  const roots = classes.filter(c => matches[type].test(c.name));
+  const rootIds = new Set(roots.map(c => c.id));
+  const children = classes.filter(c => rootIds.has(c.parent));
+  const options = [...roots, ...children.filter(c => !rootIds.has(c.id))];
+  return { roots, children, options, rootIds };
+}
 async function readJson(source: SourceConfig, params: Record<string, string>, signal?: AbortSignal) {
   const url = new URL(source.url);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -42,12 +51,9 @@ export async function getFilmCatalog(type: FilmType, sourceKey: string | null, c
   for (const source of candidates) {
     try {
       const classes = await categories(source, signal);
-      const roots = classes.filter(c => matches[type].test(c.name));
+      const { roots, children, options, rootIds: ids } = getCategoryTree(classes, type);
       if (!roots.length) throw new Error('该来源暂未提供此分类');
-      const ids = new Set(roots.map(c => c.id));
       // 分类范围由此处统一解释，默认先读取父分类，显式子分类选择始终保留。
-      const children = classes.filter(c => ids.has(c.parent));
-      const options = [...roots, ...children.filter(c => !ids.has(c.id))];
       let chosen = category ? options.find(c => c.id === category) : roots[0];
       if (!chosen) throw new Error('该子分类不属于当前类型');
       async function readCategory(id: string, requestedPage = page) {
@@ -75,4 +81,157 @@ export async function getFilmCatalog(type: FilmType, sourceKey: string | null, c
     }
   }
   throw new Error(warnings.join('；') || '暂时无法读取分类目录');
+}
+
+function validYear(item: { year?: string }): number {
+  const value = item.year?.trim() || '';
+  return /^\d{4}$/.test(value) ? Number(value) : 0;
+}
+
+function belongsToWesternMovie(item: { area?: string }): boolean {
+  return WESTERN_AREAS.test(item.area?.trim() || '');
+}
+
+function eastAsianRegion(item: { area?: string }): 'japan' | 'korea' | undefined {
+  const area = item.area || '';
+  if (/日本|japan/i.test(area)) return 'japan';
+  if (/韩国|korea/i.test(area)) return 'korea';
+  return undefined;
+}
+
+function byNewestYear(items: SearchResultItem[]): SearchResultItem[] {
+  return items.map((item, index) => ({ item, index }))
+    .sort((a, b) => validYear(b.item) - validYear(a.item) || a.index - b.index)
+    .map(entry => entry.item);
+}
+
+function interleave(items: SearchResultItem[][], limit = 12): SearchResultItem[] {
+  const result: SearchResultItem[] = [];
+  const ordered = items.map(byNewestYear);
+  for (let index = 0; result.length < limit && ordered.some(group => index < group.length); index++) {
+    for (const group of ordered) {
+      if (group[index] && result.length < limit) result.push(group[index]);
+    }
+  }
+  return result;
+}
+
+async function readHomeCategories(
+  targets: { sourceKey: string; type: FilmType; selected: FilmCategory[]; pages: number[] }[],
+  signal?: AbortSignal
+) {
+  const results = await Promise.allSettled(targets.flatMap(target => target.selected.flatMap(category => target.pages.map(page => getFilmCatalog(target.type, target.sourceKey, category.id, page, signal)))));
+  return results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
+}
+
+/** 首页专题目录：在服务端按资源站的分类和地区元数据筛选，限制来源数与分页数。 */
+export async function getHomeCatalog(kind: HomeCatalogKind, signal?: AbortSignal): Promise<HomeCatalog> {
+  const cacheKey = `home-catalog:${kind}`;
+  const cached = getCache<HomeCatalog>(cacheKey);
+  if (cached) return cached;
+
+  const started = Date.now();
+  const warnings: string[] = [];
+  const sourceKey = kind === 'western-movies' || kind === 'variety-2026-jpkr' ? 'builtin_dyttzy' : 'builtin_jisu';
+  let type: FilmType = 'movie';
+  let classes: FilmCategory[];
+  let selected: FilmCategory[] = [];
+  let pages = [1];
+  const additionalTargets: { sourceKey: string; type: FilmType; selected: FilmCategory[]; pages: number[] }[] = [];
+
+  const source = FILM_SOURCES.find(item => item.key === sourceKey);
+  if (!source) throw new Error('首页专题来源未配置');
+  try {
+    classes = await categories(source, signal);
+  } catch (error) {
+    throw new Error(`${source.name}：${error instanceof Error ? error.message : '读取分类失败'}`);
+  }
+
+  if (kind === 'western-movies') {
+    type = 'movie';
+    const { children } = getCategoryTree(classes, type);
+    const genres = [/动作/, /喜剧/, /爱情/, /科幻/, /恐怖/, /剧情/];
+    selected = genres.flatMap(genre => {
+      const category = children.find(item => genre.test(item.name));
+      return category ? [category] : [];
+    });
+    if (!selected.length) throw new Error(`${source.name}：没有可筛选的电影分类`);
+  } else if (kind === 'variety-2026-jpkr') {
+    type = 'variety';
+    const { children } = getCategoryTree(classes, type);
+    selected = children.filter(item => /日韩综艺|日韩综艺片/.test(item.name));
+    pages = [1, 2, 3];
+    if (!selected.length) throw new Error(`${source.name}：没有日韩综艺分类`);
+    const alternateSource = FILM_SOURCES.find(item => item.key === 'builtin_ikun');
+    if (alternateSource) {
+      try {
+        const alternateClasses = await categories(alternateSource, signal);
+        const alternateCategories = getCategoryTree(alternateClasses, type).children.filter(item => /日韩综艺|日韩综艺片/.test(item.name));
+        if (alternateCategories.length) additionalTargets.push({ sourceKey: alternateSource.key, type, selected: alternateCategories, pages });
+      } catch {
+        warnings.push(`${alternateSource.name}：暂时无法读取分类，已继续使用其他来源。`);
+      }
+    }
+  } else {
+    const regionSource = FILM_SOURCES.find(item => item.key === sourceKey);
+    if (!regionSource) throw new Error('分类来源未配置');
+    try {
+      classes = await categories(regionSource, signal);
+    } catch (error) {
+      throw new Error(`${regionSource.name}：${error instanceof Error ? error.message : '读取分类失败'}`);
+    }
+    if (kind === 'western-series') {
+      type = 'tv';
+      const { children } = getCategoryTree(classes, type);
+      selected = children.filter(item => /欧美剧|欧美连续剧/.test(item.name));
+    } else if (kind === 'east-asian-series') {
+      type = 'tv';
+      const { children } = getCategoryTree(classes, type);
+      selected = children.filter(item => /^(韩剧|韩国剧|日剧|日本剧)$/.test(item.name));
+    } else {
+      type = 'anime';
+      const { children } = getCategoryTree(classes, type);
+      selected = children.filter(item => /^日本动漫$/.test(item.name));
+    }
+    if (!selected.length) throw new Error(`${regionSource.name}：没有符合条件的分类`);
+  }
+
+  const targets = [{ sourceKey, type, selected, pages }, ...additionalTargets];
+  const catalogs = await readHomeCategories(targets, signal);
+  if (signal?.aborted) throw signal.reason || new Error('请求已取消');
+  if (!catalogs.length) throw new Error('专题来源暂时无法读取');
+  const requestedCount = targets.reduce((count, target) => count + target.selected.length * target.pages.length, 0);
+  if (catalogs.length < requestedCount) warnings.push(`${requestedCount - catalogs.length} 个分类页暂时不可用，已保留其余结果。`);
+
+  const seen = new Set<string>();
+  const accepts = (item: SearchResultItem) => {
+    if (!item.vodId || !item.name || blocked.test(item.typeName || '')) return false;
+    const identity = kind === 'variety-2026-jpkr'
+      ? `${item.name.normalize('NFKC').replace(/\s+/g, '').toLowerCase()}:${item.year || 'unknown'}`
+      : `${item.sourceKey}:${item.vodId}`;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    if (kind === 'western-movies') return belongsToWesternMovie(item);
+    if (kind === 'western-series') return WESTERN_AREAS.test(item.area || '') || /欧美剧/.test(item.typeName || '');
+    if (kind === 'east-asian-series') return !!eastAsianRegion(item);
+    if (kind === 'variety-2026-jpkr') return validYear(item) === 2026 && !!eastAsianRegion(item);
+    return /日本动漫/.test(item.typeName || '') || /日本|japan/i.test(item.area || '');
+  };
+  const groupedItems = catalogs.map(catalog => catalog.list.filter(accepts));
+  let list: SearchResultItem[];
+  if (kind === 'east-asian-series') {
+    // 日韩剧各有独立分类，轮流展示，避免首屏被单一地区占满。
+    list = interleave(groupedItems);
+  } else if (kind === 'variety-2026-jpkr') {
+    // 日韩综艺的来源排序常以韩国节目为主；将日本节目也编入首屏。
+    list = interleave(['japan', 'korea'].map(region => groupedItems.flat().filter(item => eastAsianRegion(item) === region)));
+  } else {
+    // 多分类拼接后以年份稳定排序，避免不同子分类的目录顺序互相打乱。
+    list = byNewestYear(groupedItems.flat()).slice(0, 12);
+  }
+
+  const sources = [...new Map(catalogs.map(catalog => [catalog.source.key, catalog.source])).values()];
+  const result = { kind, sources, list, ms: Date.now() - started, warnings } satisfies HomeCatalog;
+  setCache(cacheKey, result, 90_000);
+  return result;
 }
