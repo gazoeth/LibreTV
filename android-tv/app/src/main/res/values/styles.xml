@@ -1,0 +1,9 @@
+<resources>
+    <style name="FreeDyTvTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#C4ED54</item>
+        <item name="android:colorPrimary">#C4ED54</item>
+        <item name="android:windowBackground">#0C0E0C</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

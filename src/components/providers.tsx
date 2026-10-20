@@ -9,6 +9,7 @@ import { GlobalDownloadManager } from './download-manager';
 import { useAppStore, hydrateLiveProbeResults } from '@/lib/store';
 import { api, STATUS_QUERY_KEY } from '@/lib/client-api';
 import { applyEnvPresets } from '@/lib/subscription-sync';
+import { TvExperience } from './tv-experience';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -45,6 +46,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <TvExperience />
       <ThemeProvider>
         <ToastProvider>
           {/* 全站常驻：下载事件监听（enqueueDownload）依赖它存在——

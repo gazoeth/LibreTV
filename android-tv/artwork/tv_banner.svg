@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <defs>
+    <radialGradient id="halo" cx="82%" cy="22%" r="72%">
+      <stop offset="0" stop-color="#243019" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#0c0e0c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4ff5a"/>
+      <stop offset="1" stop-color="#a9d93f"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#d9edb5" stroke-opacity=".035"/>
+    </pattern>
+  </defs>
+  <rect width="640" height="360" fill="#0c0e0c"/>
+  <rect width="640" height="360" fill="url(#halo)"/>
+  <rect width="640" height="360" fill="url(#grid)"/>
+  <circle cx="525" cy="42" r="2.5" fill="#d1ff54"/>
+  <circle cx="525" cy="42" r="14" fill="#d1ff54" fill-opacity=".08"/>
+  <g transform="translate(78 126) scale(1.65)">
+    <path fill="url(#accent)" fill-rule="evenodd" d="M11 8h18C45 8 56 17.5 56 32S45 56 29 56H11V8Zm16 13v22l18-11-18-11Z"/>
+  </g>
+  <text x="220" y="196" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="-5" fill="#f1f4ed">Free<tspan fill="#c4ed54">DY</tspan></text>
+  <text x="224" y="239" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="500" letter-spacing="4" fill="#a5ad9d">TV · 自由观影，遥控即播</text>
+  <path d="M224 274h112" stroke="#c4ed54" stroke-opacity=".65" stroke-width="2"/>
+  <text x="224" y="307" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="600" letter-spacing="3" fill="#788176">SEARCH · CHOOSE · WATCH</text>
+</svg>

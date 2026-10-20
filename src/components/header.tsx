@@ -40,11 +40,21 @@ export function Header({ showSearch = false, landing = false }: { showSearch?: b
     submitSearch(text);
   };
 
+  const openLandingSearch = () => {
+    if (document.documentElement.dataset.fdTv === 'true') {
+      document.documentElement.setAttribute('data-fd-tv-search', 'true');
+    }
+  };
+
+  const closeLandingSearch = () => {
+    document.documentElement.removeAttribute('data-fd-tv-search');
+  };
+
   return (
     <>
       <header className="fd-site-header sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line" data-landing={landing}>
         <div className="fd-header-inner max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" aria-label="FreeDY 首页" className={cn('flex items-center shrink-0', landing && 'zip-header-brand')}>
+          <Link href="/" onClick={closeLandingSearch} aria-label="FreeDY 首页" className={cn('flex items-center shrink-0', landing && 'zip-header-brand')}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/freedy-mark.svg?v=2" alt="FreeDY D 标志" className={cn('w-7 h-7', landing && 'zip-header-logo')} />
             <span className="fd-brand-word">Free<span>DY</span></span>
@@ -103,7 +113,7 @@ export function Header({ showSearch = false, landing = false }: { showSearch?: b
           <div className="flex-1 sm:hidden" />
 
           <nav className="fd-desktop-nav flex items-center gap-1 ml-auto" aria-label="主导航">
-            <HeaderLink href="/" active={pathname === '/'}>首页</HeaderLink>
+            <HeaderLink href="/" active={pathname === '/'} onClick={closeLandingSearch}>首页</HeaderLink>
             <FilmMenu active={pathname === '/films'} landing={landing} />
             <HeaderLink href="/tv" active={pathname === '/live' || pathname === '/tv'} landing={landing}>
               看电视
@@ -113,7 +123,7 @@ export function Header({ showSearch = false, landing = false }: { showSearch?: b
               关于
             </HeaderLink>
             <button className="fd-nav-utility" onClick={() => setFavoritesOpen(true)}>收藏</button>
-            <Link className="fd-desktop-search" href="/?focus=search#top" aria-label="搜索影视"><Icon name="search" /></Link>
+            <Link className="fd-desktop-search" href="/?focus=search#top" onClick={openLandingSearch} aria-label="搜索影视"><Icon name="search" /></Link>
             <ThemeToggle />
             <IconButton label="观看历史" onClick={() => setHistoryOpen(true)}>
               <Icon name="clock" />
@@ -125,7 +135,7 @@ export function Header({ showSearch = false, landing = false }: { showSearch?: b
               <Icon name="gear" />
             </IconButton>
           </nav>
-          <div className="fd-mobile-actions"><Link href="/?focus=search#top" className="fd-mobile-search" aria-label="搜索影视"><Icon name="search" /></Link>
+          <div className="fd-mobile-actions"><Link href="/?focus=search#top" onClick={openLandingSearch} className="fd-mobile-search" aria-label="搜索影视"><Icon name="search" /></Link>
             <IconButton label="观看历史" onClick={() => setHistoryOpen(true)}><Icon name="clock" /></IconButton>
             <button className="fd-menu-button" aria-label="打开导航菜单" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
           </div>
@@ -171,10 +181,11 @@ function FilmMenu({ active }: { active: boolean; landing: boolean }) {
   </div>;
 }
 
-function HeaderLink({ href, active, landing = false, children }: { href: string; active: boolean; landing?: boolean; children: React.ReactNode }) {
+function HeaderLink({ href, active, landing = false, onClick, children }: { href: string; active: boolean; landing?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'px-2.5 py-1.5 rounded-md text-sm transition-colors',

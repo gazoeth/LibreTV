@@ -42,6 +42,14 @@ interface PlayerShellProps {
   onPause?: (position: number, duration: number) => void;
   /** 恢复策略判源不可用（重试耗尽/格式硬失败）时回调：父级弹出换源面板 */
   onRequestSwitchSource?: (reason: string) => void;
+  /** 提供给电视遥控按钮的稳定播放控制接口。 */
+  onRegisterRemoteControls?: (controls: PlayerRemoteControls | null) => void;
+}
+
+export interface PlayerRemoteControls {
+  togglePlayback: () => void;
+  seekBy: (seconds: number) => void;
+  toggleFullscreen: () => void;
 }
 
 export function PlayerShell({
@@ -57,6 +65,7 @@ export function PlayerShell({
   onEnded,
   onPause,
   onRequestSwitchSource,
+  onRegisterRemoteControls,
 }: PlayerShellProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,11 +83,11 @@ export function PlayerShell({
   // 始终持有最新 props/回调，避免重建播放器
   const propsRef = useRef({
     url, title, adFilter, autoplayNext, episodeKey, nextUrl, nextEpisodeKey,
-    getRestorePosition, onTimeUpdate, onEnded, onPause, onRequestSwitchSource,
+    getRestorePosition, onTimeUpdate, onEnded, onPause, onRequestSwitchSource, onRegisterRemoteControls,
   });
   propsRef.current = {
     url, title, adFilter, autoplayNext, episodeKey, nextUrl, nextEpisodeKey,
-    getRestorePosition, onTimeUpdate, onEnded, onPause, onRequestSwitchSource,
+    getRestorePosition, onTimeUpdate, onEnded, onPause, onRequestSwitchSource, onRegisterRemoteControls,
   };
 
   // 跨集共享、每次换集重置的播放链路状态
@@ -345,6 +354,14 @@ export function PlayerShell({
       },
     });
     artRef.current = art;
+    propsRef.current.onRegisterRemoteControls?.({
+      togglePlayback: () => art.toggle(),
+      seekBy: (seconds) => {
+        const duration = Number.isFinite(art.duration) ? art.duration : Number.POSITIVE_INFINITY;
+        art.currentTime = Math.max(0, Math.min(duration, art.currentTime + seconds));
+      },
+      toggleFullscreen: () => { art.fullscreen = !art.fullscreen; },
+    });
     art.on('video:loadedmetadata', () => {
       // ArtPlayer 运行时支持 title 选项（类型定义未覆盖），用于界面标题展示
       try {
@@ -513,6 +530,7 @@ export function PlayerShell({
       if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
       recoveryRef.current?.dispose();
       getVideoPrefetcher().stop();
+      propsRef.current.onRegisterRemoteControls?.(null);
       art.destroy();
       artRef.current = null;
     };

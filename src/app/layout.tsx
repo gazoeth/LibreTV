@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './tv.css';
 import './experience.css';
+import './tv-experience.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
@@ -40,6 +41,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{
             __html:
               "(function(){try{var t=localStorage.getItem('libretv-theme')||'dark';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()",
+          }}
+        />
+        {/* Android TV WebView 通过专用 UA 标记启用遥控器界面；?tv=1 供本机预览。 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var p=new URLSearchParams(location.search);var tv=(navigator.userAgent||'').indexOf('FreeDYTV')!==-1||p.get('tv')==='1';if(tv){document.documentElement.setAttribute('data-fd-tv','true');if(p.get('focus')==='search')document.documentElement.setAttribute('data-fd-tv-search','true')}}catch(e){}})()",
           }}
         />
       </head>

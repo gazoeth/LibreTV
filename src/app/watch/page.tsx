@@ -19,6 +19,7 @@ const PlayerShell = dynamic(() => import('@/components/player-shell').then((m) =
 });
 import { EmptyState, LoadingState, Spinner } from '@/components/states';
 import { SwitchSourceModal } from '@/components/switch-source';
+import type { PlayerRemoteControls } from '@/components/player-shell';
 import { enqueueDownload } from '@/components/download-manager';
 import { Icon } from '@/components/icon';
 import { useAuth } from '@/components/auth';
@@ -67,6 +68,7 @@ function WatchContent() {
   const [reversed, setReversed] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [remoteControls, setRemoteControls] = useState<PlayerRemoteControls | null>(null);
 
   const source = resolveSource(store, sourceKey, {
     url: searchParams.get('sourceUrl') || undefined,
@@ -218,14 +220,15 @@ function WatchContent() {
           <HomeButton />
           <div className="min-w-0">
             <h1 className="text-sm font-medium text-content truncate">{videoTitle}</h1>
-            <p className="text-xs text-faint">
-              {source.name}
-              {episodes.length > 0 && ` · 第 ${currentIndex + 1}/${episodes.length} 集`}
+            <p className="fd-watch-subtitle text-xs text-faint">
+              <span className="fd-watch-source-name">{source.name}</span>
+              {episodes.length > 0 && <span className="fd-watch-episode-position">第 {currentIndex + 1} / {episodes.length} 集</span>}
             </p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            {vodId && <button className="fd-watch-header-favorite fd-watch-favorite btn-ghost btn-sm" aria-pressed={isFavorite} onClick={toggleFavorite}>{isFavorite ? '★ 已收藏' : '☆ 收藏'}</button>}
             <button
-              className="btn-ghost btn-sm"
+              className="fd-watch-download btn-ghost btn-sm"
               onClick={() => {
                 if (!currentUrl) return;
                 enqueueDownload({
@@ -240,8 +243,8 @@ function WatchContent() {
             >
               下载本集
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => setSwitchOpen(true)}>
-              切换资源
+            <button className="fd-watch-switch-source btn-ghost btn-sm" onClick={() => setSwitchOpen(true)}>
+              切换线路
             </button>
           </div>
         </div>
@@ -250,7 +253,18 @@ function WatchContent() {
       <main className="fd-watch-main flex-1 max-w-7xl w-full mx-auto px-4 py-4">
         <div className="fd-watch-grid grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
           <div>
-            <div className="video-frame bg-black rounded-lg overflow-hidden">
+            <div
+              className="video-frame bg-black rounded-lg overflow-hidden"
+              data-tv-player-surface
+              tabIndex={0}
+              role="group"
+              aria-label={`${videoTitle} 播放画面`}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+                event.preventDefault();
+                remoteControls?.togglePlayback();
+              }}
+            >
               <div className="absolute inset-0">
                 {currentUrl ? (
                   <PlayerShell
@@ -267,6 +281,7 @@ function WatchContent() {
                     onPause={handleProgress}
                     onEnded={handleEnded}
                     onRequestSwitchSource={() => setSwitchOpen(true)}
+                    onRegisterRemoteControls={setRemoteControls}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -283,32 +298,40 @@ function WatchContent() {
             </div>
 
             {/* 操作栏 */}
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              <button className="btn-ghost btn-sm" onClick={async () => { const ok = await copyToClipboard(window.location.href); toast(ok ? '播放链接已复制' : '复制失败，请从地址栏复制链接', ok ? 'success' : 'error'); }}>分享链接 ↗</button>
-              {vodId && <button className="fd-watch-favorite btn-ghost btn-sm" aria-pressed={isFavorite} onClick={toggleFavorite}>{isFavorite ? '★ 已收藏' : '☆ 收藏影片'}</button>}
-              <button
-                className="btn-ghost btn-sm"
-                disabled={currentIndex <= 0}
-                onClick={() => goEpisode(currentIndex - 1)}
-              >
-                上一集
-              </button>
-              <button
-                className="btn-ghost btn-sm"
-                disabled={episodes.length === 0 || currentIndex >= episodes.length - 1}
-                onClick={() => goEpisode(currentIndex + 1)}
-              >
-                下一集
-              </button>
-              <label className="flex items-center gap-1.5 text-xs text-muted ml-auto cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="h-3.5 w-3.5 accent-[#2563eb]"
-                  checked={store.autoplayNext}
-                  onChange={(e) => store.updateSettings({ autoplayNext: e.target.checked })}
-                />
-                自动连播
-              </label>
+            <div className="fd-watch-actions flex flex-wrap items-center gap-2 mt-3">
+              <div className="fd-watch-standard-actions flex flex-wrap items-center gap-2">
+                <button className="fd-watch-share btn-ghost btn-sm" onClick={async () => { const ok = await copyToClipboard(window.location.href); toast(ok ? '播放链接已复制' : '复制失败，请从地址栏复制链接', ok ? 'success' : 'error'); }}>分享链接 ↗</button>
+                {vodId && <button className="fd-watch-favorite btn-ghost btn-sm" aria-pressed={isFavorite} onClick={toggleFavorite}>{isFavorite ? '★ 已收藏' : '☆ 收藏影片'}</button>}
+                <button
+                  className="btn-ghost btn-sm fd-watch-prev-episode"
+                  disabled={currentIndex <= 0}
+                  onClick={() => goEpisode(currentIndex - 1)}
+                >
+                  上一集
+                </button>
+                <button
+                  className="btn-ghost btn-sm fd-watch-next-episode"
+                  disabled={episodes.length === 0 || currentIndex >= episodes.length - 1}
+                  onClick={() => goEpisode(currentIndex + 1)}
+                >
+                  下一集
+                </button>
+                <label className="fd-watch-autoplay flex items-center gap-1.5 text-xs text-muted ml-auto cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 accent-[#2563eb]"
+                    checked={store.autoplayNext}
+                    onChange={(e) => store.updateSettings({ autoplayNext: e.target.checked })}
+                  />
+                  自动连播
+                </label>
+              </div>
+              <div className="fd-tv-player-controls" role="group" aria-label="电视播放控制">
+                <button className="btn-ghost" onClick={() => remoteControls?.seekBy(-10)} disabled={!remoteControls} aria-label="快退 10 秒">−10 秒</button>
+                <button className="btn-primary" onClick={() => remoteControls?.togglePlayback()} disabled={!remoteControls} aria-label="播放或暂停">播放 / 暂停</button>
+                <button className="btn-ghost" onClick={() => remoteControls?.seekBy(10)} disabled={!remoteControls} aria-label="快进 10 秒">+10 秒</button>
+                <button className="btn-ghost" onClick={() => remoteControls?.toggleFullscreen()} disabled={!remoteControls} aria-label="切换全屏">全屏</button>
+              </div>
             </div>
           </div>
 
