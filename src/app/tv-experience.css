@@ -275,16 +275,19 @@ html[data-fd-tv='true'] .art-video-player .art-controls { gap: 12px; }
 html[data-fd-tv='true'] .art-video-player .art-time { font-size: 17px; }
 
 html[data-fd-tv='true'] .fd-watch-actions { flex: 0 0 auto; flex-wrap: nowrap; align-items: stretch; gap: 12px; margin-top: 16px; }
-html[data-fd-tv='true'] .fd-watch-standard-actions { flex: 0 0 auto; gap: 10px; }
-html[data-fd-tv='true'] .fd-watch-share,
-html[data-fd-tv='true'] .fd-watch-standard-actions .fd-watch-favorite,
-html[data-fd-tv='true'] .fd-watch-autoplay { display: none !important; }
+html[data-fd-tv='true'] .fd-watch-standard-actions { display: none !important; }
 html[data-fd-tv='true'] .fd-watch-standard-actions .fd-watch-prev-episode,
 html[data-fd-tv='true'] .fd-watch-standard-actions .fd-watch-next-episode { min-width: 112px; }
-html[data-fd-tv='true'] .fd-tv-player-controls { display: flex; flex: 1 1 auto; min-width: 0; gap: 10px; }
+html[data-fd-tv='true'] .fd-tv-player-controls {
+  display: grid;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
 html[data-fd-tv='true'] .fd-tv-player-controls button,
 html[data-fd-tv='true'] .fd-watch-standard-actions button { min-height: 66px; padding-inline: clamp(12px, 1.5vw, 26px); border-radius: 13px; font-size: clamp(16px, 1.25vw, 21px); white-space: nowrap; }
-html[data-fd-tv='true'] .fd-tv-player-controls button { flex: 1 1 0; }
 html[data-fd-tv='true'] .fd-tv-player-controls button:disabled { opacity: .48; }
 
 html[data-fd-tv='true'] .fd-watch-sidebar { grid-template-rows: minmax(0, 1fr); min-height: 0; gap: 0; }
