@@ -12,7 +12,7 @@ import {
 } from '@/lib/video-prefetcher';
 import { loadCacheSettings } from '@/lib/video-cache';
 import { formatTime } from '@/lib/utils';
-import { getHlsPlaybackEngine } from '@/lib/player-compat';
+import { getHlsPlaybackEngine, prefersNativeHls } from '@/lib/player-compat';
 import { proxyBaseForAdFilter } from '@/lib/m3u8';
 
 /**
@@ -114,6 +114,21 @@ export function PlayerShell({
     hintTimerRef.current = setTimeout(() => setHint(''), 2500);
   };
 
+  const requestPlayback = (video: HTMLVideoElement, fromClick = false) => {
+    // 同步调用保留点击事件的用户手势，不能先等待异步请求。
+    const result = video.play();
+    if (result && typeof result.catch === 'function') result.catch((reason: unknown) => {
+      const name = reason && typeof reason === 'object' && 'name' in reason ? String(reason.name) : '';
+      if (name === 'NotAllowedError') {
+        // 等待用户点击不属于线路连接超时。
+        if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
+        showHint('点击画面中的播放按钮开始观看');
+      } else if (fromClick && name !== 'AbortError') {
+        showHint('视频尚未就绪，请稍候或检测其他线路');
+      }
+    });
+  };
+
   // 片段缓存开启时调大 hls.js 自身缓冲，缓冲之外的空窗由预取器补齐
   const buildHlsConfig = (): Partial<HlsConfig> => {
     const p = propsRef.current;
@@ -141,6 +156,8 @@ export function PlayerShell({
 
   // 当前集预取（episodeKey 缺省 = 关闭，见 ensure 内部 settings.enabled 判断）
   const ensurePrefetch = (mediaUrl: string, currentTime: number, horizonSeconds?: number) => {
+    // 原生 HLS 不读取 hls.js 的分片缓存，避免重复下载争抢旧设备带宽。
+    if (nativeHlsRef.current) return;
     const p = propsRef.current;
     if (!p.episodeKey) return;
     getVideoPrefetcher().ensure({
@@ -178,14 +195,19 @@ export function PlayerShell({
     currentMediaUrlRef.current = mediaUrl;
     const nativeMimeSupport = video.canPlayType('application/vnd.apple.mpegurl') ||
       video.canPlayType('application/x-mpegURL');
-    const engine = getHlsPlaybackEngine(Hls.isSupported(), nativeMimeSupport);
+    const engine = getHlsPlaybackEngine(Hls.isSupported(), nativeMimeSupport, prefersNativeHls(navigator.userAgent, navigator.maxTouchPoints));
     if (engine === 'native') {
-      if (propsRef.current.adFilter && allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
-        setupHls(video, `${proxyBaseForAdFilter(true, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`, false);
-        return;
-      }
       nativeHlsRef.current = true;
-      const fallbackToProxy = () => {
+      const filteredProxy = propsRef.current.adFilter && allowProxyFallback && !mediaUrl.startsWith('/api/proxy');
+      const nativeUrl = filteredProxy
+        ? `${proxyBaseForAdFilter(true, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`
+        : mediaUrl;
+      const fallbackPlayback = () => {
+        if (filteredProxy) {
+          showHint('过滤代理不可用，尝试原生直连；本次直连无法过滤切片广告');
+          setupHls(video, mediaUrl, false);
+          return;
+        }
         if (allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
           showHint('直连失败，改用代理重试...');
           setupHls(video, `${proxyBaseForAdFilter(propsRef.current.adFilter, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`, false);
@@ -193,12 +215,15 @@ export function PlayerShell({
           setError('视频播放失败，请尝试其他视频源');
         }
       };
-      video.addEventListener('error', fallbackToProxy, { once: true });
-      nativeCleanupRef.current = () => video.removeEventListener('error', fallbackToProxy);
-      video.src = mediaUrl;
+      video.addEventListener('error', fallbackPlayback, { once: true });
+      nativeCleanupRef.current = () => video.removeEventListener('error', fallbackPlayback);
+      video.removeAttribute('crossorigin');
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+      video.preload = 'metadata';
+      video.src = nativeUrl;
       video.load();
-      const playResult = video.play();
-      if (playResult && typeof playResult.catch === 'function') playResult.catch(() => {});
+      requestPlayback(video);
       return;
     }
     if (engine === 'unsupported') {
@@ -234,7 +259,7 @@ export function PlayerShell({
       }
       // 新集立即预取（否则要等 timeupdate 的 30s 节流，起播初期无缓存）
       ensurePrefetch(mediaUrl, prefetchAnchor);
-      video.play().catch(() => {});
+      requestPlayback(video);
     });
     // 播放链路恢复（FRAG_LOADED / MANIFEST_PARSED）：静默窗外清零连续失败计数
     hls.on(Hls.Events.FRAG_LOADED, () => recoveryRef.current?.markHealthy());
@@ -346,7 +371,7 @@ export function PlayerShell({
       hotkey: false,
       theme: '#2563eb',
       lang: navigator.language.toLowerCase().startsWith('zh') ? 'zh-cn' : 'en',
-      moreVideoAttr: { crossOrigin: 'anonymous', playsInline: true },
+      moreVideoAttr: { playsInline: true },
       customType: {
         m3u8: (video: HTMLVideoElement, mediaUrl: string) => {
           setupHls(video, mediaUrl, true);
@@ -374,6 +399,7 @@ export function PlayerShell({
       if (startupTimerRef.current) clearTimeout(startupTimerRef.current);
       playbackStartedRef.current = true;
       setShowPoster(false);
+      if (nativeHlsRef.current) mediaHealthyRef.current = true;
       // 仅在媒体真正恢复（有分片进入 buffer）后清错误遮罩：
       // 否则「视频轨挂了、音频轨先播出来」时会清掉遮罩，留下黑屏假死态
       if (mediaHealthyRef.current) setError('');
@@ -569,7 +595,20 @@ export function PlayerShell({
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
           }}
-        />
+        >
+          <button
+            type="button"
+            className="pointer-events-auto absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent px-7 py-4 text-black font-semibold shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            onClick={() => {
+              const video = artRef.current?.video as HTMLVideoElement | undefined;
+              if (!video) return;
+              requestPlayback(video, true);
+            }}
+            aria-label="播放视频"
+          >
+            ▶ 点击播放
+          </button>
+        </div>
       )}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80">
