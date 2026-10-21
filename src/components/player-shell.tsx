@@ -135,7 +135,7 @@ export function PlayerShell({
       abrEwmaDefaultEstimate: 500_000,
       appendErrorMaxRetry: 5,
       // 组合 loader：广告过滤（blockAd 随设置）+ 片段缓存命中（cacheEnabled）
-      loader: createHlsLoader(Hls, { blockAd: p.adFilter }) as unknown as HlsConfig['loader'],
+      loader: createHlsLoader(Hls, { blockAd: p.adFilter, adContext: p.episodeKey }) as unknown as HlsConfig['loader'],
     };
   };
 
@@ -181,14 +181,14 @@ export function PlayerShell({
     const engine = getHlsPlaybackEngine(Hls.isSupported(), nativeMimeSupport);
     if (engine === 'native') {
       if (propsRef.current.adFilter && allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
-        setupHls(video, `${proxyBaseForAdFilter(true)}${encodeURIComponent(mediaUrl)}`, false);
+        setupHls(video, `${proxyBaseForAdFilter(true, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`, false);
         return;
       }
       nativeHlsRef.current = true;
       const fallbackToProxy = () => {
         if (allowProxyFallback && !mediaUrl.startsWith('/api/proxy')) {
           showHint('直连失败，改用代理重试...');
-          setupHls(video, `${proxyBaseForAdFilter(propsRef.current.adFilter)}${encodeURIComponent(mediaUrl)}`, false);
+          setupHls(video, `${proxyBaseForAdFilter(propsRef.current.adFilter, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`, false);
         } else {
           setError('视频播放失败，请尝试其他视频源');
         }
@@ -260,7 +260,7 @@ export function PlayerShell({
             (decision.attempt >= 2 || data.details === 'manifestLoadError')
           ) {
             showHint('直连失败，改用代理重试...');
-            const proxyUrl = `${proxyBaseForAdFilter(propsRef.current.adFilter)}${encodeURIComponent(mediaUrl)}`;
+            const proxyUrl = `${proxyBaseForAdFilter(propsRef.current.adFilter, propsRef.current.episodeKey)}${encodeURIComponent(mediaUrl)}`;
             setupHls(video, proxyUrl, false);
             return;
           }

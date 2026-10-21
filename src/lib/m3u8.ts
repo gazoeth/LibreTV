@@ -9,8 +9,21 @@
 /** 点播代理地址（查询串形式，路径形式会被 EdgeOne 等网关的 URL 归一化破坏，见 proxy-handlers.ts） */
 export const PROXY_BASE = '/api/proxy?url=';
 /** 点播代理地址，并将用户的广告过滤偏好传递到后续分片和子清单请求。 */
-export function proxyBaseForAdFilter(enabled: boolean): string {
-  return `/api/proxy?adFilter=${enabled ? '1' : '0'}&url=`;
+export function proxyBaseForAdFilter(enabled: boolean, adContext?: string): string {
+  const context = enabled && adContext ? `&adContext=${encodeURIComponent(adContext)}` : '';
+  return `/api/proxy?adFilter=${enabled ? '1' : '0'}${context}&url=`;
+}
+/** 代理服务已按同一规则过滤时，客户端不要重复应用有时间窗的单片目规则。 */
+export function isAdContextProxyUrl(url: string, adContext?: string): boolean {
+  if (!adContext) return false;
+  try {
+    const parsed = new URL(url, documentBaseURI() || 'https://libretv.invalid');
+    return (parsed.pathname === '/api/proxy' || parsed.pathname.startsWith('/api/proxy/')) &&
+      parsed.searchParams.get('adFilter') === '1' &&
+      parsed.searchParams.get('adContext') === adContext;
+  } catch {
+    return false;
+  }
 }
 /** 直播流代理地址（查询串形式） */
 export const LIVE_STREAM_BASE = '/api/live/stream?url=';
@@ -339,6 +352,43 @@ function stripRepeatedInterstitialAdGroups(m3u8Content: string): string {
 }
 
 /**
+ * 如意资源《磐石计划：南天门》（vod_id=88825）已核对的中插：13 集均在约 02:48–02:51
+ * 有一个 18–30 秒的独立分组；第 5 集从 02:50.4 开始。该源不给分片加广告 URL 标记，
+ * 且普通分组结构相同，所以只在精确的来源/影片上下文中按这条已确认的时间窗过滤。
+ * 若时间位置或分组结构发生变化则不处理，避免把规则扩散到其他片目。
+ */
+function stripKnownRuyiSeriesAdGroup(m3u8Content: string, adContext?: string): string {
+  if (!/^builtin_ruyi:88825:\d+$/.test(adContext || '')) return m3u8Content;
+
+  const lines = m3u8Content.split('\n');
+  const isDisc = (line: string) => line.trim() === '#EXT-X-DISCONTINUITY';
+  const isSegment = (line: string) => {
+    const value = line.trim();
+    return value !== '' && !value.startsWith('#');
+  };
+  const groups = scanGroups(lines, isDisc, isSegment);
+  let elapsed = 0;
+  const matches: AdGroupScan[] = [];
+  for (const group of groups) {
+    const startsInWindow = elapsed >= 160 && elapsed <= 180;
+    if (group.discLine >= 0 && startsInWindow && group.seconds >= 18 && group.seconds <= 30 && group.count >= 4 && group.count <= 8) {
+      matches.push(group);
+    }
+    elapsed += group.seconds;
+  }
+  // 只在时间与分组结构唯一吻合时移除；不确定或多重匹配时保留原始清单。
+  if (matches.length !== 1) return m3u8Content;
+
+  const target = matches[0];
+  const drop = new Set<number>([target.discLine]);
+  for (let i = target.start; i < target.end; i++) {
+    const value = lines[i].trim();
+    if (!value.startsWith('#EXT-X-KEY') && !value.startsWith('#EXT-X-MAP')) drop.add(i);
+  }
+  return lines.filter((_, index) => !drop.has(index)).join('\n');
+}
+
+/**
  * 剔除「长正片段之间的超短插入段」（URL 无特征的纯时长型中插广告）。
  * 判定：段时长 ≤ 30s，且前后邻段时长都 ≥ 120s。基于原始分组一次性评估，
  * 不级联；dytt 式「全片都是短段」的源因邻段不满足长段条件而完全不触发。
@@ -391,13 +441,13 @@ function stripLeadingDisc(content: string): string {
  *（URL 特征 → 长片间超短中插 → 片头短组），本地重复分片组签名作为补充；
  * 最后统一清掉首分片前失去语义的 DISCONTINUITY。
  */
-export function stripAdGroups(m3u8Content: string): string {
+export function stripAdGroups(m3u8Content: string, adContext?: string): string {
   if (!m3u8Content) return '';
   return stripLeadingDisc(
     stripRepeatedInterstitialAdGroups(
       stripLeadAdGroup(
         stripInterstitialAdGroups(
-          stripMarkedAdGroups(m3u8Content)
+          stripMarkedAdGroups(stripKnownRuyiSeriesAdGroup(m3u8Content, adContext))
         )
       )
     )

@@ -68,7 +68,7 @@ export function decodePathTarget(encodedUrl: string): string {
  * - 未登录仅放行图片目标（豆瓣封面等），且同样受 SSRF 防护约束；
  * - m3u8 文本重写为代理地址，分片/key/map 全部经本站转发，规避上游 CORS。
  */
-export async function handleProxyRequest(req: Request, targetUrl: string, adFilter = false): Promise<Response> {
+export async function handleProxyRequest(req: Request, targetUrl: string, adFilter = false, adContext?: string): Promise<Response> {
   const guarded = guardRequest(req);
   if (guarded && !looksLikeImageUrl(targetUrl)) return guarded;
 
@@ -129,8 +129,8 @@ export async function handleProxyRequest(req: Request, targetUrl: string, adFilt
   // m3u8 文本：重写为代理地址（以重定向后的最终 URL 为 base 解析相对地址）
   if (isM3u8) {
     const text = await response.text();
-    const playlist = adFilter ? stripAdGroups(text) : text;
-    return new NextResponse(rewriteM3u8(playlist, finalUrl, 0, proxyBaseForAdFilter(adFilter)), {
+    const playlist = adFilter ? stripAdGroups(text, adContext) : text;
+    return new NextResponse(rewriteM3u8(playlist, finalUrl, 0, proxyBaseForAdFilter(adFilter, adContext)), {
       status: response.status,
       headers: {
         'Content-Type': 'application/vnd.apple.mpegurl',

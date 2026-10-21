@@ -1,5 +1,5 @@
 import type HlsType from 'hls.js';
-import { stripAdGroups } from './m3u8';
+import { isAdContextProxyUrl, stripAdGroups } from './m3u8';
 import { buildSegmentCacheKey, readCachedSegment, touchMeta } from './video-cache';
 
 /**
@@ -17,6 +17,8 @@ import { buildSegmentCacheKey, readCachedSegment, touchMeta } from './video-cach
  */
 interface LoaderOptions {
   blockAd?: boolean;
+  /** 播放来源上下文，仅用于范围严格限定的已核实广告规则。 */
+  adContext?: string;
   /** 缓存命中探针（设置面板展示命中率用），可缺省 */
   onProbe?: (hit: boolean) => void;
 }
@@ -28,7 +30,7 @@ export function createHlsLoader(
   HlsCtor: typeof HlsType,
   options: LoaderOptions = {}
 ): HlsLoaderCtor {
-  const { blockAd = false, onProbe } = options;
+  const { blockAd = false, adContext, onProbe } = options;
 
   return class CacheFirstHlsLoader extends (HlsCtor.DefaultConfig.loader as HlsLoaderCtor) {
     private destroyed = false;
@@ -51,7 +53,8 @@ export function createHlsLoader(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             callbacks.onSuccess = function (response: any, stats: any, ctx: any, networkDetails: any) {
               if (response.data && typeof response.data === 'string') {
-                response.data = stripAdGroups(response.data);
+                const ruleContext = isAdContextProxyUrl(context.url, adContext) ? undefined : adContext;
+                response.data = stripAdGroups(response.data, ruleContext);
               }
               onSuccess(response, stats, ctx, networkDetails);
             };

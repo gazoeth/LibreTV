@@ -12,5 +12,5 @@ export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const targetUrl = searchParams.get('url');
   if (!targetUrl) return new NextResponse('缺少 url 参数', { status: 400 });
-  return handleProxyRequest(req, targetUrl, searchParams.get('adFilter') === '1');
+  return handleProxyRequest(req, targetUrl, searchParams.get('adFilter') === '1', searchParams.get('adContext') || undefined);
 }

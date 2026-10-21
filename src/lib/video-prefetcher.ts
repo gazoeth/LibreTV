@@ -213,7 +213,7 @@ export class VideoPrefetcher {
 
     let parsed: ParsedPlaylist;
     try {
-      parsed = await parseM3u8Playlist(options.m3u8Url);
+      parsed = await parseM3u8Playlist(options.m3u8Url, 0, undefined, { adContext: options.episodeKey });
     } catch (err) {
       if (generation !== this.generation) return;
       this.setState({

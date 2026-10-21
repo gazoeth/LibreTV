@@ -1,4 +1,4 @@
-import { makeAbsolute, stripAdGroups, documentBaseURI } from './m3u8';
+import { isAdContextProxyUrl, makeAbsolute, stripAdGroups, documentBaseURI } from './m3u8';
 
 /**
  * m3u8 播放列表解析（预取器与离线下载共用）。
@@ -100,6 +100,8 @@ function parseAesConf(line: string): AesConf | undefined {
 export interface ParseOptions {
   /** 剔除广告段（URL 特征的中插段 + 片头无特征插入段）；缺省 true */
   stripLeadAd?: boolean;
+  /** 播放来源上下文，用于同一套解析规则识别已核实的单片目广告段。 */
+  adContext?: string;
 }
 
 /** 解析播放列表：master 递归选档，media 输出分片清单。fetch 失败 / 超限直接抛错由调用方降级 */
@@ -117,7 +119,9 @@ export async function parseM3u8Playlist(
   const res = await fetch(base, { headers: { Accept: '*/*' } });
   if (!res.ok) throw new Error(`m3u8 拉取失败：HTTP ${res.status}`);
   // 剔除片头广告段要在统计时长/分片之前做，下载产物才不会带上广告
-  const text = opts?.stripLeadAd === false ? await res.text() : stripAdGroups(await res.text());
+  const rawText = await res.text();
+  const ruleContext = isAdContextProxyUrl(base, opts?.adContext) ? undefined : opts?.adContext;
+  const text = opts?.stripLeadAd === false ? rawText : stripAdGroups(rawText, ruleContext);
 
   // —— master：收集变体，选档后递归 ——
   if (text.includes('#EXT-X-STREAM-INF')) {
