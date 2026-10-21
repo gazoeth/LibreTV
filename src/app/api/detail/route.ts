@@ -90,7 +90,7 @@ export async function GET(req: Request) {
     }
 
     if (!resolved || resolved.episodes.length === 0) {
-      return NextResponse.json({ error: failures.at(-1)?.reason || '未找到播放资源', attempts: failures }, { status: 404 });
+      return NextResponse.json({ error: failures[failures.length - 1]?.reason || '未找到播放资源', attempts: failures }, { status: 404 });
     }
     assertActive();
     setCache(cacheKey, resolved, DETAIL_CACHE_TTL);

@@ -79,8 +79,8 @@ function LiveContent() {
       if (event.key !== 'Tab') return;
       const items = Array.from(channelPanelRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]):not([hidden]), input, select, a[href], [tabindex="0"]') || []).filter(item => item.getClientRects().length > 0);
       if (!items.length) return;
-      if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
-      else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0].focus(); }
+      if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items[items.length - 1]?.focus(); }
+      else if (!event.shiftKey && document.activeElement === items[items.length - 1]) { event.preventDefault(); items[0].focus(); }
     };
     window.addEventListener('keydown', onKey);
     return () => { unlockScroll(); window.removeEventListener('keydown', onKey); previousFocus?.focus(); };

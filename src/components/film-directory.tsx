@@ -12,6 +12,7 @@ import { FILM_TYPES, isFilmType, type FilmCatalog } from '@/lib/film-types';
 import type { SearchResultItem } from '@/lib/types';
 import { buildWatchUrl } from '@/lib/utils';
 import { ZIP0_LINE_KEYS } from '@/lib/builtin-vod-sources';
+import { subscribeMediaQueryChange } from '@/lib/media-query';
 
 export function FilmDirectory() {
   const params = useSearchParams(); const router = useRouter(); const { verified } = useAuth();
@@ -35,8 +36,8 @@ export function FilmDirectory() {
   useEffect(() => {
     const media = window.matchMedia('(min-width: 761px)');
     const sync = () => setFiltersOpen(media.matches);
-    sync(); media.addEventListener('change', sync);
-    return () => media.removeEventListener('change', sync);
+    sync();
+    return subscribeMediaQueryChange(media, sync);
   }, []);
 
   const [health, setHealth] = useState<Record<string, { state: 'checking' | 'ok' | 'empty' | 'error'; count?: number; ms?: number; category?: string }>>({});

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { subscribeMediaQueryChange } from '@/lib/media-query';
 
 /**
  * 主题上下文：light / dark / system，持久化到 localStorage，默认 dark。
@@ -52,8 +53,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setResolved(apply('system'));
       }
     };
-    media.addEventListener('change', onChange);
-    return () => media.removeEventListener('change', onChange);
+    return subscribeMediaQueryChange(media, onChange);
   }, []);
 
   const setTheme = useCallback((t: ThemeChoice) => {
