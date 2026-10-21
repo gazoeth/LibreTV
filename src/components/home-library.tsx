@@ -64,7 +64,7 @@ export function RecentLibrary() {
     { type: 'tv', title: '日韩剧', english: 'JAPANESE & KOREAN SERIES', homeFeed: 'east-asian-series' },
     { type: 'short', title: '短剧', english: 'RECENT SHORTS' },
     { type: 'variety', title: '2026日韩综艺', english: '2026 JAPANESE & KOREAN SHOWS', homeFeed: 'variety-2026-jpkr' },
-    { type: 'anime', title: '日漫', english: 'JAPANESE ANIME', homeFeed: 'japanese-anime' },
+    { type: 'anime', title: '大陆动漫', english: 'CHINESE ANIMATION', homeFeed: 'chinese-anime' },
   ];
   return <section className="zip-width fd-recent-library" id="recent-updates"><div className="zip-section-heading"><div><p className="zip-eyebrow">LATEST UPDATES</p><h2>近期更新</h2><p className="zip-section-subtitle">从片库直接出发，选中封面即可播放。</p></div><Link className="zip-text-link" href="/films">进入影视片库 ↗</Link></div>{rows.map(row => <RecentRow key={row.type} {...row} />)}</section>;
 }

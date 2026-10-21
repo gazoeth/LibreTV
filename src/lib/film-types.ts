@@ -10,7 +10,7 @@ export const FILM_TYPES = [
   { key: 'sports', name: '体育', caption: '重温赛场上的每个高光。' },
 ] as const;
 export type FilmType = typeof FILM_TYPES[number]['key'];
-export const HOME_CATALOG_KINDS = ['western-movies', 'western-series', 'east-asian-series', 'variety-2026-jpkr', 'japanese-anime'] as const;
+export const HOME_CATALOG_KINDS = ['western-movies', 'western-series', 'east-asian-series', 'variety-2026-jpkr', 'japanese-anime', 'chinese-anime'] as const;
 export type HomeCatalogKind = typeof HOME_CATALOG_KINDS[number];
 export interface FilmCategory { id: string; name: string; parent: string }
 export interface FilmCatalog {

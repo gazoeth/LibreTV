@@ -11,6 +11,8 @@
 
 构建先通过 OpenNext 生成 Next.js 服务端，然后由 `tools/package-cloudflare-pages.mjs` 编译 Pages 高级模式 `_worker.js` 并复制静态资源。`cloudflare/pages-entry.js` 仅导出请求处理函数，构建生成的公共静态路径表及 Next.js 静态 JS 走内建 ASSETS，其他页面及 API 交给 Next.js。原根目录旧 HTML 与 `/functions` 不参与此次输出。
 
+当前仓库仍固定在 Next.js 15.5.28。OpenNext 已将此版本标记为超出上游支持期，构建脚本暂时显式传入 `--dangerouslyUseUnsupportedNextVersion` 以保持 Pages 发布可用；这只是构建时兼容开关，不代表该版本重新获得安全维护。后续升级到受支持的 Next.js 版本后应移除此开关。
+
 这是项目自行实现的 Pages 打包适配，基于 Cloudflare 公开的高级模式协议；不宣称是 OpenNext 官方 Pages 适配器。当前无持久 ISR 缓存、Durable Objects、图片优化或服务自绑定需求；若新增这些能力，需重新验证 Pages 支持范围。
 
 ## 访问保护与回滚

@@ -13,7 +13,7 @@
     "test": "vitest run",
     "audit:hls": "node tools/analyze-hls-sources.mjs",
     "test:hls": "vitest run src/lib/m3u8.test.ts",
-    "build:cloudflare": "opennextjs-cloudflare build --config wrangler.worker.jsonc",
+    "build:cloudflare": "opennextjs-cloudflare build --config wrangler.worker.jsonc --dangerouslyUseUnsupportedNextVersion",
     "preview:cloudflare": "npm run build:cloudflare && opennextjs-cloudflare preview --config wrangler.worker.jsonc",
     "deploy:cloudflare": "npm run build:cloudflare && opennextjs-cloudflare deploy --config wrangler.worker.jsonc",
     "build:pages": "npm run build:cloudflare && node tools/package-cloudflare-pages.mjs",

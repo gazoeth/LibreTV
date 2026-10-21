@@ -188,10 +188,14 @@ export async function getHomeCatalog(kind: HomeCatalogKind, signal?: AbortSignal
       type = 'tv';
       const { children } = getCategoryTree(classes, type);
       selected = children.filter(item => /^(韩剧|韩国剧|日剧|日本剧)$/.test(item.name));
-    } else {
+    } else if (kind === 'japanese-anime') {
       type = 'anime';
       const { children } = getCategoryTree(classes, type);
       selected = children.filter(item => /^日本动漫$/.test(item.name));
+    } else {
+      type = 'anime';
+      const { children } = getCategoryTree(classes, type);
+      selected = children.filter(item => /^(国产动漫|中国动漫|大陆动漫)$/.test(item.name));
     }
     if (!selected.length) throw new Error(`${regionSource.name}：没有符合条件的分类`);
   }
@@ -215,6 +219,8 @@ export async function getHomeCatalog(kind: HomeCatalogKind, signal?: AbortSignal
     if (kind === 'western-series') return WESTERN_AREAS.test(item.area || '') || /欧美剧/.test(item.typeName || '');
     if (kind === 'east-asian-series') return !!eastAsianRegion(item);
     if (kind === 'variety-2026-jpkr') return validYear(item) === 2026 && !!eastAsianRegion(item);
+    // 已按资源站「国产／中国／大陆动漫」子分类请求；这里不强制要求单条数据重复填写地区字段。
+    if (kind === 'chinese-anime') return true;
     return /日本动漫/.test(item.typeName || '') || /日本|japan/i.test(item.area || '');
   };
   const groupedItems = catalogs.map(catalog => catalog.list.filter(accepts));
