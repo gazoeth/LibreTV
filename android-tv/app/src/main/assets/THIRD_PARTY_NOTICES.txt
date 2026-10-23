@@ -1,0 +1,26 @@
+FreeDY TV 2.0
+
+FreeDY/LibreTV: GNU Affero General Public License 3.0 or later.
+Project source and license: https://github.com/gazoeth/LibreTV
+
+AndroidX Media3 / ExoPlayer
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+https://www.apache.org/licenses/LICENSE-2.0
+Source: https://github.com/androidx/media
+
+AndroidX support libraries and annotations
+Copyright (C) The Android Open Source Project
+Licensed under the Apache License, Version 2.0.
+
+Guava / Google common utilities
+Copyright (C) Google Inc.
+Licensed under the Apache License, Version 2.0.
+
+Kotlin standard library (transitive dependency)
+Copyright JetBrains s.r.o. and Kotlin Programming Language contributors.
+Licensed under the Apache License, Version 2.0.
+
+Full Apache-2.0 license text is included as APACHE-2.0.txt in these assets.
+No reference APK code, native libraries, artwork, private endpoints or
+signing material is included.
